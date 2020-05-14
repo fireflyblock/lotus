@@ -233,6 +233,7 @@ type WorkerStruct struct {
 		SealCommit1    func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) `perm:"admin"`
 		SealCommit2    func(context.Context, abi.SectorID, storage.Commit1Out) (storage.Proof, error)                                                                                                             `perm:"admin"`
 		FinalizeSector func(context.Context, abi.SectorID) error                                                                                                                                                  `perm:"admin"`
+		AddPiece       func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error)            `perm:"admin"`
 
 		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, bool) error `perm:"admin"`
 
@@ -860,6 +861,10 @@ func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stor
 
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return w.Internal.Closing(ctx)
+}
+
+func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName)
 }
 
 var _ api.Common = &CommonStruct{}

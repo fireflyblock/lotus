@@ -122,3 +122,11 @@ replace github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
+
+replace github.com/filecoin-project/storage-fsm => ../extern_jiaxing/storage-fsm@v0.0.0-20200427182014-01487d5ad3c8
+
+replace github.com/filecoin-project/sector-storage => ../extern_jiaxing/sector-storage@v0.0.0-20200509005126-ebc27d314ba4
+
+replace github.com/filecoin-project/specs-storage => ../extern_jiaxing/specs-storage@v0.0.0-20200417134612-61b2d91a6102
+
+replace github.com/filecoin-project/go-data-transfer => ../extern_jiaxing/go-data-transfer@v0.3.0

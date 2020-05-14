@@ -73,7 +73,7 @@ func PreSeal(maddr address.Address, pt abi.RegisteredProof, offset abi.SectorNum
 		sid := abi.SectorID{Miner: abi.ActorID(mid), Number: next}
 		next++
 
-		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(ssize).Unpadded(), rand.Reader)
+		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(ssize).Unpadded(), "", "_pledgeSector")
 		if err != nil {
 			return nil, nil, err
 		}

@@ -154,7 +154,7 @@ var runCmd = &cli.Command{
 		var taskTypes []sealtasks.TaskType
 
 		taskTypes = append(taskTypes, sealtasks.TTFetch)
-
+		taskTypes = append(taskTypes, sealtasks.TTAddPiece)
 		if cctx.Bool("precommit1") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
 		}
@@ -162,8 +162,10 @@ var runCmd = &cli.Command{
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
 		}
 		if cctx.Bool("commit") {
+			taskTypes = append(taskTypes, sealtasks.TTCommit1)
 			taskTypes = append(taskTypes, sealtasks.TTCommit2)
 		}
+		taskTypes = append(taskTypes, sealtasks.TTFinalize)
 
 		if len(taskTypes) == 0 {
 			return xerrors.Errorf("no task types specified")
@@ -257,7 +259,7 @@ var runCmd = &cli.Command{
 		remote := stores.NewRemote(localStore, nodeApi, sminfo.AuthHeader())
 
 		// Create / expose the worker
-
+		log.Info("============================ 手动 NEW localworker ==================================")
 		workerApi := &worker{
 			LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 				SealProof: spt,

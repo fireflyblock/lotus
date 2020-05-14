@@ -8,12 +8,11 @@ import (
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-jsonrpc/auth"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	storage2 "github.com/filecoin-project/specs-storage/storage"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/sector-storage"
+	"github.com/filecoin-project/specs-actors/actors/abi"
+	//storage2 "github.com/filecoin-project/specs-storage/storage"
 )
 
 type remoteWorker struct {
@@ -25,9 +24,9 @@ func (r *remoteWorker) NewSector(ctx context.Context, sector abi.SectorID) error
 	return xerrors.New("unsupported")
 }
 
-func (r *remoteWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage2.Data) (abi.PieceInfo, error) {
-	return abi.PieceInfo{}, xerrors.New("unsupported")
-}
+//func (r *remoteWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage2.Data) (abi.PieceInfo, error) {
+//	return abi.PieceInfo{}, xerrors.New("unsupported")
+//}
 
 func connectRemoteWorker(ctx context.Context, fa api.Common, url string) (*remoteWorker, error) {
 	token, err := fa.AuthNew(ctx, []auth.Permission{"admin"})

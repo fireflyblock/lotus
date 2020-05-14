@@ -22,9 +22,13 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
 type SealSerialization uint8
+
+var log = logging.Logger("advmgr")
 
 const (
 	SerializationUnixfs0 SealSerialization = 'u'
@@ -98,6 +102,7 @@ func (st *SectorBlocks) writeRef(dealID abi.DealID, sectorID abi.SectorNumber, o
 }
 
 func (st *SectorBlocks) AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d sealing.DealInfo) (sectorID abi.SectorNumber, err error) {
+	log.Info("============================ SectorBlocks 开始 AddPiece ")
 	sectorID, pieceOffset, err := st.Miner.AllocatePiece(padreader.PaddedSize(uint64(size)))
 	if err != nil {
 		return 0, err
