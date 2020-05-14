@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	sectorstorage "github.com/filecoin-project/sector-storage"
+	"golang.org/x/xerrors"
 	"sort"
 	"strings"
 
@@ -14,11 +17,20 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
+const DefaultAddPieceSize = 5
+const DefaultPre1CommitSize = 4
+const DefaultPre2CommitSize = 1
+const DefaultCommit1Size = 1
+const DefaultCommit2Size = 1
+
 var workersCmd = &cli.Command{
 	Name:  "workers",
 	Usage: "interact with workers",
 	Subcommands: []*cli.Command{
 		workersListCmd,
+		workersTasksCmd,
+		setTasksNumberCmd,
+		getTasksNumberCmd,
 	},
 }
 
@@ -102,6 +114,189 @@ var workersListCmd = &cli.Command{
 				fmt.Printf("\tGPU: %s\n", color.New(gpuCol).Sprintf("%s, %sused", gpu, gpuUse))
 			}
 		}
+
+		return nil
+	},
+}
+
+var workersTasksCmd = &cli.Command{
+	Name:  "tasks",
+	Usage: "list workers tasks",
+	Flags: []cli.Flag{
+		&cli.StringFlag{Name: "hostname"},
+	},
+	Action: func(cctx *cli.Context) error {
+		hostname := cctx.String("hostname")
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		tasks, err := nodeApi.WorkerTasks(ctx, hostname)
+		if err != nil {
+			return err
+		}
+
+		type sortableTasks struct {
+			id uint64
+			storiface.WorkerTasks
+		}
+
+		st := make([]sortableTasks, 0, len(tasks))
+		for id, task := range tasks {
+			st = append(st, sortableTasks{id, task})
+		}
+
+		sort.Slice(st, func(i, j int) bool {
+			return st[i].id < st[j].id
+		})
+
+		for _, task := range st {
+
+			fmt.Printf("Worker %d, host %s\n", task.id, color.MagentaString(task.Info.Hostname))
+			fmt.Printf("finished tasks:count:%d  value:%+v", len(task.FinishedTasks), task.FinishedTasks)
+			fmt.Printf("Computing tasks:\nAddPiece:count:%d  value:%+v\n,Pre1:count:%d  value:%+v\n,Pre2:count:%d  value:%+v\n,Commit1:count:%d  value:%+v\n,Commit2:count:%d value:%+v\n",
+				len(task.ComputingTasks.AddPiece), task.ComputingTasks.AddPiece,
+				len(task.ComputingTasks.PreCommit1), task.ComputingTasks.PreCommit1,
+				len(task.ComputingTasks.PreCommit2), task.ComputingTasks.PreCommit2,
+				len(task.ComputingTasks.SealCommit1), task.ComputingTasks.SealCommit1,
+				len(task.ComputingTasks.SealCommit2), task.ComputingTasks.SealCommit2)
+			fmt.Printf("Waitting tasks:\nAddPiece:count:%d  value:%+v\n,Pre1:count:%d  value:%+v\n,Pre2:count:%d  value:%+v\n,Commit1:count:%d  value:%+v\n,Commit2:count:%d value:%+v\n",
+				len(task.WaitingTasks.AddPiece), task.WaitingTasks.AddPiece,
+				len(task.WaitingTasks.PreCommit1), task.WaitingTasks.PreCommit1,
+				len(task.WaitingTasks.PreCommit2), task.WaitingTasks.PreCommit2,
+				len(task.WaitingTasks.SealCommit1), task.WaitingTasks.SealCommit1,
+				len(task.WaitingTasks.SealCommit2), task.WaitingTasks.SealCommit2)
+		}
+
+		return nil
+	},
+}
+
+var setTasksNumberCmd = &cli.Command{
+	Name:  "set-tasks-number",
+	Usage: "Set the number of acceptable tasks",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "hostname",
+			Usage: "the hostname of the worker to be queried",
+		},
+		&cli.UintFlag{
+			Name:  "apsize",
+			Usage: "the number of addpiece tasks the worker can accept",
+			Value: DefaultAddPieceSize,
+		},
+		&cli.UintFlag{
+			Name:  "p1size",
+			Usage: "the number of pre1commit tasks the worker can accept",
+			Value: DefaultPre1CommitSize,
+		},
+		&cli.UintFlag{
+			Name:  "p2size",
+			Usage: "the number of pre2commit tasks the worker can accept",
+			Value: DefaultPre2CommitSize,
+		},
+		&cli.UintFlag{
+			Name:  "c1size",
+			Usage: "the number of commit1 tasks the worker can accept",
+			Value: DefaultCommit1Size,
+		},
+		&cli.UintFlag{
+			Name:  "c2size",
+			Usage: "the number of commit2 tasks the worker can accept",
+			Value: DefaultCommit2Size,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		hostname := cctx.String("hostname")
+		if hostname == "" {
+			return xerrors.Errorf("hostname cannot be empty")
+		}
+		tc := &sectorstorage.TaskConfig{}
+
+		apSize := cctx.Uint("apsize")
+		if apSize > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", apSize)
+		}
+		tc.AddPieceSize = uint8(apSize)
+
+		p1Size := cctx.Uint("p1size")
+		if p1Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", p1Size)
+		}
+		tc.Pre1CommitSize = uint8(p1Size)
+
+		p2Size := cctx.Uint("p2size")
+		if p2Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", p2Size)
+		}
+		tc.Pre2CommitSize = uint8(p2Size)
+
+		c1Size := cctx.Uint("c1size")
+		if c1Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", c1Size)
+		}
+		tc.Commit1 = uint8(c1Size)
+
+		c2Size := cctx.Uint("c2size")
+		if c2Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", c2Size)
+		}
+		tc.Commit2 = uint8(c2Size)
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		data, err := json.Marshal(tc)
+		if err != nil {
+			return err
+		}
+		err = nodeApi.WorkerConf(ctx, hostname, data)
+
+		if err != nil {
+			return xerrors.Errorf("set tasks number err: %w", err)
+		}
+		fmt.Printf("Successful set tasks numbe\n")
+		return nil
+	},
+}
+
+var getTasksNumberCmd = &cli.Command{
+	Name:  "get-tasks-number",
+	Usage: "get the number of acceptable tasks",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "hostname",
+			Usage: "the hostname of the worker to be queried",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		hostname := cctx.String("hostname")
+		if hostname == "" {
+			return xerrors.Errorf("hostname cannot be empty")
+		}
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		tc, err := nodeApi.GetWorkerConf(ctx, hostname)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Worker:    【%s】 \nTaskConfig: %+v\n", hostname, tc)
 
 		return nil
 	},

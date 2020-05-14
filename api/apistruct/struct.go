@@ -2,6 +2,7 @@ package apistruct
 
 import (
 	"context"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -207,8 +208,11 @@ type StorageMinerStruct struct {
 		SectorsRefs   func(context.Context) (map[string][]api.SealedRef, error)       `perm:"read"`
 		SectorsUpdate func(context.Context, abi.SectorNumber, api.SectorState) error  `perm:"write"`
 
-		WorkerConnect func(context.Context, string) error                             `perm:"admin"` // TODO: worker perm
-		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error) `perm:"admin"`
+		WorkerConnect func(context.Context, string) error                                          `perm:"admin"` // TODO: worker perm
+		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error)              `perm:"admin"`
+		WorkerTasks   func(context.Context, string) (map[uint64]storiface.WorkerTasks, error)      `perm:"admin"`
+		WorkerConf    func(context.Context, string, []byte) error                                  `perm:"admin"`
+		GetWorkerConf func(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) `perm:"admin"`
 
 		StorageList          func(context.Context) (map[stores.ID][]stores.Decl, error)                                                                                    `perm:"admin"`
 		StorageLocal         func(context.Context) (map[stores.ID]string, error)                                                                                           `perm:"admin"`
@@ -253,6 +257,8 @@ type WorkerStruct struct {
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) error                   `perm:"admin"`
 
 		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
+
+		FetchRealData func(ctx context.Context, id abi.SectorID) error `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -793,6 +799,18 @@ func (c *StorageMinerStruct) WorkerStats(ctx context.Context) (map[uint64]storif
 	return c.Internal.WorkerStats(ctx)
 }
 
+func (c *StorageMinerStruct) WorkerTasks(ctx context.Context, hostname string) (map[uint64]storiface.WorkerTasks, error) {
+	return c.Internal.WorkerTasks(ctx, hostname)
+}
+
+func (c *StorageMinerStruct) WorkerConf(ctx context.Context, hostname string, config []byte) error {
+	return c.Internal.WorkerConf(ctx, hostname, config)
+}
+
+func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) {
+	return c.Internal.GetWorkerConf(ctx, hostname)
+}
+
 func (c *StorageMinerStruct) StorageAttach(ctx context.Context, si stores.StorageInfo, st stores.FsStat) error {
 	return c.Internal.StorageAttach(ctx, si, st)
 }
@@ -929,6 +947,10 @@ func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.S
 
 func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
 	return w.Internal.Fetch(ctx, id, fileType, ptype, am)
+}
+
+func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
+	return w.Internal.FetchRealData(ctx, id)
 }
 
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {

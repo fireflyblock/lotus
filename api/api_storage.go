@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
-
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-address"
@@ -44,7 +44,9 @@ type StorageMiner interface {
 	// WorkerConnect tells the node to connect to workers RPC
 	WorkerConnect(context.Context, string) error
 	WorkerStats(context.Context) (map[uint64]storiface.WorkerStats, error)
-
+	WorkerTasks(ctx context.Context, hostname string) (map[uint64]storiface.WorkerTasks, error)
+	WorkerConf(ctx context.Context, hostname string, config []byte) error
+	GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error)
 	stores.SectorIndex
 
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error
