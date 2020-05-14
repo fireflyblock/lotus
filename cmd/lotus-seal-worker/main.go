@@ -34,6 +34,11 @@ import (
 var log = logging.Logger("main")
 
 const FlagStorageRepo = "workerrepo"
+const DefaultAddPieceSize = 5
+const DefaultPre1CommitSize = 4
+const DefaultPre2CommitSize = 1
+const DefaultCommit1Size = 1
+const DefaultCommit2Size = 1
 
 func main() {
 	lotuslog.SetupLogLevels()
@@ -42,6 +47,7 @@ func main() {
 
 	local := []*cli.Command{
 		runCmd,
+		setTasksNumberCmd,
 	}
 
 	app := &cli.App{
@@ -100,8 +106,13 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "commit",
-			Usage: "enable commit (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
+			Name:  "commit1",
+			Usage: "enable commit1 (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
+			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:  "commit2",
+			Usage: "enable commit2 (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
 			Value: true,
 		},
 	},
@@ -147,7 +158,7 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		if cctx.Bool("commit") {
+		if cctx.Bool("commit1") {
 			if err := paramfetch.GetParams(ctx, build.ParametersJSON(), uint64(ssize)); err != nil {
 				return xerrors.Errorf("get params: %w", err)
 			}
@@ -155,17 +166,21 @@ var runCmd = &cli.Command{
 
 		var taskTypes []sealtasks.TaskType
 
-		taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTCommit1, sealtasks.TTFinalize)
-
+		taskTypes = append(taskTypes, sealtasks.TTFetch)
 		if cctx.Bool("precommit1") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
+			taskTypes = append(taskTypes, sealtasks.TTAddPiece)
 		}
 		if cctx.Bool("precommit2") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
 		}
-		if cctx.Bool("commit") {
+		if cctx.Bool("commit1") {
+			taskTypes = append(taskTypes, sealtasks.TTCommit1)
+		}
+		if cctx.Bool("commit2") {
 			taskTypes = append(taskTypes, sealtasks.TTCommit2)
 		}
+		taskTypes = append(taskTypes, sealtasks.TTFinalize)
 
 		if len(taskTypes) == 0 {
 			return xerrors.Errorf("no task types specified")
@@ -259,7 +274,8 @@ var runCmd = &cli.Command{
 		remote := stores.NewRemote(localStore, nodeApi, sminfo.AuthHeader())
 
 		// Create / expose the worker
-
+		log.Infof("============================ 手动 NEW localworker =========\n SealProof:%+v \n,TaskTypes:%+v \n,remote:%+v \n,localStore:%+v \n,nodeApi:,%+v \n",
+			spt, taskTypes, remote, localStore, nodeApi)
 		workerApi := &worker{
 			LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 				SealProof: spt,
@@ -307,6 +323,7 @@ var runCmd = &cli.Command{
 		log.Info("Waiting for tasks")
 
 		go func() {
+			log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
 			if err := nodeApi.WorkerConnect(ctx, "ws://"+cctx.String("address")+"/rpc/v0"); err != nil {
 				log.Errorf("Registering worker failed: %+v", err)
 				cancel()
@@ -315,5 +332,93 @@ var runCmd = &cli.Command{
 		}()
 
 		return srv.Serve(nl)
+	},
+}
+
+var setTasksNumberCmd = &cli.Command{
+	Name:  "set-tasks-number",
+	Usage: "Set the number of acceptable tasks",
+	Flags: []cli.Flag{
+		&cli.UintFlag{
+			Name:  "apsize",
+			Usage: "the number of addpiece tasks the worker can accept",
+			Value: DefaultAddPieceSize,
+		},
+		&cli.UintFlag{
+			Name:  "p1size",
+			Usage: "the number of pre1commit tasks the worker can accept",
+			Value: DefaultPre1CommitSize,
+		},
+		&cli.UintFlag{
+			Name:  "p2size",
+			Usage: "the number of pre2commit tasks the worker can accept",
+			Value: DefaultPre2CommitSize,
+		},
+		&cli.UintFlag{
+			Name:  "c1size",
+			Usage: "the number of commit1 tasks the worker can accept",
+			Value: DefaultCommit1Size,
+		},
+		&cli.UintFlag{
+			Name:  "c2size",
+			Usage: "the number of commit2 tasks the worker can accept",
+			Value: DefaultCommit2Size,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return xerrors.Errorf("getting hostname : %w", err)
+		}
+		tc := &sectorstorage.TaskConfig{}
+
+		apSize := cctx.Uint("apsize")
+		if apSize > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", apSize)
+		}
+		tc.AddPieceSize = uint8(apSize)
+
+		p1Size := cctx.Uint("p1size")
+		if p1Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", p1Size)
+		}
+		tc.Pre1CommitSize = uint8(p1Size)
+
+		p2Size := cctx.Uint("p2size")
+		if p2Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", p2Size)
+		}
+		tc.Pre2CommitSize = uint8(p2Size)
+
+		c1Size := cctx.Uint("c1size")
+		if c1Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", c1Size)
+		}
+		tc.Commit1 = uint8(c1Size)
+
+		c2Size := cctx.Uint("c2size")
+		if c2Size > 255 {
+			return xerrors.Errorf("constant %d overflows uint8", c2Size)
+		}
+		tc.Commit2 = uint8(c2Size)
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		data, err := json.Marshal(tc)
+		if err != nil {
+			return err
+		}
+		err = nodeApi.WorkerConf(ctx, hostname, data)
+
+		if err != nil {
+			return xerrors.Errorf("set tasks number err: %w", err)
+		}
+		return nil
 	},
 }

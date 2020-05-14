@@ -23,6 +23,8 @@ type WorkerAPI interface {
 	Paths(context.Context) ([]stores.StoragePath, error)
 	Info(context.Context) (storiface.WorkerInfo, error)
 
+	FetchRealData(ctx context.Context, id abi.SectorID) error
+
 	storage.Sealer
 
 	MoveStorage(ctx context.Context, sector abi.SectorID) error
