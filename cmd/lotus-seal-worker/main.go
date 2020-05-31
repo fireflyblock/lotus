@@ -259,7 +259,8 @@ var runCmd = &cli.Command{
 		remote := stores.NewRemote(localStore, nodeApi, sminfo.AuthHeader())
 
 		// Create / expose the worker
-		log.Info("============================ 手动 NEW localworker ==================================")
+		log.Infof("============================ 手动 NEW localworker =========\n SealProof:%+v \n,TaskTypes:%+v \n,remote:%+v \n,localStore:%+v \n,nodeApi:,%+v \n",
+			spt, taskTypes, remote, localStore, nodeApi)
 		workerApi := &worker{
 			LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 				SealProof: spt,
@@ -307,6 +308,7 @@ var runCmd = &cli.Command{
 		log.Info("Waiting for tasks")
 
 		go func() {
+			log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
 			if err := nodeApi.WorkerConnect(ctx, "ws://"+cctx.String("address")+"/rpc/v0"); err != nil {
 				log.Errorf("Registering worker failed: %+v", err)
 				cancel()
