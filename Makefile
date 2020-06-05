@@ -167,6 +167,13 @@ bench:
 .PHONY: bench
 BINS+=bench
 
+bench-multi:
+	rm -f bench-multi
+	go build -o bench-multi ./cmd/lotus-bench-multi
+	go run github.com/GeertJohan/go.rice/rice append --exec bench-multi -i ./build
+.PHONY: bench-multi
+BINS+=bench-multi
+
 stats:
 	rm -f stats
 	go build -o stats ./tools/stats
