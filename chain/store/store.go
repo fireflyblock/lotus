@@ -18,7 +18,6 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/util/adt"
 
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/metrics"
@@ -62,6 +61,8 @@ type ChainStore struct {
 	tstLk   sync.Mutex
 	tipsets map[abi.ChainEpoch][]cid.Cid
 
+	cindex *ChainIndex
+
 	reorgCh          chan<- reorg
 	headChangeNotifs []func(rev, app []*types.TipSet) error
 
@@ -83,6 +84,10 @@ func NewChainStore(bs bstore.Blockstore, ds dstore.Batching, vmcalls runtime.Sys
 		tsCache:  tsc,
 		vmcalls:  vmcalls,
 	}
+
+	ci := NewChainIndex(cs.LoadTipSet)
+
+	cs.cindex = ci
 
 	cs.reorgCh = cs.reorgWorker(context.TODO())
 
@@ -940,35 +945,31 @@ func (cs *ChainStore) GetTipsetByHeight(ctx context.Context, h abi.ChainEpoch, t
 	}
 
 	if h > ts.Height() {
-		return nil, xerrors.Errorf("looking for tipset with height less than start point")
+		return nil, xerrors.Errorf("looking for tipset with height greater than start point")
 	}
 
 	if h == ts.Height() {
 		return ts, nil
 	}
 
-	if ts.Height()-h > build.ForkLengthThreshold {
-		log.Warnf("expensive call to GetTipsetByHeight, seeking %d levels", ts.Height()-h)
+	lbts, err := cs.cindex.GetTipsetByHeight(ctx, ts, h)
+	if err != nil {
+		return nil, err
 	}
 
-	for {
-		pts, err := cs.LoadTipSet(ts.Parents())
+	if lbts.Height() < h {
+		log.Warnf("chain index returned the wrong tipset at height %d, using slow retrieval", h)
+		lbts, err = cs.cindex.GetTipsetByHeightWithoutCache(ts, h)
 		if err != nil {
 			return nil, err
 		}
-
-		if h > pts.Height() {
-			if prev {
-				return pts, nil
-			}
-			return ts, nil
-		}
-		if h == pts.Height() {
-			return pts, nil
-		}
-
-		ts = pts
 	}
+
+	if lbts.Height() == h || !prev {
+		return lbts, nil
+	}
+
+	return cs.LoadTipSet(lbts.Parents())
 }
 
 func recurseLinks(bs blockstore.Blockstore, root cid.Cid, in []cid.Cid) ([]cid.Cid, error) {
