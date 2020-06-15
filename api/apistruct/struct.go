@@ -255,9 +255,9 @@ type WorkerStruct struct {
 
 		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
 
-		FetchRealData func(ctx context.Context, id abi.SectorID) error `perm:"admin"`
-
-		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
+		FetchRealData func(ctx context.Context, id abi.SectorID) error           `perm:"admin"`
+		GetWorkScope  func(ctx context.Context) (sectorstorage.ScopeType, error) `perm:"admin"`
+		Closing       func(context.Context) (<-chan struct{}, error)             `perm:"admin"`
 	}
 }
 
@@ -938,6 +938,10 @@ func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error
 	return w.Internal.FetchRealData(ctx, id)
 }
 
+//GetWorkScope(ctx context.Context) (ScopeType, error)
+func (w *WorkerStruct) GetWorkScope(ctx context.Context) (sectorstorage.ScopeType, error) {
+	return w.Internal.GetWorkScope(ctx)
+}
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return w.Internal.Closing(ctx)
 }

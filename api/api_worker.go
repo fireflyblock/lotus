@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -24,6 +25,7 @@ type WorkerAPI interface {
 	Info(context.Context) (storiface.WorkerInfo, error)
 
 	FetchRealData(ctx context.Context, id abi.SectorID) error
+	GetWorkScope(ctx context.Context) (sectorstorage.ScopeType, error)
 
 	storage.Sealer
 
