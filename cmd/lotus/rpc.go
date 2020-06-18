@@ -28,7 +28,7 @@ import (
 
 var log = logging.Logger("main")
 
-func serveRPC(a api.FullNode, stop node.StopFunc, addr multiaddr.Multiaddr) error {
+func serveRPC(a api.FullNode, stop node.StopFunc, addr multiaddr.Multiaddr, shutdownCh <-chan struct{}) error {
 	rpcServer := jsonrpc.NewServer()
 	rpcServer.Register("Filecoin", apistruct.PermissionedFullAPI(a))
 
@@ -62,17 +62,23 @@ func serveRPC(a api.FullNode, stop node.StopFunc, addr multiaddr.Multiaddr) erro
 
 	srv := &http.Server{Handler: http.DefaultServeMux}
 
-	sigChan := make(chan os.Signal, 2)
+	sigCh := make(chan os.Signal, 2)
 	go func() {
-		<-sigChan
+		select {
+		case <-sigCh:
+		case <-shutdownCh:
+		}
+
+		log.Warn("Shutting down...")
 		if err := srv.Shutdown(context.TODO()); err != nil {
 			log.Errorf("shutting down RPC server failed: %s", err)
 		}
 		if err := stop(context.TODO()); err != nil {
 			log.Errorf("graceful shutting down failed: %s", err)
 		}
+		log.Warn("Graceful shutdown successful")
 	}()
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
 	return srv.Serve(manet.NetListener(lst))
 }
@@ -85,14 +91,14 @@ func handleImport(a *impl.FullNodeAPI) func(w http.ResponseWriter, r *http.Reque
 		}
 		if !auth.HasPerm(r.Context(), nil, apistruct.PermWrite) {
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(struct{ Error string }{"unauthorized: missing write permission"})
+			_ = json.NewEncoder(w).Encode(struct{ Error string }{"unauthorized: missing write permission"})
 			return
 		}
 
 		c, err := a.ClientImportLocal(r.Context(), r.Body)
 		if err != nil {
 			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(struct{ Error string }{err.Error()})
+			_ = json.NewEncoder(w).Encode(struct{ Error string }{err.Error()})
 			return
 		}
 		w.WriteHeader(200)

@@ -17,7 +17,7 @@ MODULES:=
 CLEAN:=
 BINS:=
 
-ldflags=-X=github.com/filecoin-project/lotus/build.CurrentCommit='+git$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))'
+ldflags=-X=github.com/filecoin-project/lotus/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))
 ifneq ($(strip $(LDFLAGS)),)
 	ldflags+=-extldflags=$(LDFLAGS)
 endif
@@ -132,7 +132,7 @@ benchmarks:
 	@curl -X POST 'http://benchmark.kittyhawk.wtf/benchmark' -d '@bench.json' -u "${benchmark_http_cred}"
 .PHONY: benchmarks
 
-pond: build
+pond: 2k
 	go build -o pond ./lotuspond
 	(cd lotuspond/front && npm i && CI=false npm run build)
 .PHONY: pond
@@ -166,6 +166,13 @@ bench:
 	go run github.com/GeertJohan/go.rice/rice append --exec bench -i ./build
 .PHONY: bench
 BINS+=bench
+
+bench-multi:
+	rm -f bench-multi
+	go build -o bench-multi ./cmd/lotus-bench-multi
+	go run github.com/GeertJohan/go.rice/rice append --exec bench-multi -i ./build
+.PHONY: bench-multi
+BINS+=bench-multi
 
 stats:
 	rm -f stats

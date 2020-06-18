@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/crypto"
 	"golang.org/x/xerrors"
 
-	"gopkg.in/urfave/cli.v2"
+	"github.com/urfave/cli/v2"
 )
 
 func init() {
@@ -72,7 +72,7 @@ func init() {
 			uts := head.MinTimestamp() + uint64(build.BlockDelay)
 			nheight := head.Height() + 1
 			blk, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
-				addr, head.Key(), ticket, nil, nil, msgs, nheight, uts, nil,
+				addr, head.Key(), ticket, &types.ElectionProof{}, nil, msgs, nheight, uts, gen.ValidWpostForTesting,
 			})
 			if err != nil {
 				return xerrors.Errorf("creating block: %w", err)

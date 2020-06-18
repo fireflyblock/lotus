@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/filecoin-project/lotus/build"
 
 	"github.com/filecoin-project/go-address"
-	"gopkg.in/urfave/cli.v2"
+	"github.com/urfave/cli/v2"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -29,6 +30,8 @@ var verifRegCmd = &cli.Command{
 		verifRegVerifyClientCmd,
 		verifRegListVerifiersCmd,
 		verifRegListClientsCmd,
+		verifRegCheckClientCmd,
+		verifRegCheckVerifierCmd,
 	},
 }
 
@@ -83,7 +86,7 @@ var verifRegAddVerifierCmd = &cli.Command{
 
 		fmt.Printf("message sent, now waiting on cid: %s\n", smsg.Cid())
 
-		mwait, err := api.StateWaitMsg(ctx, smsg.Cid())
+		mwait, err := api.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence)
 		if err != nil {
 			return err
 		}
@@ -159,7 +162,7 @@ var verifRegVerifyClientCmd = &cli.Command{
 
 		fmt.Printf("message sent, now waiting on cid: %s\n", smsg.Cid())
 
-		mwait, err := api.StateWaitMsg(ctx, smsg.Cid())
+		mwait, err := api.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence)
 		if err != nil {
 			return err
 		}
@@ -271,6 +274,104 @@ var verifRegListClientsCmd = &cli.Command{
 		}); err != nil {
 			return err
 		}
+
+		return nil
+	},
+}
+
+var verifRegCheckClientCmd = &cli.Command{
+	Name:  "check-client",
+	Usage: "check verified client remaining bytes",
+	Action: func(cctx *cli.Context) error {
+		if !cctx.Args().Present() {
+			return fmt.Errorf("must specify client address to check")
+		}
+
+		caddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		act, err := api.StateGetActor(ctx, builtin.VerifiedRegistryActorAddr, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+
+		apibs := apibstore.NewAPIBlockstore(api)
+		cst := cbor.NewCborStore(apibs)
+
+		var st verifreg.State
+		if err := cst.Get(ctx, act.Head, &st); err != nil {
+			return err
+		}
+
+		vh, err := hamt.LoadNode(ctx, cst, st.VerifiedClients)
+		if err != nil {
+			return err
+		}
+
+		var dcap verifreg.DataCap
+		if err := vh.Find(ctx, string(caddr.Bytes()), &dcap); err != nil {
+			return err
+		}
+
+		fmt.Println(dcap)
+
+		return nil
+	},
+}
+
+var verifRegCheckVerifierCmd = &cli.Command{
+	Name:  "check-verifier",
+	Usage: "check verifiers remaining bytes",
+	Action: func(cctx *cli.Context) error {
+		if !cctx.Args().Present() {
+			return fmt.Errorf("must specify verifier address to check")
+		}
+
+		vaddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		act, err := api.StateGetActor(ctx, builtin.VerifiedRegistryActorAddr, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+
+		apibs := apibstore.NewAPIBlockstore(api)
+		cst := cbor.NewCborStore(apibs)
+
+		var st verifreg.State
+		if err := cst.Get(ctx, act.Head, &st); err != nil {
+			return err
+		}
+
+		vh, err := hamt.LoadNode(ctx, cst, st.Verifiers)
+		if err != nil {
+			return err
+		}
+
+		var dcap verifreg.DataCap
+		if err := vh.Find(ctx, string(vaddr.Bytes()), &dcap); err != nil {
+			return err
+		}
+
+		fmt.Println(dcap)
 
 		return nil
 	},

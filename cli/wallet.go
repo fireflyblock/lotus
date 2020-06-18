@@ -15,7 +15,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/crypto"
 	"golang.org/x/xerrors"
 
-	"gopkg.in/urfave/cli.v2"
+	"github.com/urfave/cli/v2"
 )
 
 var walletCmd = &cli.Command{
@@ -31,6 +31,7 @@ var walletCmd = &cli.Command{
 		walletSetDefault,
 		walletSign,
 		walletVerify,
+		walletDelete,
 	},
 }
 
@@ -112,7 +113,12 @@ var walletBalance = &cli.Command{
 			return err
 		}
 
-		fmt.Printf("%s\n", types.FIL(balance))
+		if balance.Equals(types.NewInt(0)) {
+			fmt.Printf("%s (warning: may display 0 if chain sync in progress)\n", types.FIL(balance))
+		} else {
+			fmt.Printf("%s\n", types.FIL(balance))
+		}
+
 		return nil
 	},
 }
@@ -373,5 +379,30 @@ var walletVerify = &cli.Command{
 			fmt.Println("invalid")
 			return NewCliError("CLI Verify called with invalid signature")
 		}
+	},
+}
+
+var walletDelete = &cli.Command{
+	Name:      "delete",
+	Usage:     "Delete an account from the wallet",
+	ArgsUsage: "<address> ",
+	Action: func(cctx *cli.Context) error {
+		api, closer, err := GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := ReqContext(cctx)
+
+		if !cctx.Args().Present() || cctx.NArg() != 1 {
+			return fmt.Errorf("must specify address to delete")
+		}
+
+		addr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		return api.WalletDelete(ctx, addr)
 	},
 }

@@ -8,18 +8,47 @@ import (
 	"text/tabwriter"
 
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multibase"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-	"gopkg.in/urfave/cli.v2"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 
+	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 )
+
+var CidBaseFlag = cli.StringFlag{
+	Name:        "cid-base",
+	Hidden:      true,
+	Value:       "base32",
+	Usage:       "Multibase encoding used for version 1 CIDs in output.",
+	DefaultText: "base32",
+}
+
+// GetCidEncoder returns an encoder using the `cid-base` flag if provided, or
+// the default (Base32) encoder if not.
+func GetCidEncoder(cctx *cli.Context) (cidenc.Encoder, error) {
+	val := cctx.String("cid-base")
+
+	e := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
+
+	if val != "" {
+		var err error
+		e.Base, err = multibase.EncoderByName(val)
+		if err != nil {
+			return e, err
+		}
+	}
+
+	return e, nil
+}
 
 var clientCmd = &cli.Command{
 	Name:  "client",
@@ -46,6 +75,7 @@ var clientImportCmd = &cli.Command{
 			Name:  "car",
 			Usage: "import from a car file instead of a regular file",
 		},
+		&CidBaseFlag,
 	},
 	Action: func(cctx *cli.Context) error {
 		api, closer, err := GetFullNodeAPI(cctx)
@@ -67,7 +97,14 @@ var clientImportCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(c.String())
+
+		encoder, err := GetCidEncoder(cctx)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(encoder.Encode(c))
+
 		return nil
 	},
 }
@@ -76,6 +113,9 @@ var clientCommPCmd = &cli.Command{
 	Name:      "commP",
 	Usage:     "calculate the piece-cid (commP) of a CAR file",
 	ArgsUsage: "[inputFile minerAddress]",
+	Flags: []cli.Flag{
+		&CidBaseFlag,
+	},
 	Action: func(cctx *cli.Context) error {
 		api, closer, err := GetFullNodeAPI(cctx)
 		if err != nil {
@@ -94,12 +134,17 @@ var clientCommPCmd = &cli.Command{
 		}
 
 		ret, err := api.ClientCalcCommP(ctx, cctx.Args().Get(0), miner)
-
 		if err != nil {
 			return err
 		}
-		fmt.Println("CID: ", ret.Root)
-		fmt.Println("Piece size: ", ret.Size)
+
+		encoder, err := GetCidEncoder(cctx)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("CID: ", encoder.Encode(ret.Root))
+		fmt.Println("Piece size: ", types.SizeStr(types.NewInt(uint64(ret.Size))))
 		return nil
 	},
 }
@@ -137,6 +182,9 @@ var clientCarGenCmd = &cli.Command{
 var clientLocalCmd = &cli.Command{
 	Name:  "local",
 	Usage: "List locally imported data",
+	Flags: []cli.Flag{
+		&CidBaseFlag,
+	},
 	Action: func(cctx *cli.Context) error {
 		api, closer, err := GetFullNodeAPI(cctx)
 		if err != nil {
@@ -149,8 +197,14 @@ var clientLocalCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		encoder, err := GetCidEncoder(cctx)
+		if err != nil {
+			return err
+		}
+
 		for _, v := range list {
-			fmt.Printf("%s %s %d %s\n", v.Key, v.FilePath, v.Size, v.Status)
+			fmt.Printf("%s %s %s %s\n", encoder.Encode(v.Key), v.FilePath, types.SizeStr(types.NewInt(v.Size)), v.Status)
 		}
 		return nil
 	},
@@ -178,6 +232,7 @@ var clientDealCmd = &cli.Command{
 			Usage: "specify the epoch that the deal should start at",
 			Value: -1,
 		},
+		&CidBaseFlag,
 	},
 	Action: func(cctx *cli.Context) error {
 		api, closer, err := GetFullNodeAPI(cctx)
@@ -263,7 +318,13 @@ var clientDealCmd = &cli.Command{
 			return err
 		}
 
-		fmt.Println(proposal)
+		encoder, err := GetCidEncoder(cctx)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(encoder.Encode(*proposal))
+
 		return nil
 	},
 }
@@ -311,7 +372,7 @@ var clientFindCmd = &cli.Command{
 				fmt.Printf("ERR %s@%s: %s\n", offer.Miner, offer.MinerPeerID, offer.Err)
 				continue
 			}
-			fmt.Printf("RETRIEVAL %s@%s-%sfil-%db\n", offer.Miner, offer.MinerPeerID, types.FIL(offer.MinPrice), offer.Size)
+			fmt.Printf("RETRIEVAL %s@%s-%sfil-%s\n", offer.Miner, offer.MinerPeerID, types.FIL(offer.MinPrice), types.SizeStr(types.NewInt(offer.Size)))
 		}
 
 		return nil
@@ -331,6 +392,10 @@ var clientRetrieveCmd = &cli.Command{
 			Name:  "car",
 			Usage: "export to a car file instead of a regular file",
 		},
+		&cli.StringFlag{
+			Name:  "miner",
+			Usage: "miner address for retrieval, if not present it'll use local discovery",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 2 {
@@ -338,7 +403,7 @@ var clientRetrieveCmd = &cli.Command{
 			return nil
 		}
 
-		api, closer, err := GetFullNodeAPI(cctx)
+		fapi, closer, err := GetFullNodeAPI(cctx)
 		if err != nil {
 			return err
 		}
@@ -349,7 +414,7 @@ var clientRetrieveCmd = &cli.Command{
 		if cctx.String("address") != "" {
 			payer, err = address.NewFromString(cctx.String("address"))
 		} else {
-			payer, err = api.WalletDefaultAddress(ctx)
+			payer, err = fapi.WalletDefaultAddress(ctx)
 		}
 		if err != nil {
 			return err
@@ -372,23 +437,39 @@ var clientRetrieveCmd = &cli.Command{
 			return nil
 		}*/ // TODO: fix
 
-		offers, err := api.ClientFindData(ctx, file)
-		if err != nil {
-			return err
+		var offer api.QueryOffer
+		minerStrAddr := cctx.String("miner")
+		if minerStrAddr == "" { // Local discovery
+			offers, err := fapi.ClientFindData(ctx, file)
+			if err != nil {
+				return err
+			}
+
+			// TODO: parse offer strings from `client find`, make this smarter
+			if len(offers) < 1 {
+				fmt.Println("Failed to find file")
+				return nil
+			}
+			offer = offers[0]
+		} else { // Directed retrieval
+			minerAddr, err := address.NewFromString(minerStrAddr)
+			if err != nil {
+				return err
+			}
+			offer, err = fapi.ClientMinerQueryOffer(ctx, file, minerAddr)
+			if err != nil {
+				return err
+			}
 		}
-
-		// TODO: parse offer strings from `client find`, make this smarter
-
-		if len(offers) < 1 {
-			fmt.Println("Failed to find file")
-			return nil
+		if offer.Err != "" {
+			return fmt.Errorf("The received offer errored: %s", offer.Err)
 		}
 
 		ref := &lapi.FileRef{
 			Path:  cctx.Args().Get(1),
 			IsCAR: cctx.Bool("car"),
 		}
-		if err := api.ClientRetrieve(ctx, offers[0].Order(payer), ref); err != nil {
+		if err := fapi.ClientRetrieve(ctx, offer.Order(payer), ref); err != nil {
 			return xerrors.Errorf("Retrieval Failed: %w", err)
 		}
 
@@ -446,11 +527,11 @@ var clientQueryAskCmd = &cli.Command{
 				return xerrors.Errorf("failed to get peerID for miner: %w", err)
 			}
 
-			if mi.PeerId == peer.ID("SETME") {
+			if peer.ID(mi.PeerId) == peer.ID("SETME") {
 				return fmt.Errorf("the miner hasn't initialized yet")
 			}
 
-			pid = mi.PeerId
+			pid = peer.ID(mi.PeerId)
 		}
 
 		ask, err := api.ClientQueryAsk(ctx, pid, maddr)
@@ -460,7 +541,7 @@ var clientQueryAskCmd = &cli.Command{
 
 		fmt.Printf("Ask: %s\n", maddr)
 		fmt.Printf("Price per GiB: %s\n", types.FIL(ask.Ask.Price))
-		fmt.Printf("Max Piece size: %d\n", ask.Ask.MaxPieceSize)
+		fmt.Printf("Max Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.Ask.MaxPieceSize))))
 
 		size := cctx.Int64("size")
 		if size == 0 {
@@ -537,7 +618,7 @@ var clientListDeals = &cli.Command{
 				slashed = fmt.Sprintf("Y (epoch %d)", d.OnChainDealState.SlashEpoch)
 			}
 
-			fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%d\t%s\n", d.LocalDeal.ProposalCid, d.LocalDeal.DealID, d.LocalDeal.Provider, storagemarket.DealStates[d.LocalDeal.State], onChain, slashed, d.LocalDeal.PieceCID, d.LocalDeal.Size, d.LocalDeal.PricePerEpoch, d.LocalDeal.Duration, d.LocalDeal.Message)
+			fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", d.LocalDeal.ProposalCid, d.LocalDeal.DealID, d.LocalDeal.Provider, storagemarket.DealStates[d.LocalDeal.State], onChain, slashed, d.LocalDeal.PieceCID, types.SizeStr(types.NewInt(d.LocalDeal.Size)), d.LocalDeal.PricePerEpoch, d.LocalDeal.Duration, d.LocalDeal.Message)
 		}
 		return w.Flush()
 	},

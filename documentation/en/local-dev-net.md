@@ -8,13 +8,13 @@ make 2k
 
 Download the 2048 byte parameters:
 ```sh
-./lotus fetch-params --proving-params 2048
+./lotus fetch-params 2048
 ```
 
 Pre-seal some sectors:
 
 ```sh
-./lotus-seed pre-seal --sector-size 2048 --num-sectors 2
+./lotus-seed pre-seal --sector-size 2KiB --num-sectors 2
 ```
 
 Create the genesis block and start up the first node:
@@ -34,7 +34,7 @@ Then, in another console, import the genesis miner key:
 Set up the genesis miner:
 
 ```sh
-./lotus-storage-miner init --genesis-miner --actor=t01000 --sector-size=2048 --pre-sealed-sectors=~/.genesis-sectors --pre-sealed-metadata=~/.genesis-sectors/pre-seal-t01000.json --nosync
+./lotus-storage-miner init --genesis-miner --actor=t01000 --sector-size=2KiB --pre-sealed-sectors=~/.genesis-sectors --pre-sealed-metadata=~/.genesis-sectors/pre-seal-t01000.json --nosync
 ```
 
 Now, finally, start up the miner:
