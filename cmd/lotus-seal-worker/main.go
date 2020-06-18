@@ -94,6 +94,10 @@ var runCmd = &cli.Command{
 			Name:  "address",
 			Usage: "Locally reachable address",
 		},
+		&cli.StringFlag{
+			Name:  "pub-address",
+			Usage: "publick reachable address,指定端口映射的公网ip:port",
+		},
 		&cli.BoolFlag{
 			Name:  "no-local-storage",
 			Usage: "don't use storageminer repo for sector storage",
@@ -336,12 +340,22 @@ var runCmd = &cli.Command{
 		log.Info("Waiting for tasks")
 
 		go func() {
-			log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
-			if err := nodeApi.WorkerConnect(ctx, "ws://"+cctx.String("address")+"/rpc/v0"); err != nil {
-				log.Errorf("Registering worker failed: %+v", err)
-				cancel()
-				return
+			if cctx.String("pub-address") == "" {
+				if err := nodeApi.WorkerConnect(ctx, "ws://"+cctx.String("address")+"/rpc/v0"); err != nil {
+					log.Errorf("Registering worker failed: %+v", err)
+					cancel()
+					return
+				}
+				log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
+			} else {
+				if err := nodeApi.WorkerConnect(ctx, "ws://"+cctx.String("pub-address")+"/rpc/v0"); err != nil {
+					log.Errorf("Registering worker failed: %+v", err)
+					cancel()
+					return
+				}
+				log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("pub-address")+"/rpc/v0")
 			}
+
 		}()
 
 		return srv.Serve(nl)
