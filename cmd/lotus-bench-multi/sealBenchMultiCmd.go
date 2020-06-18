@@ -41,6 +41,14 @@ var sealBenchMultiCmd = &cli.Command{
 			Name:  "p1Count",
 			Value: 4,
 		},
+		&cli.IntFlag{
+			Name:  "p2Count",
+			Value: 1,
+		},
+		&cli.IntFlag{
+			Name:  "c2Count",
+			Value: 1,
+		},
 	},
 	Action: func(c *cli.Context) error {
 
@@ -127,7 +135,7 @@ func initSector(sdir, sSize string, num abi.SectorNumber, ti *taskInfo) error {
 	ti.spt = spt
 	ti.mid = mid
 	ti.sid = sid
-	ti.number=num
+	ti.number = num
 	return nil
 }
 
@@ -149,19 +157,19 @@ func runMultiSeals(c *cli.Context, taskinfos *[]*taskInfo) error {
 	start := time.Now()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go sched(&taskstate, &wg, c.Int64("p1Count"),1, 1)
+	go sched(&taskstate, &wg, c.Int64("p1Count"), c.Int64("p2Count"), c.Int64("c2Count"))
 	total := time.Now().Sub(start)
 	fmt.Printf("----\ntotal cost time: %s\n", total)
 	wg.Wait()
 
 	// printcost time
-	printTimeResult(time.Now(), time.Now(), fmt.Sprintf("size-%s count-%d",c.String("sector-size"),c.Int("num-sectors")), c.String("result-filename"), true)
-	for _,info:=range *taskinfos{
-		printTimeResult(info.SealResult.AddPieceStart,info.SealResult.AddPieceEnd,fmt.Sprintf("s-%d-addpiece",info.number),c.String("result-filename"),false)
-		printTimeResult(info.SealResult.PreCommit1Start,info.SealResult.PreCommit1End,fmt.Sprintf("s-%d-precommit1",info.number),c.String("result-filename"),false)
-		printTimeResult(info.SealResult.PreCommit2Start,info.SealResult.PreCommit2End,fmt.Sprintf("s-%d-precommit2",info.number),c.String("result-filename"),false)
-		printTimeResult(info.SealResult.SealCommit1Start,info.SealResult.SealCommit1End,fmt.Sprintf("s-%d-sealcommit1",info.number),c.String("result-filename"),false)
-		printTimeResult(info.SealResult.SealCommit2Start,info.SealResult.SealCommit2End,fmt.Sprintf("s-%d-sealcommit2",info.number),c.String("result-filename"),false)
+	printTimeResult(time.Now(), time.Now(), fmt.Sprintf("size-%s count-%d", c.String("sector-size"), c.Int("num-sectors")), c.String("result-filename"), true)
+	for _, info := range *taskinfos {
+		printTimeResult(info.SealResult.AddPieceStart, info.SealResult.AddPieceEnd, fmt.Sprintf("s-%d-addpiece", info.number), c.String("result-filename"), false)
+		printTimeResult(info.SealResult.PreCommit1Start, info.SealResult.PreCommit1End, fmt.Sprintf("s-%d-precommit1", info.number), c.String("result-filename"), false)
+		printTimeResult(info.SealResult.PreCommit2Start, info.SealResult.PreCommit2End, fmt.Sprintf("s-%d-precommit2", info.number), c.String("result-filename"), false)
+		printTimeResult(info.SealResult.SealCommit1Start, info.SealResult.SealCommit1End, fmt.Sprintf("s-%d-sealcommit1", info.number), c.String("result-filename"), false)
+		printTimeResult(info.SealResult.SealCommit2Start, info.SealResult.SealCommit2End, fmt.Sprintf("s-%d-sealcommit2", info.number), c.String("result-filename"), false)
 	}
 
 	return nil

@@ -8,67 +8,70 @@ import (
 	"github.com/prometheus/common/log"
 	"net/url"
 	"os"
+	"time"
 )
 
 type taskInfo struct {
-	mid abi.ActorID
-	sid abi.SectorID
-	number abi.SectorNumber
-	spt abi.RegisteredProof
-	seed lapi.SealSeed
+	mid        abi.ActorID
+	sid        abi.SectorID
+	number     abi.SectorNumber
+	spt        abi.RegisteredProof
+	seed       lapi.SealSeed
 	sectorSize abi.SectorSize
-	trand [32]byte
-	ticket abi.SealRandomness
-	pi abi.PieceInfo
-	pc1o storage.PreCommit1Out
-	cids storage.SectorCids
-	c1o storage.Commit1Out
+	trand      [32]byte
+	ticket     abi.SealRandomness
+	pi         abi.PieceInfo
+	pc1o       storage.PreCommit1Out
+	cids       storage.SectorCids
+	c1o        storage.Commit1Out
 }
 
 type TaskInfoOut struct {
-	Mid abi.ActorID `json:"mid"`
-	Sid abi.SectorID `json:"sid"`
-	Number abi.SectorNumber `json:"number"`
-	Spt abi.RegisteredProof `json:"spt"`
-	Seed lapi.SealSeed `json:"seed"`
-	SectorSize abi.SectorSize `json:"sectorsize"`
-	Trand [32]byte `json:"trand"`
-	Ticket abi.SealRandomness `json:"ticket"`
-	Pi abi.PieceInfo `json:"pi"`
-	Pc1o storage.PreCommit1Out `json:"pc1o"`
-	Cids storage.SectorCids `json:"cids"`
-	C1o storage.Commit1Out `json:"c1o"`
+	Mid        abi.ActorID           `json:"mid"`
+	Sid        abi.SectorID          `json:"sid"`
+	Number     abi.SectorNumber      `json:"number"`
+	Spt        abi.RegisteredProof   `json:"spt"`
+	Seed       lapi.SealSeed         `json:"seed"`
+	SectorSize abi.SectorSize        `json:"sectorsize"`
+	Trand      [32]byte              `json:"trand"`
+	Ticket     abi.SealRandomness    `json:"ticket"`
+	Pi         abi.PieceInfo         `json:"pi"`
+	Pc1o       storage.PreCommit1Out `json:"pc1o"`
+	Cids       storage.SectorCids    `json:"cids"`
+	C1o        storage.Commit1Out    `json:"c1o"`
 }
 
-func (t *TaskInfoOut)transfer(info taskInfo){
-	t.Mid=info.mid
-	t.Sid=info.sid
-	t.Number=info.number
-	t.Spt=info.spt
-	t.SectorSize=info.sectorSize
-	t.Trand=info.trand
-	t.Ticket=info.ticket
-	t.Pi=info.pi
-	t.Pc1o=info.pc1o
-	t.Cids=info.cids
-	t.C1o=info.c1o
+func (t *TaskInfoOut) transfer(info taskInfo) {
+	t.Mid = info.mid
+	t.Sid = info.sid
+	t.Number = info.number
+	t.Spt = info.spt
+	t.SectorSize = info.sectorSize
+	t.Trand = info.trand
+	t.Ticket = info.ticket
+	t.Pi = info.pi
+	t.Pc1o = info.pc1o
+	t.Cids = info.cids
+	t.C1o = info.c1o
 }
 
-func (t *taskInfo)transfer(info TaskInfoOut){
-	t.mid=info.Mid
-	t.sid=info.Sid
-	t.number=info.Number
-	t.spt=info.Spt
-	t.sectorSize=info.SectorSize
-	t.trand=info.Trand
-	t.ticket=info.Ticket
-	t.pi=info.Pi
-	t.pc1o=info.Pc1o
-	t.cids=info.Cids
-	t.c1o=info.C1o
+func (t *taskInfo) transfer(info TaskInfoOut) {
+	t.mid = info.Mid
+	t.sid = info.Sid
+	t.number = info.Number
+	t.spt = info.Spt
+	t.sectorSize = info.SectorSize
+	t.trand = info.Trand
+	t.ticket = info.Ticket
+	t.pi = info.Pi
+	t.pc1o = info.Pc1o
+	t.cids = info.Cids
+	t.c1o = info.C1o
 
 }
+
 type SectorState string
+
 const (
 	UndefinedSectorState SectorState = ""
 
@@ -106,29 +109,42 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
-func acquireWorkerHost() string  {
-	sinfo:="http://172.16.0.10:2349/remote/sealed/s-t01012-12"
+func acquireWorkerHost() string {
+	sinfo := "http://172.16.0.10:2349/remote/sealed/s-t01012-12"
 	//if sinfo!=nil && len(sinfo.URLs)>0{
-		url,err:=url.Parse(sinfo)
-		if err!=nil {
-			log.Errorf("======acquire worker`s storageinfo failed, err: %+v",err)
-			return ""
-		}
-		return  url.Hostname()
+	url, err := url.Parse(sinfo)
+	if err != nil {
+		log.Errorf("======acquire worker`s storageinfo failed, err: %+v", err)
+		return ""
+	}
+	return url.Hostname()
 	//}
 	return ""
 }
 
-func main(){
+func main() {
 	fmt.Println(acquireWorkerHost())
-//	log.Infof("start")
-//	processMsgStart:=time.Now()
-//	time.Sleep(time.Second*7)
-//	// 只处理5秒的消息
-//	if time.Now().Sub(processMsgStart).Seconds()>=5{
-//		log.Infof("=======process MSG total cost %fs,interrupt!!",time.Now().Sub(processMsgStart).Seconds())
-//	}
-//	log.Info("end")
+	for i := 0; i < 10; i++ {
+		if i == 2 {
+			go func() {
+				go func() {
+					panic("just panic")
+				}()
+				fmt.Println("can you find me?")
+			}()
+		}
+
+		time.Sleep(time.Second * 10)
+		fmt.Println("sleep 10s-------->>>>>", i)
+	}
+	//	log.Infof("start")
+	//	processMsgStart:=time.Now()
+	//	time.Sleep(time.Second*7)
+	//	// 只处理5秒的消息
+	//	if time.Now().Sub(processMsgStart).Seconds()>=5{
+	//		log.Infof("=======process MSG total cost %fs,interrupt!!",time.Now().Sub(processMsgStart).Seconds())
+	//	}
+	//	log.Info("end")
 	//end:=1024*1024*1024*50
 	//wg:=sync.WaitGroup{}
 	//wg.Add(1)
