@@ -30,9 +30,9 @@ require (
 	github.com/filecoin-project/go-statestore v0.1.0
 	github.com/filecoin-project/go-storedcounter v0.0.0-20200421200003-1c99c62e8a5b
 	github.com/filecoin-project/sector-storage v0.0.0-20200615192001-42c9e08595b7
-	github.com/filecoin-project/specs-actors v0.6.1
+	github.com/filecoin-project/specs-actors v0.6.2-0.20200617175406-de392ca14121
 	github.com/filecoin-project/specs-storage v0.1.0
-	github.com/filecoin-project/storage-fsm v0.0.0-20200615162749-494c3bc48743
+	github.com/filecoin-project/storage-fsm v0.0.0-20200617183754-4380106d3e94
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.1
 	github.com/go-kit/kit v0.10.0
 	github.com/go-ole/go-ole v1.2.4 // indirect
@@ -127,3 +127,14 @@ require (
 replace github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.18.0
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
+
+//replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
+
+replace github.com/filecoin-project/storage-fsm => ../storage-fsm
+
+replace github.com/filecoin-project/sector-storage => ../sector-storage
+
+replace github.com/filecoin-project/specs-storage => ../specs-storage
+
+//replace github.com/filecoin-project/specs-actors => ../specs-actors@v0.5.4
+//replace github.com/filecoin-project/go-data-transfer => ../filecoin-project/go-data-transfer@v0.3.0

@@ -2,6 +2,7 @@ package apistruct
 
 import (
 	"context"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -50,7 +51,8 @@ type CommonStruct struct {
 		LogList     func(context.Context) ([]string, error)     `perm:"write"`
 		LogSetLevel func(context.Context, string, string) error `perm:"write"`
 
-		Shutdown func(context.Context) error `perm:"admin"`
+		Shutdown func(context.Context) error                    `perm:"admin"`
+		Closing  func(context.Context) (<-chan struct{}, error) `perm:"read"`
 	}
 }
 
@@ -108,17 +110,18 @@ type FullNodeStruct struct {
 		WalletImport         func(context.Context, *types.KeyInfo) (address.Address, error)                       `perm:"admin"`
 		WalletDelete         func(context.Context, address.Address) error                                         `perm:"write"`
 
-		ClientImport      func(ctx context.Context, ref api.FileRef) (cid.Cid, error)                                          `perm:"admin"`
-		ClientListImports func(ctx context.Context) ([]api.Import, error)                                                      `perm:"write"`
-		ClientHasLocal    func(ctx context.Context, root cid.Cid) (bool, error)                                                `perm:"write"`
-		ClientFindData    func(ctx context.Context, root cid.Cid) ([]api.QueryOffer, error)                                    `perm:"read"`
-		ClientStartDeal   func(ctx context.Context, params *api.StartDealParams) (*cid.Cid, error)                             `perm:"admin"`
-		ClientGetDealInfo func(context.Context, cid.Cid) (*api.DealInfo, error)                                                `perm:"read"`
-		ClientListDeals   func(ctx context.Context) ([]api.DealInfo, error)                                                    `perm:"write"`
-		ClientRetrieve    func(ctx context.Context, order api.RetrievalOrder, ref *api.FileRef) error                          `perm:"admin"`
-		ClientQueryAsk    func(ctx context.Context, p peer.ID, miner address.Address) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
-		ClientCalcCommP   func(ctx context.Context, inpath string, miner address.Address) (*api.CommPRet, error)               `perm:"read"`
-		ClientGenCar      func(ctx context.Context, ref api.FileRef, outpath string) error                                     `perm:"write"`
+		ClientImport          func(ctx context.Context, ref api.FileRef) (cid.Cid, error)                                          `perm:"admin"`
+		ClientListImports     func(ctx context.Context) ([]api.Import, error)                                                      `perm:"write"`
+		ClientHasLocal        func(ctx context.Context, root cid.Cid) (bool, error)                                                `perm:"write"`
+		ClientFindData        func(ctx context.Context, root cid.Cid) ([]api.QueryOffer, error)                                    `perm:"read"`
+		ClientMinerQueryOffer func(ctx context.Context, root cid.Cid, miner address.Address) (api.QueryOffer, error)               `perm:"read"`
+		ClientStartDeal       func(ctx context.Context, params *api.StartDealParams) (*cid.Cid, error)                             `perm:"admin"`
+		ClientGetDealInfo     func(context.Context, cid.Cid) (*api.DealInfo, error)                                                `perm:"read"`
+		ClientListDeals       func(ctx context.Context) ([]api.DealInfo, error)                                                    `perm:"write"`
+		ClientRetrieve        func(ctx context.Context, order api.RetrievalOrder, ref *api.FileRef) error                          `perm:"admin"`
+		ClientQueryAsk        func(ctx context.Context, p peer.ID, miner address.Address) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
+		ClientCalcCommP       func(ctx context.Context, inpath string, miner address.Address) (*api.CommPRet, error)               `perm:"read"`
+		ClientGenCar          func(ctx context.Context, ref api.FileRef, outpath string) error                                     `perm:"write"`
 
 		StateNetworkName                  func(context.Context) (dtypes.NetworkName, error)                                                                   `perm:"read"`
 		StateMinerSectors                 func(context.Context, address.Address, *abi.BitField, bool, types.TipSetKey) ([]*api.ChainSectorInfo, error)        `perm:"read"`
@@ -192,10 +195,11 @@ type StorageMinerStruct struct {
 
 		MiningBase func(context.Context) (*types.TipSet, error) `perm:"read"`
 
-		MarketImportDealData      func(context.Context, cid.Cid, string) error                   `perm:"write"`
-		MarketListDeals           func(ctx context.Context) ([]storagemarket.StorageDeal, error) `perm:"read"`
-		MarketListIncompleteDeals func(ctx context.Context) ([]storagemarket.MinerDeal, error)   `perm:"read"`
-		MarketSetPrice            func(context.Context, types.BigInt) error                      `perm:"admin"`
+		MarketImportDealData      func(context.Context, cid.Cid, string) error                                                                                                     `perm:"write"`
+		MarketListDeals           func(ctx context.Context) ([]storagemarket.StorageDeal, error)                                                                                   `perm:"read"`
+		MarketListIncompleteDeals func(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                     `perm:"read"`
+		MarketSetAsk              func(ctx context.Context, price types.BigInt, duration abi.ChainEpoch, minPieceSize abi.PaddedPieceSize, maxPieceSize abi.PaddedPieceSize) error `perm:"admin"`
+		MarketGetAsk              func(ctx context.Context) (*storagemarket.SignedStorageAsk, error)                                                                               `perm:"read"`
 
 		PledgeSector func(context.Context) error `perm:"write"`
 
@@ -204,8 +208,11 @@ type StorageMinerStruct struct {
 		SectorsRefs   func(context.Context) (map[string][]api.SealedRef, error)       `perm:"read"`
 		SectorsUpdate func(context.Context, abi.SectorNumber, api.SectorState) error  `perm:"write"`
 
-		WorkerConnect func(context.Context, string) error                             `perm:"admin"` // TODO: worker perm
-		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error) `perm:"admin"`
+		WorkerConnect func(context.Context, string) error                                          `perm:"admin"` // TODO: worker perm
+		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error)              `perm:"admin"`
+		WorkerTasks   func(context.Context, string) (map[uint64]storiface.WorkerTasks, error)      `perm:"admin"`
+		WorkerConf    func(context.Context, string, []byte) error                                  `perm:"admin"`
+		GetWorkerConf func(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) `perm:"admin"`
 
 		StorageList          func(context.Context) (map[stores.ID][]stores.Decl, error)                                                                                    `perm:"admin"`
 		StorageLocal         func(context.Context) (map[stores.ID]string, error)                                                                                           `perm:"admin"`
@@ -244,13 +251,16 @@ type WorkerStruct struct {
 		SealCommit2    func(context.Context, abi.SectorID, storage.Commit1Out) (storage.Proof, error)                                                                                                             `perm:"admin"`
 		FinalizeSector func(context.Context, abi.SectorID) error                                                                                                                                                  `perm:"admin"`
 		MoveStorage    func(ctx context.Context, sector abi.SectorID) error                                                                                                                                       `perm:"admin"`
+		AddPiece       func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error)            `perm:"admin"`
 
 		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) error                   `perm:"admin"`
 
 		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
 
-		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
+		FetchRealData func(ctx context.Context, id abi.SectorID) error           `perm:"admin"`
+		GetWorkScope  func(ctx context.Context) (sectorstorage.ScopeType, error) `perm:"admin"`
+		Closing       func(context.Context) (<-chan struct{}, error)             `perm:"admin"`
 	}
 }
 
@@ -313,6 +323,10 @@ func (c *CommonStruct) Shutdown(ctx context.Context) error {
 	return c.Internal.Shutdown(ctx)
 }
 
+func (c *CommonStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
+	return c.Internal.Closing(ctx)
+}
+
 // FullNodeStruct
 
 func (c *FullNodeStruct) ClientListImports(ctx context.Context) ([]api.Import, error) {
@@ -329,6 +343,10 @@ func (c *FullNodeStruct) ClientHasLocal(ctx context.Context, root cid.Cid) (bool
 
 func (c *FullNodeStruct) ClientFindData(ctx context.Context, root cid.Cid) ([]api.QueryOffer, error) {
 	return c.Internal.ClientFindData(ctx, root)
+}
+
+func (c *FullNodeStruct) ClientMinerQueryOffer(ctx context.Context, root cid.Cid, miner address.Address) (api.QueryOffer, error) {
+	return c.Internal.ClientMinerQueryOffer(ctx, root, miner)
 }
 
 func (c *FullNodeStruct) ClientStartDeal(ctx context.Context, params *api.StartDealParams) (*cid.Cid, error) {
@@ -781,6 +799,18 @@ func (c *StorageMinerStruct) WorkerStats(ctx context.Context) (map[uint64]storif
 	return c.Internal.WorkerStats(ctx)
 }
 
+func (c *StorageMinerStruct) WorkerTasks(ctx context.Context, hostname string) (map[uint64]storiface.WorkerTasks, error) {
+	return c.Internal.WorkerTasks(ctx, hostname)
+}
+
+func (c *StorageMinerStruct) WorkerConf(ctx context.Context, hostname string, config []byte) error {
+	return c.Internal.WorkerConf(ctx, hostname, config)
+}
+
+func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) {
+	return c.Internal.GetWorkerConf(ctx, hostname)
+}
+
 func (c *StorageMinerStruct) StorageAttach(ctx context.Context, si stores.StorageInfo, st stores.FsStat) error {
 	return c.Internal.StorageAttach(ctx, si, st)
 }
@@ -841,8 +871,12 @@ func (c *StorageMinerStruct) MarketListIncompleteDeals(ctx context.Context) ([]s
 	return c.Internal.MarketListIncompleteDeals(ctx)
 }
 
-func (c *StorageMinerStruct) MarketSetPrice(ctx context.Context, p types.BigInt) error {
-	return c.Internal.MarketSetPrice(ctx, p)
+func (c *StorageMinerStruct) MarketSetAsk(ctx context.Context, price types.BigInt, duration abi.ChainEpoch, minPieceSize abi.PaddedPieceSize, maxPieceSize abi.PaddedPieceSize) error {
+	return c.Internal.MarketSetAsk(ctx, price, duration, minPieceSize, maxPieceSize)
+}
+
+func (c *StorageMinerStruct) MarketGetAsk(ctx context.Context) (*storagemarket.SignedStorageAsk, error) {
+	return c.Internal.MarketGetAsk(ctx)
 }
 
 func (c *StorageMinerStruct) DealsImportData(ctx context.Context, dealPropCid cid.Cid, file string) error {
@@ -915,8 +949,20 @@ func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stor
 	return w.Internal.Fetch(ctx, id, fileType, ptype, am)
 }
 
+func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
+	return w.Internal.FetchRealData(ctx, id)
+}
+
+//GetWorkScope(ctx context.Context) (ScopeType, error)
+func (w *WorkerStruct) GetWorkScope(ctx context.Context) (sectorstorage.ScopeType, error) {
+	return w.Internal.GetWorkScope(ctx)
+}
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return w.Internal.Closing(ctx)
+}
+
+func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName)
 }
 
 var _ api.Common = &CommonStruct{}
