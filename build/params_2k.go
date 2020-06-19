@@ -13,7 +13,8 @@ import (
 func init() {
 	power.ConsensusMinerMinPower = big.NewInt(2048)
 	miner.SupportedProofTypes = map[abi.RegisteredSealProof]struct{}{
-		abi.RegisteredSealProof_StackedDrg2KiBV1: {},
+		abi.RegisteredSealProof_StackedDrg2KiBV1:   {},
+		abi.RegisteredSealProof_StackedDrg512MiBV1: {},
 	}
 	verifreg.MinVerifiedDealSize = big.NewInt(256)
 
@@ -21,7 +22,7 @@ func init() {
 }
 
 // Seconds
-const BlockDelay = 2
+const BlockDelay = 5
 
 const PropagationDelay = 3
 

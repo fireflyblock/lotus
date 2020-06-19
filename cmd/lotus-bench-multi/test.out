@@ -1,0 +1,2178 @@
+2020-04-26T17:49:19.383+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/main.go:74	Starting lotus-bench
+2020-04-26T17:49:19.383+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-e4a49558d04647264048879511e843136e4488499e23bc442a341083a19ee79c.vk is ok
+2020-04-26T17:49:19.383+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 8, 0>-Sha256Hasher-8a0719d8b9de3605f89b084c73210dfe2a557407c6343f8d32640094f2c9d074.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-3ea05428c9d11689f23529cde32fd30aabd50f7d2c93657c1d3650bca3e8ea9e.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-50c7368dea9593ed0989e70974d28024efa9d156d585b7eea1be22b2e753f331.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-e3c3fd959a83bf60522a401dc3bf0e2d48f0e2172bcdf4c0cb3c39fa4deacd87.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-0cfb4f178bbb71cf2ecfcd42accce558b27199ab4fb59cb78f2483fe21ef36d9.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-7d739b8cf60f1b0709eeebee7730e297683552e4b69cab6984ec0285663c5781.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 8, 0>-559e581f022bb4e4ec6e719e563bf0e026ad6de42e56c18714a2c692b1b88d7e.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-5294475db5237a2e83c3e52fd6c2b03859a1831d45ed08c4f35dbf9a803165a9.vk is ok
+2020-04-26T17:49:19.384+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-0170db1f394b35d995252228ee359194b13199d259380541dc529fb0099096b0.vk is ok
+2020-04-26T17:49:19.386+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 8, 0>-0377ded656c6f524f1618760bffe4e0a1c51d5a70c4509eedae8a27555733edc.vk is ok
+2020-04-26T17:49:19.395+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-0170db1f394b35d995252228ee359194b13199d259380541dc529fb0099096b0.params is ok
+2020-04-26T17:49:19.427+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-proof-of-spacetime-fallback-MerkleTree<PoseidonHasher, 8, 0, 0>-3ea05428c9d11689f23529cde32fd30aabd50f7d2c93657c1d3650bca3e8ea9e.params is ok
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	build	go-paramfetch@v0.0.2-0.20200218225740-47c639bab663/paramfetch.go:127	Parameter file /var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.params is ok
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 10
+working 0
+finished 0
+
+preCommit1Task:
+wait 0
+working 0
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 3 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 2 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 7 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 4 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 6 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 9 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 8 ...
+
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 5 ...
+
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 10 ...
+
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:279	Write piece into sector 1 ...
+
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.350 INFO filcrypto::proofs::api > write_with_alignment: start
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+addPieceTask:
+wait 0
+working 8
+finished 2
+
+preCommit1Task:
+wait 1
+working 0
+finished 0
+
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+addPieceTask:
+wait 0
+working 6
+finished 4
+
+preCommit1Task:
+wait 1
+working 1
+finished 0
+
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+2020-04-26T17:49:20.351+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 10 ...
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 3
+finished 7
+
+preCommit1Task:
+wait 2
+working 1
+finished 0
+
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 2
+finished 8
+
+preCommit1Task:
+wait 3
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 2
+finished 8
+
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
+preCommit1Task:
+wait 4
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 1
+finished 9
+
+preCommit1Task:
+wait 5
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 1
+finished 9
+
+preCommit1Task:
+wait 6
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 1
+finished 9
+
+preCommit1Task:
+wait 7
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 1
+finished 9
+
+preCommit1Task:
+wait 8
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filcrypto::proofs::api > write_with_alignment: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 9
+working 1
+finished 0
+
+preCommit2Task:
+wait 0
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.351 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.352 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.352 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+WARN: sha-ni not available, falling back
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.353 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 9
+working 0
+finished 1
+
+preCommit2Task:
+wait 1
+working 0
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.353+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 10 ...
+
+2020-04-26T17:49:20.353 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.353+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 8 ...
+
+2020-04-26T17:49:20.353 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.353 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.353 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.353 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.353 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.354 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.354 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.354 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.354 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.354 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.355 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.355 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.355 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.355 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 7
+working 1
+finished 2
+
+preCommit2Task:
+wait 1
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.355+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 2 ...
+
+2020-04-26T17:49:20.355 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.355 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.355 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.356 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.356 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.356 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.356 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.356 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.356 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.357 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.357 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.357 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.357 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 6
+working 1
+finished 3
+
+preCommit2Task:
+wait 2
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.357+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 9 ...
+
+2020-04-26T17:49:20.357 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.357 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.357 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.358 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.358 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.358 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.358 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.358 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.359 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.359 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.359 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.359 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 6
+working 0
+finished 4
+
+preCommit2Task:
+wait 3
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.359+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 3 ...
+
+2020-04-26T17:49:20.359 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.359 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.359 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.360 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.360 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.360 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.360 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 5
+working 0
+finished 5
+
+preCommit2Task:
+wait 4
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.361+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 6 ...
+
+2020-04-26T17:49:20.361 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.361 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.361 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.362 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.362 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.362 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.362 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 4
+working 0
+finished 6
+
+preCommit2Task:
+wait 5
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.362+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 4 ...
+
+2020-04-26T17:49:20.362 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.362 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.362 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.363 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.364 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.364 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.364 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 3
+working 0
+finished 7
+
+preCommit2Task:
+wait 6
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.364+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 1 ...
+
+2020-04-26T17:49:20.364 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.364 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.364 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.365 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.365 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.365 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.365 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.365 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.366 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.366 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.366 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.366 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 2
+working 0
+finished 8
+
+preCommit2Task:
+wait 7
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.366+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 7 ...
+
+2020-04-26T17:49:20.366 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.366 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.366 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.367 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.367 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.367 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.367 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.367 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.368 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.368 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.368 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.368 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 1
+working 0
+finished 9
+
+preCommit2Task:
+wait 8
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.368+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:250	doing preCommit1 for sector 5 ...
+
+2020-04-26T17:49:20.368 INFO filcrypto::proofs::api > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.368 INFO filecoin_proofs::api::seal > seal_pre_commit_phase1: start
+2020-04-26T17:49:20.368 INFO filecoin_proofs::api::seal > building merkle tree for the original data
+2020-04-26T17:49:20.369 INFO filecoin_proofs::api::seal > verifying pieces
+2020-04-26T17:49:20.369 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase1
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof > generate labels
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof > generating layer: 1
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof >   setting exp parents
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof >   storing labels on disk
+2020-04-26T17:49:20.369 INFO storage_proofs_porep::stacked::vanilla::proof >   generated layer 1 store with id layer-1
+2020-04-26T17:49:20.369 INFO filcrypto::proofs::api > seal_pre_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 9
+working 1
+finished 0
+
+sealCommit1Task:
+wait 0
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.380 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.380 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.380 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.382 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.382 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-10
+2020-04-26T17:49:20.387 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 9
+working 0
+finished 1
+
+sealCommit1Task:
+wait 1
+working 0
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.387+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 10 ...
+
+2020-04-26T17:49:20.387+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 1 ...
+
+2020-04-26T17:49:20.387 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.387 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.387 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.387 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.387 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.387 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.387 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.387 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.389 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.389 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.389 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.390 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.390 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-1
+2020-04-26T17:49:20.390 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 8
+working 0
+finished 2
+
+sealCommit1Task:
+wait 1
+working 1
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.390+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 1 ...
+
+2020-04-26T17:49:20.390 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.390+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 8 ...
+
+2020-04-26T17:49:20.390 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.390 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.390 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.390 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.390 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.390 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.391 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.392 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.392 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.392 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.394 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.394 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-8
+2020-04-26T17:49:20.394 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.394 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 6
+working 1
+finished 3
+
+sealCommit1Task:
+wait 1
+working 2
+finished 0
+
+sealCommit2Task:
+wait 0
+working 0
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.394+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 2 ...
+
+2020-04-26T17:49:20.394+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 8 ...
+
+2020-04-26T17:49:20.394 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.394 INFO filcrypto::proofs::api > seal_commit_phase1: finish
+2020-04-26T17:49:20.394 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.394 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.394 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.394 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 6
+working 1
+finished 3
+
+2020-04-26T17:49:20.394 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+sealCommit1Task:
+wait 0
+working 2
+finished 1
+
+sealCommit2Task:
+wait 1
+working 0
+finished 0
+
+2020-04-26T17:49:20.394 INFO filecoin_proofs::pieces > verifying 1 pieces
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.394+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 10 ...
+
+2020-04-26T17:49:20.394 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:49:20.394 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.395 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:49:20.395 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:49:20.395 INFO filecoin_proofs::caches > no params in memory cache for STACKED[2048]
+2020-04-26T17:49:20.395 INFO storage_proofs_core::parameter_cache > parameter set identifier for cache: layered_drgporep::PublicParams{ graph: stacked_graph::StackedGraph{expansion_degree: 8 base_graph: drgraph::BucketGraph{size: 64; degree: 6; hasher: PoseidonHasher} }, challenges: LayerChallenges { layers: 1, max_count: 2 }, tree: MerkleTree<PoseidonHasher, 8, 0, 0> }
+2020-04-26T17:49:20.395 INFO storage_proofs_core::parameter_cache > ensuring that all ancestor directories for: "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.params" exist
+2020-04-26T17:49:20.395 INFO storage_proofs_core::parameter_cache > checking cache_path: "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.params" for parameters
+2020-04-26T17:49:20.396 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.396 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.396 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.398 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.398 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.398 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-2
+2020-04-26T17:49:20.398 INFO filcrypto::proofs::api > seal_commit_phase1: finish
+2020-04-26T17:49:20.398 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 6
+working 0
+finished 4
+
+sealCommit1Task:
+wait 0
+working 1
+finished 2
+
+sealCommit2Task:
+wait 1
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 6
+working 0
+finished 4
+
+sealCommit1Task:
+wait 1
+working 1
+finished 2
+
+sealCommit2Task:
+wait 1
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.398+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 2 ...
+
+2020-04-26T17:49:20.398+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 3 ...
+
+2020-04-26T17:49:20.398 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.398 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.398 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.398 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.398 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.398 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.398 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.398 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.399 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.399 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.399 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.401 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.401 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-3
+2020-04-26T17:49:20.401 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 5
+working 0
+finished 5
+
+sealCommit1Task:
+wait 1
+working 2
+finished 2
+
+sealCommit2Task:
+wait 1
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.401+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 3 ...
+
+2020-04-26T17:49:20.401+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 9 ...
+
+2020-04-26T17:49:20.401 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.401 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.401 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.401 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.401 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.401 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.401 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.401 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.403 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.403 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.403 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.403 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.403 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 4
+working 1
+finished 5
+
+sealCommit1Task:
+wait 0
+working 2
+finished 3
+
+sealCommit2Task:
+wait 2
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.404 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.404 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-9
+2020-04-26T17:49:20.404 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 3
+working 1
+finished 6
+
+sealCommit1Task:
+wait 1
+working 2
+finished 3
+
+sealCommit2Task:
+wait 2
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.404+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 4 ...
+
+2020-04-26T17:49:20.404+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 9 ...
+
+2020-04-26T17:49:20.404 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.404 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.404 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.404 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.404 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.404 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.404 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.405 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.405 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.405 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 3
+working 1
+finished 6
+
+sealCommit1Task:
+wait 0
+working 2
+finished 4
+
+sealCommit2Task:
+wait 3
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.406 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.406 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.406 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.407 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.407 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-4
+2020-04-26T17:49:20.408 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 2
+working 1
+finished 7
+
+sealCommit1Task:
+wait 1
+working 2
+finished 4
+
+sealCommit2Task:
+wait 3
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.408+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 6 ...
+
+2020-04-26T17:49:20.408+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 4 ...
+
+2020-04-26T17:49:20.408 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.408 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.408 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.408 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.408 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.408 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.408 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.408 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.409 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.409 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.409 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.410 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.410 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 2
+working 1
+finished 7
+
+sealCommit1Task:
+wait 0
+working 2
+finished 5
+
+sealCommit2Task:
+wait 4
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.411 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.411 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-6
+2020-04-26T17:49:20.411 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 2
+working 0
+finished 8
+
+sealCommit1Task:
+wait 1
+working 2
+finished 5
+
+sealCommit2Task:
+wait 4
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.411+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 6 ...
+
+2020-04-26T17:49:20.411+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 7 ...
+
+2020-04-26T17:49:20.411 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.411 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.411 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.411 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.411 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.411 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.411 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.411 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.413 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.413 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.413 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 1
+working 1
+finished 8
+
+2020-04-26T17:49:20.413 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+sealCommit1Task:
+wait 0
+working 2
+finished 6
+
+sealCommit2Task:
+wait 5
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.413 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.414 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.414 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-7
+2020-04-26T17:49:20.414 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 1
+finished 9
+
+sealCommit1Task:
+wait 1
+working 2
+finished 6
+
+sealCommit2Task:
+wait 5
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.414+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:220	doing preCommit2 for sector 5 ...
+
+2020-04-26T17:49:20.414+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 7 ...
+
+2020-04-26T17:49:20.414 INFO filcrypto::proofs::api > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.414 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.414 INFO filecoin_proofs::api::seal > seal_pre_commit_phase2: start
+2020-04-26T17:49:20.415 INFO storage_proofs_porep::stacked::vanilla::proof > replicate_phase2
+2020-04-26T17:49:20.415 INFO storage_proofs_porep::stacked::vanilla::proof > Building column hashes
+2020-04-26T17:49:20.415 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.415 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.415 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_c 1/1
+2020-04-26T17:49:20.416 INFO storage_proofs_porep::stacked::vanilla::proof > tree_c done
+2020-04-26T17:49:20.416 INFO storage_proofs_porep::stacked::vanilla::proof > building tree_r_last
+2020-04-26T17:49:20.416 INFO storage_proofs_porep::stacked::vanilla::proof > building base tree_r_last 1/1
+2020-04-26T17:49:20.417 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.417 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 1
+finished 9
+
+sealCommit1Task:
+wait 0
+working 2
+finished 7
+
+sealCommit2Task:
+wait 6
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.418 INFO storage_proofs_porep::stacked::vanilla::proof > tree_r_last done
+2020-04-26T17:49:20.418 INFO storage_proofs_core::data > dropping data /home/lwc/.lotus-bench/bench413069971/sealed/s-t01000-5
+2020-04-26T17:49:20.418 INFO filcrypto::proofs::api > seal_pre_commit_phase2: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 1
+working 2
+finished 7
+
+sealCommit2Task:
+wait 6
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.418+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:190	doing sealcommit1 for sector 5 ...
+
+2020-04-26T17:49:20.418 INFO filcrypto::proofs::api > seal_commit_phase1: start
+2020-04-26T17:49:20.418 INFO filecoin_proofs::api::seal > seal_commit_phase1:start
+2020-04-26T17:49:20.418 INFO filecoin_proofs::pieces > verifying 1 pieces
+2020-04-26T17:49:20.419 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.419 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 2
+finished 8
+
+sealCommit2Task:
+wait 7
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.422 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.422 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 1
+finished 9
+
+sealCommit2Task:
+wait 8
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.425 INFO filecoin_proofs::api::seal > seal_commit_phase1:end
+2020-04-26T17:49:20.425 INFO filcrypto::proofs::api > seal_commit_phase1: finish
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 9
+working 1
+finished 0
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:20.462 INFO storage_proofs_core::parameter_cache > read parameters from cache "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.params" 
+2020-04-26T17:49:20.462 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:49:20.462 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:49:20.462 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:49:24.880 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:49:25.075 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:49:25.075 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:49:25.075 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:49:26.307 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:49:26.393 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:49:26.393 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:49:26.393 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:49:32.059 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:49:32.059 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:32.059 INFO filecoin_proofs::caches > no params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:32.059 INFO storage_proofs_core::parameter_cache > parameter set identifier for cache: layered_drgporep::PublicParams{ graph: stacked_graph::StackedGraph{expansion_degree: 8 base_graph: drgraph::BucketGraph{size: 64; degree: 6; hasher: PoseidonHasher} }, challenges: LayerChallenges { layers: 1, max_count: 2 }, tree: MerkleTree<PoseidonHasher, 8, 0, 0> }
+2020-04-26T17:49:32.059 INFO storage_proofs_core::parameter_cache > ensuring that all ancestor directories for: "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.vk" exist
+2020-04-26T17:49:32.059 INFO storage_proofs_core::parameter_cache > checking cache_path: "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.vk" for verifying key
+2020-04-26T17:49:32.068 INFO storage_proofs_core::parameter_cache > read verifying key from cache "/var/tmp/filecoin-proof-parameters/v25-stacked-proof-of-replication-MerkleTree<PoseidonHasher, 8, 0, 0>-Sha256Hasher-840969a6a9533823ecdc37310ef8c99d35991a2145300e10be0b883f1226a0f6.vk" 
+2020-04-26T17:49:32.068 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:32.078 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:49:32.078 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:49:32.078 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:49:32.078 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:32.078 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:32.078 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:32.088 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:49:32.088+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 10 seal successed
+2020-04-26T17:49:32.088+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 10 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 9
+working 0
+finished 1
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:32.088+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 4 ...
+
+2020-04-26T17:49:32.088 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:49:32.089 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:49:32.089 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:49:32.089 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:49:32.089 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:49:32.089 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:49:32.089 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:49:36.426 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:49:36.513 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:49:36.513 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:49:36.513 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:49:37.730 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:49:37.810 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:49:37.810 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:49:37.810 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:49:43.641 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:49:43.641 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:43.641 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:43.641 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:43.651 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:49:43.651 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:49:43.651 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:49:43.651 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:43.651 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:43.651 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:43.661 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:49:43.661+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 4 seal successed
+2020-04-26T17:49:43.661+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 4 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 8
+working 0
+finished 2
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:43.661+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 2 ...
+
+2020-04-26T17:49:43.661 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:49:43.661 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:49:43.661 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:49:43.661 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:49:43.661 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:49:43.661 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:49:43.661 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:49:48.000 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:49:48.082 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:49:48.082 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:49:48.082 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:49:49.301 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:49:49.380 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:49:49.380 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:49:49.380 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:49:55.173 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:49:55.173 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:55.174 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:55.174 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:55.184 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:49:55.184 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:49:55.184 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:49:55.184 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:49:55.185 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:49:55.185 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:49:55.195 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:49:55.195+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 2 seal successed
+2020-04-26T17:49:55.195+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 2 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 7
+working 0
+finished 3
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:49:55.195+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 7 ...
+
+2020-04-26T17:49:55.195 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:49:55.195 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:49:55.195 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:49:55.195 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:49:55.195 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:49:55.195 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:49:55.195 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:49:59.558 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:49:59.638 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:49:59.639 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:49:59.639 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:00.884 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:00.963 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:00.963 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:00.963 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:50:06.818 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:50:06.818 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:06.818 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:06.818 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:06.827 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:50:06.827 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:50:06.827 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:50:06.827 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:06.827 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:06.827 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:06.837 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:50:06.837+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 7 seal successed
+2020-04-26T17:50:06.837+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 7 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 6
+working 0
+finished 4
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:50:06.837+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 6 ...
+
+2020-04-26T17:50:06.837 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:50:06.838 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:50:06.838 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:50:06.838 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:50:06.838 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:50:06.838 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:50:06.838 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:50:11.190 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:50:11.270 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:50:11.270 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:50:11.271 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:12.508 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:12.593 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:12.593 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:12.593 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:50:18.410 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:50:18.410 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:18.410 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:18.410 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:18.420 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:50:18.420 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:50:18.420 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:50:18.420 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:18.420 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:18.420 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:18.430 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:50:18.430+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 6 seal successed
+2020-04-26T17:50:18.430+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 6 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 5
+working 0
+finished 5
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:50:18.430+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 8 ...
+
+2020-04-26T17:50:18.430 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:50:18.430 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:50:18.430 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:50:18.430 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:50:18.430 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:50:18.430 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:50:18.430 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:50:22.818 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:50:22.904 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:50:22.904 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:50:22.904 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:24.148 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:24.228 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:24.228 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:24.228 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:50:30.009 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:50:30.009 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:30.009 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:30.009 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:30.018 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:50:30.018 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:50:30.018 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:50:30.019 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:30.019 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:30.019 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:30.030 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:50:30.030+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 8 seal successed
+2020-04-26T17:50:30.030+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 8 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 4
+working 0
+finished 6
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:50:30.030+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 5 ...
+
+2020-04-26T17:50:30.030 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:50:30.030 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:50:30.030 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:50:30.030 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:50:30.030 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:50:30.030 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:50:30.030 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:50:34.381 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:50:34.466 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:50:34.466 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:50:34.466 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:35.690 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:35.771 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:35.771 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:35.771 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:50:41.500 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:50:41.500 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:41.500 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:41.500 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:41.510 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:50:41.510 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:50:41.510 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:50:41.511 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:41.511 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:41.511 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:41.521 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:50:41.521+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 5 seal successed
+2020-04-26T17:50:41.521+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 5 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 3
+working 0
+finished 7
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:50:41.521+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 1 ...
+
+2020-04-26T17:50:41.521 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:50:41.521 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:50:41.521 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:50:41.521 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:50:41.521 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:50:41.521 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:50:41.521 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:50:45.873 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:50:45.955 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:50:45.955 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:50:45.955 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:47.190 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:47.269 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:47.269 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:47.269 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:50:53.070 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:50:53.070 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:53.070 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:53.070 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:53.080 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:50:53.080 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:50:53.080 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:50:53.080 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:50:53.081 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:50:53.081 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:50:53.090 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:50:53.090+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 1 seal successed
+2020-04-26T17:50:53.090+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 1 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 2
+working 0
+finished 8
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:50:53.090+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 3 ...
+
+2020-04-26T17:50:53.091 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:50:53.091 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:50:53.091 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:50:53.091 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:50:53.091 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:50:53.091 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:50:53.091 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:50:57.438 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:50:57.519 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:50:57.519 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:50:57.519 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:50:58.749 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:50:58.831 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:50:58.831 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:50:58.831 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:51:04.676 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:51:04.676 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:51:04.676 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:51:04.676 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:51:04.686 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:51:04.686 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:51:04.686 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:51:04.686 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:51:04.686 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:51:04.686 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:51:04.695 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:51:04.695+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 3 seal successed
+2020-04-26T17:51:04.695+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 3 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 1
+working 0
+finished 9
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:51:04.695+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:161	doing sealcommit2 for sector 9 ...
+
+2020-04-26T17:51:04.695 INFO filcrypto::proofs::api > seal_commit_phase2: start
+2020-04-26T17:51:04.695 INFO filecoin_proofs::api::seal > seal_commit_phase2:start
+2020-04-26T17:51:04.695 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]
+2020-04-26T17:51:04.695 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]
+2020-04-26T17:51:04.695 INFO filecoin_proofs::api::seal > got groth params (2048) while sealing
+2020-04-26T17:51:04.695 INFO filecoin_proofs::api::seal > snark_proof:start
+2020-04-26T17:51:04.696 INFO bellperson::groth16::prover > Bellperson 0.6.4 is being used!
+2020-04-26T17:51:09.051 INFO bellperson::gpu::locks > GPU is available for FFT!
+2020-04-26T17:51:09.133 INFO bellperson::gpu::fft > FFT: 1 working device(s) selected.
+2020-04-26T17:51:09.133 INFO bellperson::gpu::fft > FFT: Device 0: GeForce RTX 2080 Ti
+2020-04-26T17:51:09.133 INFO bellperson::domain > GPU FFT kernel instantiated!
+2020-04-26T17:51:10.378 INFO bellperson::gpu::locks > GPU is available for Multiexp!
+2020-04-26T17:51:10.457 INFO bellperson::gpu::multiexp > Multiexp: 1 working device(s) selected. (CPU utilization: 0)
+2020-04-26T17:51:10.457 INFO bellperson::gpu::multiexp > Multiexp: Device 0: GeForce RTX 2080 Ti (Chunk-size: 7488999)
+2020-04-26T17:51:10.457 INFO bellperson::multiexp > GPU Multiexp kernel instantiated!
+2020-04-26T17:51:16.263 INFO filecoin_proofs::api::seal > snark_proof:finish
+2020-04-26T17:51:16.263 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:51:16.263 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:51:16.263 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:51:16.273 INFO filecoin_proofs::api::seal > seal_commit_phase2:end
+2020-04-26T17:51:16.273 INFO filcrypto::proofs::api > seal_commit_phase2: finish
+2020-04-26T17:51:16.273 INFO filcrypto::proofs::api > verify_seal: start
+2020-04-26T17:51:16.273 INFO filecoin_proofs::caches > trying parameters memory cache for: STACKED[2048]-verifying-key
+2020-04-26T17:51:16.273 INFO filecoin_proofs::caches > found params in memory cache for STACKED[2048]-verifying-key
+2020-04-26T17:51:16.273 INFO filecoin_proofs::api::seal > got verifying key (2048) while verifying seal
+2020-04-26T17:51:16.283 INFO filcrypto::proofs::api > verify_seal: finish
+2020-04-26T17:51:16.283+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/tasks.go:184	sector 9 seal successed
+2020-04-26T17:51:16.283+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:43	---sector 9 finished seal and pass verify!!!!
+
++++++++++++++++++++++++++++++++++++
+addPieceTask:
+wait 0
+working 0
+finished 10
+
+preCommit1Task:
+wait 0
+working 0
+finished 10
+
+preCommit2Task:
+wait 0
+working 0
+finished 10
+
+sealCommit1Task:
+wait 0
+working 0
+finished 10
+
+sealCommit2Task:
+wait 0
+working 0
+finished 10
+
++++++++++++++++++++++++++++++++++++
+2020-04-26T17:51:16.283+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:50	--------all task are finished!!!---------
+----
+results (v25) (2048)
+sector 0 cost times below:
+seal: addPiece: 664.405µs (2.94 MiB/s)
+seal: preCommit phase 1: 1.650038ms (1.18 MiB/s)
+2020-04-26T17:51:16.283+0800	[34mINFO[0m	lotus-bench	lotus-bench-multi/sched.go:149	no waiting sealcommit2 !!!!
+seal: preCommit phase 2: 3.377708ms (592 KiB/s)
+seal: commit phase 1: 7.312509ms (274 KiB/s)
+seal: commit phase 2: 11.559796744s (177 B/s)
+===================================================
+
+sector 1 cost times below:
+seal: addPiece: 1.015474ms (1.92 MiB/s)
+seal: preCommit phase 1: 2.049042ms (976 KiB/s)
+seal: preCommit phase 2: 3.493306ms (573 KiB/s)
+seal: commit phase 1: 7.484469ms (267 KiB/s)
+seal: commit phase 2: 11.523686419s (177 B/s)
+===================================================
+
+sector 2 cost times below:
+seal: addPiece: 1.141062ms (1.71 MiB/s)
+seal: preCommit phase 1: 1.637801ms (1.19 MiB/s)
+seal: preCommit phase 2: 3.243366ms (617 KiB/s)
+seal: commit phase 1: 9.294841ms (215 KiB/s)
+seal: commit phase 2: 11.595102774s (176 B/s)
+===================================================
+
+sector 3 cost times below:
+seal: addPiece: 1.011258ms (1.93 MiB/s)
+seal: preCommit phase 1: 1.870844ms (1.04 MiB/s)
+seal: preCommit phase 2: 3.147501ms (635 KiB/s)
+seal: commit phase 1: 9.195941ms (217 KiB/s)
+seal: commit phase 2: 11.562793844s (177 B/s)
+===================================================
+
+sector 4 cost times below:
+seal: addPiece: 821.754µs (2.38 MiB/s)
+seal: preCommit phase 1: 1.734946ms (1.13 MiB/s)
+seal: preCommit phase 2: 3.42826ms (583 KiB/s)
+seal: commit phase 1: 7.430328ms (269 KiB/s)
+seal: commit phase 2: 11.480632668s (178 B/s)
+===================================================
+
+sector 5 cost times below:
+seal: addPiece: 982.198µs (1.99 MiB/s)
+seal: preCommit phase 1: 1.839162ms (1.06 MiB/s)
+seal: preCommit phase 2: 3.338488ms (599 KiB/s)
+seal: commit phase 1: 8.280967ms (242 KiB/s)
+seal: commit phase 2: 11.582591801s (176 B/s)
+===================================================
+
+sector 6 cost times below:
+seal: addPiece: 1.232563ms (1.58 MiB/s)
+seal: preCommit phase 1: 1.622578ms (1.2 MiB/s)
+seal: preCommit phase 2: 3.445604ms (580 KiB/s)
+seal: commit phase 1: 7.719832ms (259 KiB/s)
+seal: commit phase 2: 11.632747105s (176 B/s)
+===================================================
+
+sector 7 cost times below:
+seal: addPiece: 860.261µs (2.27 MiB/s)
+seal: preCommit phase 1: 1.71058ms (1.14 MiB/s)
+seal: preCommit phase 2: 3.758672ms (532 KiB/s)
+seal: commit phase 1: 8.625674ms (232 KiB/s)
+seal: commit phase 2: 11.588400024s (176 B/s)
+===================================================
+
+sector 8 cost times below:
+seal: addPiece: 924.484µs (2.11 MiB/s)
+seal: preCommit phase 1: 1.737667ms (1.12 MiB/s)
+seal: preCommit phase 2: 3.319363ms (603 KiB/s)
+seal: commit phase 1: 8.367351ms (239 KiB/s)
+seal: commit phase 2: 11.57752594s (176 B/s)
+===================================================
+
+sector 9 cost times below:
+seal: addPiece: 675.22µs (2.89 MiB/s)
+seal: preCommit phase 1: 2.380426ms (840 KiB/s)
+seal: preCommit phase 2: 33.718181ms (59.3 KiB/s)
+seal: commit phase 1: 7.340454ms (272 KiB/s)
+seal: commit phase 2: 11.683588756s (175 B/s)
+===================================================
+
+----
+total cost time: 1m55.932997852s
