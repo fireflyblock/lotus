@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"os"
@@ -119,14 +120,22 @@ var importBenchCmd = &cli.Command{
 			ts = next
 		}
 
-		out := make([]TipSetExec, 0, len(tschain))
+		ibj, err := os.Create("import-bench.json")
+		if err != nil {
+			return err
+		}
+		defer ibj.Close() //nolint:errcheck
+
+		enc := json.NewEncoder(ibj)
+
+		var lastTse *TipSetExec
 
 		lastState := tschain[len(tschain)-1].ParentState()
 		for i := len(tschain) - 2; i >= 0; i-- {
 			cur := tschain[i]
 			log.Infof("computing state (height: %d, ts=%s)", cur.Height(), cur.Cids())
 			if cur.ParentState() != lastState {
-				lastTrace := out[len(out)-1].Trace
+				lastTrace := lastTse.Trace
 				d, err := json.MarshalIndent(lastTrace, "", "  ")
 				if err != nil {
 					panic(err)
@@ -140,29 +149,39 @@ var importBenchCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			out = append(out, TipSetExec{
+			stripCallers(trace)
+
+			lastTse = &TipSetExec{
 				TipSet:   cur.Key(),
 				Trace:    trace,
 				Duration: time.Since(start),
-			})
+			}
 			lastState = st
+			if err := enc.Encode(lastTse); err != nil {
+				return xerrors.Errorf("failed to write out tipsetexec: %w", err)
+			}
 		}
 
 		pprof.StopCPUProfile()
 
-		ibj, err := os.Create("import-bench.json")
-		if err != nil {
-			return err
-		}
-		defer ibj.Close() //nolint:errcheck
-
-		if err := json.NewEncoder(ibj).Encode(out); err != nil {
-			return err
-		}
-
 		return nil
 
 	},
+}
+
+func walkExecutionTrace(et *types.ExecutionTrace) {
+	for _, gc := range et.GasCharges {
+		gc.Callers = nil
+	}
+	for _, sub := range et.Subcalls {
+		walkExecutionTrace(&sub) //nolint:scopelint,gosec
+	}
+}
+
+func stripCallers(trace []*api.InvocResult) {
+	for _, t := range trace {
+		walkExecutionTrace(&t.ExecutionTrace)
+	}
 }
 
 type Invocation struct {
@@ -236,8 +255,15 @@ var importAnalyzeCmd = &cli.Command{
 		}
 
 		var results []TipSetExec
-		if err := json.NewDecoder(fi).Decode(&results); err != nil {
-			return err
+		for {
+			var tse TipSetExec
+			if err := json.NewDecoder(fi).Decode(&tse); err != nil {
+				if err != io.EOF {
+					return err
+				}
+				break
+			}
+			results = append(results, tse)
 		}
 
 		chargeDeltas := make(map[string][]float64)
