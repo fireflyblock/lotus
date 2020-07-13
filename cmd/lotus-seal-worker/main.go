@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -32,6 +33,8 @@ import (
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
+
+	_ "net/http/pprof"
 )
 
 var log = logging.Logger("main")
@@ -43,7 +46,15 @@ const DefaultPre2CommitSize = 1
 const DefaultCommit1Size = 1
 const DefaultCommit2Size = 1
 
+func init() {
+	runtime.SetMutexProfileFraction(1)
+	runtime.SetBlockProfileRate(1)
+}
+
 func main() {
+	go func() {
+		http.ListenAndServe("0.0.0.0:7070", nil)
+	}()
 	lotuslog.SetupLogLevels()
 
 	log.Info("Starting lotus worker")

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"net/http"
 	"os"
+	"runtime"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -12,13 +14,22 @@ import (
 	"github.com/filecoin-project/lotus/lib/lotuslog"
 	"github.com/filecoin-project/lotus/lib/tracing"
 	"github.com/filecoin-project/lotus/node/repo"
+	_ "net/http/pprof"
 )
 
 var log = logging.Logger("main")
 
 const FlagStorageRepo = "storagerepo"
 
+func init() {
+	runtime.SetMutexProfileFraction(1)
+	runtime.SetBlockProfileRate(1)
+}
+
 func main() {
+	go func() {
+		http.ListenAndServe("0.0.0.0:6060", nil)
+	}()
 	lotuslog.SetupLogLevels()
 
 	local := []*cli.Command{
