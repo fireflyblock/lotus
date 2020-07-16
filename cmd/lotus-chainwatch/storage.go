@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"sync"
 	"time"
 
@@ -294,6 +295,30 @@ create table if not exists miner_info
 		primary key (miner_id)
 );
 
+/*
+* captures chain-specific power state for any given stateroot
+*/
+create table if not exists chain_power
+(
+	state_root text not null
+		constraint chain_power_pk
+			primary key,
+	baseline_power text not null
+);
+
+/*
+* captures miner-specific power state for any given stateroot
+*/
+create table if not exists miner_power
+(
+	miner_id text not null,
+	state_root text not null,
+	raw_bytes_power text not null,
+	quality_adjusted_power text not null,
+	constraint miner_power_pk
+		primary key (miner_id, state_root)
+);
+
 /* used to tell when a miners sectors (proven-not-yet-expired) changed if the miner_sectors_cid's are different a new sector was added or removed (terminated/expired) */
 create table if not exists miner_sectors_heads
 (
@@ -306,8 +331,15 @@ create table if not exists miner_sectors_heads
 		primary key (miner_id,miner_sectors_cid)
     
 );
-
-create type miner_sector_event_type as enum ('ADDED', 'EXTENDED', 'EXPIRED', 'TERMINATED');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'miner_sector_event_type') THEN
+        CREATE TYPE miner_sector_event_type AS ENUM
+        (
+			'ADDED','EXTENDED', 'EXPIRED', 'TERMINATED'
+        );
+    END IF;
+END$$;
 
 create table if not exists miner_sector_events
 (
@@ -318,7 +350,50 @@ create table if not exists miner_sector_events
     
 	constraint miner_sector_events_pk
 		primary key (sector_id, event, miner_id, state_root)
-)
+);
+
+create table if not exists market_deal_proposals
+(
+    deal_id bigint not null,
+    
+    state_root text not null,
+    
+    piece_cid text not null,
+    padded_piece_size bigint not null,
+    unpadded_piece_size bigint not null,
+    is_verified bool not null,
+    
+    client_id text not null,
+    provider_id text not null,
+    
+    start_epoch bigint not null,
+    end_epoch bigint not null,
+    slashed_epoch bigint,
+    storage_price_per_epoch text not null,
+    
+    provider_collateral text not null,
+    client_collateral text not null,
+    
+   constraint market_deal_proposal_pk
+ 		primary key (deal_id)
+);
+
+create table if not exists market_deal_states 
+(
+    deal_id bigint not null,
+    
+    sector_start_epoch bigint not null,
+    last_update_epoch bigint not null,
+    slash_epoch bigint not null,
+    
+    state_root text not null,
+    
+	unique (deal_id, sector_start_epoch, last_update_epoch, slash_epoch),
+ 
+	constraint market_deal_states_pk
+		primary key (deal_id, state_root)
+    
+);
 
 /*
 create or replace function miner_tips(epoch bigint)
@@ -500,6 +575,46 @@ func (st *storage) storeActors(actors map[address.Address]map[types.Actor]actorI
 	return nil
 }
 
+// storeChainPower captures reward actor state as it relates to power captured on-chain
+func (st *storage) storeChainPower(rewardTips map[types.TipSetKey]*rewardStateInfo) error {
+	tx, err := st.db.Begin()
+	if err != nil {
+		return xerrors.Errorf("begin chain_power tx: %w", err)
+	}
+
+	if _, err := tx.Exec(`create temp table cp (like chain_power excluding constraints) on commit drop`); err != nil {
+		return xerrors.Errorf("prep chain_power temp: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`copy cp (state_root, baseline_power) from STDIN`)
+	if err != nil {
+		return xerrors.Errorf("prepare tmp chain_power: %w", err)
+	}
+
+	for _, rewardState := range rewardTips {
+		if _, err := stmt.Exec(
+			rewardState.stateroot.String(),
+			rewardState.baselinePower.String(),
+		); err != nil {
+			log.Errorw("failed to store chain power", "state_root", rewardState.stateroot, "error", err)
+		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		return xerrors.Errorf("close prepared chain_power: %w", err)
+	}
+
+	if _, err := tx.Exec(`insert into chain_power select * from cp on conflict do nothing`); err != nil {
+		return xerrors.Errorf("insert chain_power from tmp: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return xerrors.Errorf("commit chain_power tx: %w", err)
+	}
+
+	return nil
+}
+
 type storeSectorsAPI interface {
 	StateMinerSectors(context.Context, address.Address, *abi.BitField, bool, types.TipSetKey) ([]*api.ChainSectorInfo, error)
 }
@@ -605,6 +720,50 @@ func (st *storage) storeMiners(minerTips map[types.TipSetKey][]*minerStateInfo) 
 	}
 
 	return tx.Commit()
+}
+
+// storeMinerPower captures miner actor state as it relates to power per miner captured on-chain
+func (st *storage) storeMinerPower(minerTips map[types.TipSetKey][]*minerStateInfo) error {
+	tx, err := st.db.Begin()
+	if err != nil {
+		return xerrors.Errorf("begin miner_power tx: %w", err)
+	}
+
+	if _, err := tx.Exec(`create temp table mp (like miner_power excluding constraints) on commit drop`); err != nil {
+		return xerrors.Errorf("prep miner_power temp: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`copy mp (miner_id, state_root, raw_bytes_power, quality_adjusted_power) from STDIN`)
+	if err != nil {
+		return xerrors.Errorf("prepare tmp miner_power: %w", err)
+	}
+
+	for _, miners := range minerTips {
+		for _, minerInfo := range miners {
+			if _, err := stmt.Exec(
+				minerInfo.addr.String(),
+				minerInfo.stateroot.String(),
+				minerInfo.rawPower.String(),
+				minerInfo.qalPower.String(),
+			); err != nil {
+				log.Errorw("failed to store miner power", "miner", minerInfo.addr, "stateroot", minerInfo.stateroot, "error", err)
+			}
+		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		return xerrors.Errorf("close prepared miner_power: %w", err)
+	}
+
+	if _, err := tx.Exec(`insert into miner_power select * from mp on conflict do nothing`); err != nil {
+		return xerrors.Errorf("insert miner_power from tmp: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return xerrors.Errorf("commit miner_power tx: %w", err)
+	}
+
+	return nil
 }
 
 func (st *storage) storeMinerSectorsHeads(minerTips map[types.TipSetKey][]*minerStateInfo, api api.FullNode) error {
@@ -744,7 +903,7 @@ func (st *storage) updateMinerSectors(minerTips map[types.TipSetKey][]*minerStat
 				}
 
 				for _, added := range changes.Added {
-					if _, err := eventStmt.Exec(miner.addr.String(), added.Info.SectorNumber, miner.stateroot.String(), "ADDED"); err != nil {
+					if _, err := eventStmt.Exec(added.Info.SectorNumber, "ADDED", miner.addr.String(), miner.stateroot.String()); err != nil {
 						return err
 					}
 				}
@@ -790,6 +949,172 @@ func (st *storage) updateMinerSectors(minerTips map[types.TipSetKey][]*minerStat
 	}
 
 	return updateTx.Commit()
+}
+
+func (st *storage) storeMarketActorDealStates(marketTips map[types.TipSetKey]*marketStateInfo, tipHeights []tipsetKeyHeight, api api.FullNode) error {
+	start := time.Now()
+	defer func() {
+		log.Infow("Stored Market Deal States", "duration", time.Since(start).String())
+	}()
+	tx, err := st.db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`create temp table mds (like market_deal_states excluding constraints) on commit drop;`); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`copy mds (deal_id, sector_start_epoch, last_update_epoch, slash_epoch, state_root) from STDIN`)
+	if err != nil {
+		return err
+	}
+	for _, th := range tipHeights {
+		mt := marketTips[th.tsKey]
+		dealStates, err := api.StateMarketDeals(context.TODO(), mt.tsKey)
+		if err != nil {
+			return err
+		}
+
+		for dealID, ds := range dealStates {
+			id, err := strconv.ParseUint(dealID, 10, 64)
+			if err != nil {
+				return err
+			}
+
+			if _, err := stmt.Exec(
+				id,
+				ds.State.SectorStartEpoch,
+				ds.State.LastUpdatedEpoch,
+				ds.State.SlashEpoch,
+				mt.stateroot.String(),
+			); err != nil {
+				return err
+			}
+
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`insert into market_deal_states select * from mds on conflict do nothing`); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (st *storage) storeMarketActorDealProposals(marketTips map[types.TipSetKey]*marketStateInfo, tipHeights []tipsetKeyHeight, api api.FullNode) error {
+	start := time.Now()
+	defer func() {
+		log.Infow("Stored Market Deal Proposals", "duration", time.Since(start).String())
+	}()
+	tx, err := st.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`create temp table mdp (like market_deal_proposals excluding constraints) on commit drop;`); err != nil {
+		return xerrors.Errorf("prep temp: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`copy mdp (deal_id, state_root, piece_cid, padded_piece_size, unpadded_piece_size, is_verified, client_id, provider_id, start_epoch, end_epoch, slashed_epoch, storage_price_per_epoch, provider_collateral, client_collateral) from STDIN`)
+	if err != nil {
+		return err
+	}
+
+	// insert in sorted order (lowest height -> highest height) since dealid is pk of table.
+	for _, th := range tipHeights {
+		mt := marketTips[th.tsKey]
+		dealStates, err := api.StateMarketDeals(context.TODO(), mt.tsKey)
+		if err != nil {
+			return err
+		}
+
+		for dealID, ds := range dealStates {
+			id, err := strconv.ParseUint(dealID, 10, 64)
+			if err != nil {
+				return err
+			}
+
+			if _, err := stmt.Exec(
+				id,
+				mt.stateroot.String(),
+				ds.Proposal.PieceCID.String(),
+				ds.Proposal.PieceSize,
+				ds.Proposal.PieceSize.Unpadded(),
+				ds.Proposal.VerifiedDeal,
+				ds.Proposal.Client.String(),
+				ds.Proposal.Provider.String(),
+				ds.Proposal.StartEpoch,
+				ds.Proposal.EndEpoch,
+				nil, // slashed_epoch
+				ds.Proposal.StoragePricePerEpoch.String(),
+				ds.Proposal.ProviderCollateral.String(),
+				ds.Proposal.ClientCollateral.String(),
+			); err != nil {
+				return err
+			}
+
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`insert into market_deal_proposals select * from mdp on conflict do nothing`); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+
+}
+
+func (st *storage) updateMarketActorDealProposals(marketTip map[types.TipSetKey]*marketStateInfo, tipHeights []tipsetKeyHeight, api api.FullNode) error {
+	start := time.Now()
+	defer func() {
+		log.Infow("Updated Market Deal Proposals", "duration", time.Since(start).String())
+	}()
+	pred := state.NewStatePredicates(api)
+
+	tx, err := st.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`update market_deal_proposals set slashed_epoch=$1 where deal_id=$2`)
+	if err != nil {
+		return err
+	}
+
+	for _, th := range tipHeights {
+		mt := marketTip[th.tsKey]
+		stateDiff := pred.OnStorageMarketActorChanged(pred.OnDealStateChanged(pred.OnDealStateAmtChanged()))
+
+		changed, val, err := stateDiff(context.TODO(), mt.parentTsKey, mt.tsKey)
+		if err != nil {
+			log.Warnw("error getting market deal state diff", "error", err)
+		}
+		if !changed {
+			continue
+		}
+		changes, ok := val.(*state.MarketDealStateChanges)
+		if !ok {
+			return xerrors.Errorf("Unknown type returned by Deal State AMT predicate: %T", val)
+		}
+
+		for _, modified := range changes.Modified {
+			if modified.From.SlashEpoch != modified.To.SlashEpoch {
+				if _, err := stmt.Exec(modified.To.SlashEpoch, modified.ID); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (st *storage) storeHeaders(bhs map[cid.Cid]*types.BlockHeader, sync bool) error {
