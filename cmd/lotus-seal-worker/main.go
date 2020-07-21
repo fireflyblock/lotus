@@ -175,15 +175,16 @@ var runCmd = &cli.Command{
 
 		var taskTypes []sealtasks.TaskType
 
-		taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTCommit1, sealtasks.TTFinalize)
+		taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTFinalize)
 
 		if cctx.Bool("precommit1") {
-			taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
+			taskTypes = append(taskTypes, sealtasks.TTPreCommit1, sealtasks.TTAddPiece)
 		}
 		if cctx.Bool("precommit2") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
 		}
 		if cctx.Bool("commit") {
+			taskTypes = append(taskTypes, sealtasks.TTCommit1)
 			taskTypes = append(taskTypes, sealtasks.TTCommit2)
 		}
 
@@ -332,6 +333,7 @@ var runCmd = &cli.Command{
 				cancel()
 				return
 			}
+			log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
 		}()
 
 		return srv.Serve(nl)

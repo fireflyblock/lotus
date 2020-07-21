@@ -221,6 +221,7 @@ func (sm *StorageMinerAPI) WorkerConnect(ctx context.Context, url string) error 
 	}
 
 	log.Infof("Connected to a remote worker at %s", url)
+	log.Info("============================ Manager 连接一个 remote worker ==================================", url)
 
 	return sm.StorageMgr.AddWorker(ctx, w)
 }
