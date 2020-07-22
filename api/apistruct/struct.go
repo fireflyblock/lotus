@@ -282,7 +282,8 @@ type WorkerStruct struct {
 		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) error                   `perm:"admin"`
 
-		Fetch func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
+		FetchRealData func(ctx context.Context, id abi.SectorID) error                                                      `perm:"admin"`
+		Fetch         func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -1073,6 +1074,10 @@ func (w *WorkerStruct) UnsealPiece(ctx context.Context, id abi.SectorID, index s
 
 func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) error {
 	return w.Internal.ReadPiece(ctx, writer, id, index, size)
+}
+
+func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
+	return w.Internal.FetchRealData(ctx, id)
 }
 
 func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
