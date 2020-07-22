@@ -110,8 +110,13 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "commit",
-			Usage: "enable commit (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
+			Name:  "commit1",
+			Usage: "enable commit1 (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
+			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:  "commit2",
+			Usage: "enable commit2 (32G sectors: all cores or GPUs, 128GiB Memory + 64GiB swap)",
 			Value: true,
 		},
 	},
@@ -183,8 +188,10 @@ var runCmd = &cli.Command{
 		if cctx.Bool("precommit2") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
 		}
-		if cctx.Bool("commit") {
+		if cctx.Bool("commit1") {
 			taskTypes = append(taskTypes, sealtasks.TTCommit1)
+		}
+		if cctx.Bool("commit2") {
 			taskTypes = append(taskTypes, sealtasks.TTCommit2)
 		}
 
