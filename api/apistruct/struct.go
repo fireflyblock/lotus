@@ -2,6 +2,7 @@ package apistruct
 
 import (
 	"context"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"io"
 	"time"
 
@@ -226,8 +227,10 @@ type StorageMinerStruct struct {
 		SectorRemove                  func(context.Context, abi.SectorNumber) error                   `perm:"admin"`
 		SectorMarkForUpgrade          func(ctx context.Context, id abi.SectorNumber) error            `perm:"admin"`
 
-		WorkerConnect func(context.Context, string) error                             `perm:"admin"` // TODO: worker perm
-		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error) `perm:"admin"`
+		WorkerConnect func(context.Context, string) error                                          `perm:"admin"` // TODO: worker perm
+		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error)              `perm:"admin"`
+		SetWorkerConf func(context.Context, string, []byte) error                                  `perm:"admin"`
+		GetWorkerConf func(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) `perm:"admin"`
 
 		StorageList          func(context.Context) (map[stores.ID][]stores.Decl, error)                                                                                    `perm:"admin"`
 		StorageLocal         func(context.Context) (map[stores.ID]string, error)                                                                                           `perm:"admin"`
@@ -892,6 +895,14 @@ func (c *StorageMinerStruct) WorkerConnect(ctx context.Context, url string) erro
 
 func (c *StorageMinerStruct) WorkerStats(ctx context.Context) (map[uint64]storiface.WorkerStats, error) {
 	return c.Internal.WorkerStats(ctx)
+}
+
+func (c *StorageMinerStruct) SetWorkerConf(ctx context.Context, hostname string, config []byte) error {
+	return c.Internal.SetWorkerConf(ctx, hostname, config)
+}
+
+func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) {
+	return c.Internal.GetWorkerConf(ctx, hostname)
 }
 
 func (c *StorageMinerStruct) StorageAttach(ctx context.Context, si stores.StorageInfo, st fsutil.FsStat) error {
