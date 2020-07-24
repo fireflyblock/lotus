@@ -5,8 +5,11 @@ import (
 	"fmt"
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"golang.org/x/xerrors"
+	"os"
 	"sort"
 	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -19,18 +22,19 @@ import (
 
 const DefaultSize = 255
 
-var workersCmd = &cli.Command{
-	Name:  "workers",
-	Usage: "interact with workers",
+var sealingCmd = &cli.Command{
+	Name:  "sealing",
+	Usage: "interact with sealing pipeline",
 	Subcommands: []*cli.Command{
-		workersListCmd,
+		sealingJobsCmd,
+		sealingWorkersCmd,
 		setTasksNumberCmd,
 		getTasksNumberCmd,
 	},
 }
 
-var workersListCmd = &cli.Command{
-	Name:  "list",
+var sealingWorkersCmd = &cli.Command{
+	Name:  "workers",
 	Usage: "list workers",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "color"},
@@ -111,6 +115,71 @@ var workersListCmd = &cli.Command{
 		}
 
 		return nil
+	},
+}
+
+var sealingJobsCmd = &cli.Command{
+	Name:  "jobs",
+	Usage: "list workers",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{Name: "color"},
+	},
+	Action: func(cctx *cli.Context) error {
+		color.NoColor = !cctx.Bool("color")
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		jobs, err := nodeApi.WorkerJobs(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting worker jobs: %w", err)
+		}
+
+		type line struct {
+			storiface.WorkerJob
+			wid uint64
+		}
+
+		lines := make([]line, 0)
+
+		for wid, jobs := range jobs {
+			for _, job := range jobs {
+				lines = append(lines, line{
+					WorkerJob: job,
+					wid:       wid,
+				})
+			}
+		}
+
+		// oldest first
+		sort.Slice(lines, func(i, j int) bool {
+			return lines[i].Start.Before(lines[j].Start)
+		})
+
+		workerHostnames := map[uint64]string{}
+
+		wst, err := nodeApi.WorkerStats(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting worker stats: %w", err)
+		}
+
+		for wid, st := range wst {
+			workerHostnames[wid] = st.Info.Hostname
+		}
+
+		tw := tabwriter.NewWriter(os.Stdout, 2, 4, 2, ' ', 0)
+		_, _ = fmt.Fprintf(tw, "ID\tSector\tWorker\tHostname\tTask\tTime\n")
+
+		for _, l := range lines {
+			_, _ = fmt.Fprintf(tw, "%d\t%d\t%d\t%s\t%s\t%s\n", l.ID, l.Sector.Number, l.wid, workerHostnames[l.wid], l.Task.Short(), time.Now().Sub(l.Start).Truncate(time.Millisecond*100))
+		}
+
+		return tw.Flush()
 	},
 }
 

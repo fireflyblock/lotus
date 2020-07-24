@@ -74,6 +74,10 @@ func (sm *StorageMinerAPI) WorkerStats(context.Context) (map[uint64]storiface.Wo
 	return sm.StorageMgr.WorkerStats(), nil
 }
 
+func (sm *StorageMinerAPI) WorkerJobs(ctx context.Context) (map[uint64][]storiface.WorkerJob, error) {
+	return sm.StorageMgr.WorkerJobs(), nil
+}
+
 func (sm *StorageMinerAPI) SetWorkerConf(ctx context.Context, hostname string, config []byte) error {
 	if sm.StorageMgr.WorkerConfSet(hostname, config) == 0 {
 		return xerrors.Errorf("miner did not find worker information")
