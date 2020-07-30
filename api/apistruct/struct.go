@@ -228,11 +228,11 @@ type StorageMinerStruct struct {
 		SectorRemove                  func(context.Context, abi.SectorNumber) error                   `perm:"admin"`
 		SectorMarkForUpgrade          func(ctx context.Context, id abi.SectorNumber) error            `perm:"admin"`
 
-		WorkerConnect func(context.Context, string) error                             `perm:"admin"` // TODO: worker perm
-		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error) `perm:"admin"`
-		WorkerJobs    func(context.Context) (map[uint64][]storiface.WorkerJob, error) `perm:"admin"`
-		SetWorkerConf func(context.Context, string, []byte) error                                  `perm:"admin"`
-		GetWorkerConf func(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) `perm:"admin"`
+		WorkerConnect func(context.Context, string) error                                            `perm:"admin"` // TODO: worker perm
+		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error)                `perm:"admin"`
+		WorkerJobs    func(context.Context) (map[uint64][]storiface.WorkerJob, error)                `perm:"admin"`
+		SetWorkerConf func(context.Context, string, []byte) error                                    `perm:"admin"`
+		GetWorkerConf func(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) `perm:"admin"`
 
 		StorageList          func(context.Context) (map[stores.ID][]stores.Decl, error)                                                                                    `perm:"admin"`
 		StorageLocal         func(context.Context) (map[stores.ID]string, error)                                                                                           `perm:"admin"`
@@ -911,7 +911,7 @@ func (c *StorageMinerStruct) SetWorkerConf(ctx context.Context, hostname string,
 	return c.Internal.SetWorkerConf(ctx, hostname, config)
 }
 
-func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) {
+func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) {
 	return c.Internal.GetWorkerConf(ctx, hostname)
 }
 

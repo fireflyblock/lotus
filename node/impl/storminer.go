@@ -85,12 +85,8 @@ func (sm *StorageMinerAPI) SetWorkerConf(ctx context.Context, hostname string, c
 	return nil
 }
 
-func (sm *StorageMinerAPI) GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error) {
-	tk, err := sm.StorageMgr.WorkerConfGet(hostname)
-	if err != nil {
-		return tk, err
-	}
-	return tk, nil
+func (sm *StorageMinerAPI) GetWorkerConf(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) {
+	return sm.StorageMgr.WorkerConfGet(hostname)
 }
 
 func (sm *StorageMinerAPI) ActorAddress(context.Context) (address.Address, error) {

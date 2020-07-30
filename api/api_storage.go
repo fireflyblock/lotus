@@ -64,7 +64,7 @@ type StorageMiner interface {
 	WorkerStats(context.Context) (map[uint64]storiface.WorkerStats, error)
 	WorkerJobs(context.Context) (map[uint64][]storiface.WorkerJob, error)
 	SetWorkerConf(ctx context.Context, hostname string, config []byte) error
-	GetWorkerConf(ctx context.Context, hostname string) (sectorstorage.TaskConfig, error)
+	GetWorkerConf(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error)
 
 	stores.SectorIndex
 

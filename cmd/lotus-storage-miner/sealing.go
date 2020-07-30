@@ -298,11 +298,11 @@ var getTasksNumberCmd = &cli.Command{
 
 		ctx := lcli.ReqContext(cctx)
 
-		tc, err := nodeApi.GetWorkerConf(ctx, hostname)
+		tcl, err := nodeApi.GetWorkerConf(ctx, hostname)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Worker:    【%s】 \nTaskConfig: %+v\n", hostname, tc)
+		fmt.Printf("Worker:    【%s】 \nTaskConfig: %+v\nCurrentTaskCount: %+v\n", hostname, tcl[0], tcl[1])
 
 		return nil
 	},
