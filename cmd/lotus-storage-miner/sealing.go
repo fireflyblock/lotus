@@ -327,11 +327,19 @@ var getTasksNumberCmd = &cli.Command{
 
 		ctx := lcli.ReqContext(cctx)
 
-		tcl, err := nodeApi.GetWorkerConf(ctx, hostname)
-		if err != nil {
-			return err
+		tcl, _ := nodeApi.GetWorkerConf(ctx, hostname)
+		var tcf, tct string
+		if tcl[2].AddPieceSize == 255 {
+			tcf = fmt.Sprintf("TaskConfig: No taskConfig found.\n")
+		} else {
+			tcf = fmt.Sprintf("TaskConfig: %+v\n", tcl[0])
 		}
-		fmt.Printf("Worker:    【%s】 \nTaskConfig: %+v\nCurrentTaskCount: %+v\n", hostname, tcl[0], tcl[1])
+		if tcl[3].AddPieceSize == 255 {
+			tct = fmt.Sprintf("CurrentTaskCount: No current taskCount.\n")
+		} else {
+			tct = fmt.Sprintf("CurrentTaskCount: %+v\n", tcl[1])
+		}
+		fmt.Printf("Worker:    【%s】 \n"+tcf+tct, hostname)
 
 		return nil
 	},
