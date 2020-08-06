@@ -468,6 +468,7 @@ func (a *API) ClientRetrieve(ctx context.Context, order api.RetrievalOrder, ref 
 		params,
 		order.Total,
 		order.MinerPeerID,
+
 		order.Client,
 		order.Miner,
 		store.StoreID())
