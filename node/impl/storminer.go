@@ -3,6 +3,7 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -420,3 +421,20 @@ func (sm *StorageMinerAPI) PiecesGetCIDInfo(ctx context.Context, payloadCid cid.
 }
 
 var _ api.StorageMiner = &StorageMinerAPI{}
+
+func TransferDealData(w http.ResponseWriter, r *http.Request) {
+	//log.Info("====== TransferDealData Called")
+	path, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Warn("====== TransferDealData--> ReadAll err:", err)
+	}
+	//log.Info("====== TransferDealData--> ReadAll return path:",string(path))
+	data, err := ioutil.ReadFile(string(path))
+	if err != nil {
+		log.Warn("====== TransferDealData--> ReadFile err:", err)
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		log.Warn("====== TransferDealData--> Write err:", err)
+	}
+}

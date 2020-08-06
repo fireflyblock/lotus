@@ -150,6 +150,8 @@ var runCmd = &cli.Command{
 		mux.PathPrefix("/remote").HandlerFunc(minerapi.(*impl.StorageMinerAPI).ServeRemote)
 		mux.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
 
+		http.HandleFunc("/TransferData", impl.TransferDealData)
+
 		ah := &auth.Handler{
 			Verify: minerapi.AuthVerify,
 			Next:   mux.ServeHTTP,

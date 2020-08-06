@@ -5,7 +5,7 @@ package storageadapter
 import (
 	"bytes"
 	"context"
-	"io"
+	"os"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -58,6 +58,7 @@ func NewProviderNodeAdapter(dag dtypes.StagingDAG, secb *sectorblocks.SectorBloc
 
 func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemarket.MinerDeal) (cid.Cid, error) {
 	log.Info("publishing deal")
+	//log.Info("====== PublishDeals Called")
 
 	mi, err := n.StateMinerInfo(ctx, deal.Proposal.Provider, types.EmptyTSK)
 	if err != nil {
@@ -88,8 +89,14 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 	return smsg.Cid(), nil
 }
 
-func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {
-	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sealing.DealInfo{
+func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, fileName string) (*storagemarket.PackingResult, error) {
+	//	log.Info("====== OnDealComplete Called")
+
+	path := os.Getenv("LOTUS_STORAGE_PATH")
+	filePath := path + "/" + fileName
+	//log.Infof("====== OnDealComplete --> \n filePath:%+v \n fileName: %+v",filePath,fileName)
+
+	p, offset, err := n.secb.AddPiece(ctx, pieceSize, filePath, fileName, sealing.DealInfo{
 		DealID: deal.DealID,
 		DealSchedule: sealing.DealSchedule{
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,

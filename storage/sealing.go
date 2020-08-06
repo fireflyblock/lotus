@@ -2,8 +2,6 @@ package storage
 
 import (
 	"context"
-	"io"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 
@@ -16,8 +14,8 @@ func (m *Miner) Address() address.Address {
 	return m.sealing.Address()
 }
 
-func (m *Miner) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-	return m.sealing.AddPieceToAnySector(ctx, size, r, d)
+func (m *Miner) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	return m.sealing.AddPieceToAnySector(ctx, size, filePath, fileName, d)
 }
 
 func (m *Miner) StartPackingSector(sectorNum abi.SectorNumber) error {
