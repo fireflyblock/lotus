@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -81,6 +82,7 @@ func main() {
 		Usage:   "Benchmark performance of lotus on your hardware",
 		Version: build.UserVersion(),
 		Commands: []*cli.Command{
+			parellelAddPieceCmd,
 			proveCmd,
 			sealBenchCmd,
 			importBenchCmd,
@@ -91,6 +93,118 @@ func main() {
 		log.Warnf("%+v", err)
 		return
 	}
+}
+
+var parellelAddPieceCmd = &cli.Command{
+	Name: "addpiece",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "storage-dir",
+			Value: "~/.lotus-bench",
+			Usage: "Path to the storage directory that will store sectors long term",
+		},
+		&cli.StringFlag{
+			Name:  "sector-size",
+			Value: "512MiB",
+			Usage: "size of the sectors in bytes, i.e. 32GiB",
+		},
+		&cli.IntFlag{
+			Name:  "num-sectors",
+			Value: 1,
+		},
+	},
+	Action: func(c *cli.Context) error {
+
+		var sbdir string
+
+		sdir, err := homedir.Expand(c.String("storage-dir"))
+		if err != nil {
+			return err
+		}
+
+		err = os.MkdirAll(sdir, 0775) //nolint:gosec
+		if err != nil {
+			return xerrors.Errorf("creating sectorbuilder dir: %w", err)
+		}
+
+		tsdir, err := ioutil.TempDir(sdir, "bench")
+		if err != nil {
+			return err
+		}
+		//defer func() {
+		//	if err := os.RemoveAll(tsdir); err != nil {
+		//		log.Warn("remove all: ", err)
+		//	}
+		//}()
+
+		// TODO: pretty sure this isnt even needed?
+		if err := os.MkdirAll(tsdir, 0775); err != nil {
+			return err
+		}
+
+		sbdir = tsdir
+
+		// miner address
+		maddr, err := address.NewFromString("t01000")
+		if err != nil {
+			return err
+		}
+		amid, err := address.IDFromAddress(maddr)
+		if err != nil {
+			return err
+		}
+		mid := abi.ActorID(amid)
+
+		// sector size
+		sectorSizeInt, err := units.RAMInBytes(c.String("sector-size"))
+		if err != nil {
+			return err
+		}
+		sectorSize := abi.SectorSize(sectorSizeInt)
+
+		spt, err := ffiwrapper.SealProofTypeFromSectorSize(sectorSize)
+		if err != nil {
+			return err
+		}
+
+		cfg := &ffiwrapper.Config{
+			SealProofType: spt,
+		}
+
+		sbfs := &basicfs.Provider{
+			Root: sbdir,
+		}
+
+		sb, err := ffiwrapper.New(sbfs, cfg)
+		if err != nil {
+			return err
+		}
+
+		wg := sync.WaitGroup{}
+		for i := abi.SectorNumber(1); i <= abi.SectorNumber(c.Int("num-sectors")); i++ {
+
+			wg.Add(1)
+			go func(i abi.SectorNumber) {
+				sid := abi.SectorID{
+					Miner:  mid,
+					Number: i,
+				}
+				start := time.Now()
+				_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
+				if err != nil {
+					log.Error(err)
+				}
+				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
+				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
+				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
+				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
+				wg.Done()
+			}(i)
+		}
+		wg.Wait()
+		//sealTimings, sealedSectors, err = runSeals(sb, sbfs, c.Int("num-sectors"), parCfg, mid, sectorSize, []byte(c.String("ticket-preimage")), c.String("save-commit2-input"), c.Bool("skip-commit2"), c.Bool("skip-unseal"))
+		return nil
+	},
 }
 
 var sealBenchCmd = &cli.Command{
@@ -483,9 +597,9 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 		start := time.Now()
 		log.Infof("[%d] Writing piece into sector...", i)
 
-		r := rand.New(rand.NewSource(100 + int64(i)))
+		//r := rand.New(rand.NewSource(100 + int64(i)))
 
-		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), r)
+		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
 		if err != nil {
 			return nil, nil, err
 		}
