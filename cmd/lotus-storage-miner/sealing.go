@@ -281,7 +281,7 @@ var setTasksNumberCmd = &cli.Command{
 		if c2Size > 255 {
 			return xerrors.Errorf("constant %d overflows uint8", c2Size)
 		}
-		tc.Commit2 = uint8(c2Size)
+		tc.Commit2 = uint64(c2Size)
 
 		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
 		if err != nil {
