@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -434,6 +435,75 @@ func (st *Local) Local(ctx context.Context) ([]StoragePath, error) {
 	}
 
 	return out, nil
+}
+
+func (st *Local) getLayersAndTreeCAndTreeDFiles(url string, proofType abi.RegisteredSealProof) []string {
+	layerLabel := "/sc-02-data-layer-"
+	treeCLabel := "/sc-02-data-tree-c"
+	treeD := "/sc-02-data-tree-d.dat"
+	tailLabel := ".dat"
+	var files []string
+
+	if proofType == abi.RegisteredSealProof_StackedDrg2KiBV1 || proofType == abi.RegisteredSealProof_StackedDrg512MiBV1 {
+		files = append(files, url+layerLabel+"1"+tailLabel)
+		files = append(files, url+layerLabel+"2"+tailLabel)
+		files = append(files, url+treeD)
+		files = append(files, url+treeCLabel+tailLabel)
+	} else if proofType == abi.RegisteredSealProof_StackedDrg32GiBV1 {
+		for i := 0; i < 12; i++ {
+			files = append(files, url+layerLabel+strconv.Itoa(i)+tailLabel)
+		}
+		for j := 0; j < 8; j++ {
+			files = append(files, url+treeCLabel+"-"+strconv.Itoa(j)+tailLabel)
+		}
+		files = append(files, url+treeD)
+	}
+	return files
+}
+
+func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID, proofType abi.RegisteredSealProof, typ SectorFileType) error {
+
+	log.Infof("==========try to remove sector [%+v] from worker", sid)
+
+	si, err := st.index.StorageFindSector(ctx, sid, typ, 0, false)
+	if err != nil {
+		return xerrors.Errorf("finding existing sector %d(t:%d) failed: %w", sid, typ, err)
+	}
+
+	if len(si) == 0 {
+		return xerrors.Errorf("can't delete sector %v(%d), not found", sid, typ)
+	}
+
+	for _, info := range si {
+		p, ok := st.paths[info.ID]
+		if !ok {
+			continue
+		}
+
+		if p.local == "" { // TODO: can that even be the case?
+			continue
+		}
+
+		// 不要修改index记录,会影响后面的fetch
+		//if err := st.index.StorageDropSector(ctx, info.ID, sid, typ); err != nil {
+		//	return xerrors.Errorf("dropping sector from index: %w", err)
+		//}
+
+		spath := filepath.Join(p.local, typ.String(), SectorName(sid))
+
+		files := st.getLayersAndTreeCAndTreeDFiles(spath, proofType)
+		log.Infof("==========try to remove sector [%+v] from worker--------->delete files:[%+v]", sid, files)
+		for _, file := range files {
+			log.Infof("remove %s", file)
+
+			if err := os.RemoveAll(file); err != nil {
+				log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+			}
+		}
+
+	}
+	log.Infof("======== who call me ??????????????????????????")
+	return nil
 }
 
 func (st *Local) Remove(ctx context.Context, sid abi.SectorID, typ SectorFileType, force bool) error {

@@ -86,6 +86,13 @@ func (sh *scheduler) runWorkerWatcher() {
 				Chan: nilch,
 			}
 
+			//worker断开连接
+			hostname := sh.workers[wid].info.Hostname
+			sh.tasks.Delete(hostname)
+			sh.workersLk.Lock()
+			sh.workScopeRecorder.delete(sh.workers[wid].WorkScope, sh.workers[wid].info.Hostname)
+			sh.workersLk.Unlock()
+
 			log.Warnf("worker %d dropped", wid)
 			// send in a goroutine to avoid a deadlock between workerClosing / watchClosing
 			go func() {

@@ -451,3 +451,12 @@ func TestSched(t *testing.T) {
 		}))
 	}
 }
+
+func TestCalculateResources(t *testing.T) {
+	//resources:=new(storiface.WorkerResources)
+	resources := storiface.WorkerResources{
+		MemPhysical: 1,
+	}
+
+	fmt.Printf("taskConfig :%+v", CalculateResources(resources, 4<<30))
+}

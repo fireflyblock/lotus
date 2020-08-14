@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/elastic/go-sysinfo"
 	"github.com/hashicorp/go-multierror"
@@ -22,6 +23,9 @@ import (
 )
 
 var pathTypes = []stores.SectorFileType{stores.FTUnsealed, stores.FTSealed, stores.FTCache}
+
+// local lock to lock addpiece task .
+//var addPieceLock sync.Mutex
 
 type WorkerConfig struct {
 	SealProof abi.RegisteredSealProof
@@ -104,13 +108,15 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 	return sb.NewSector(ctx, sector)
 }
 
-func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 	sb, err := l.sb()
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-
-	return sb.AddPiece(ctx, sector, epcs, sz, r)
+	//addPieceLock.Lock()
+	pi, err := sb.AddPiece(ctx, sector, epcs, sz, filePath, fileName)
+	//addPieceLock.Unlock()
+	return pi, err
 }
 
 func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
@@ -139,7 +145,14 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 		return nil, err
 	}
 
-	return sb.SealPreCommit1(ctx, sector, ticket, pieces)
+	startAt := time.Now()
+	out, err = sb.SealPreCommit1(ctx, sector, ticket, pieces)
+	log.Infof("================ worker  finished %+v  [SealPreCommit1] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+
+	return out, err
+
+	//	return sb.SealPreCommit1(ctx, sector, ticket, pieces)
 }
 
 func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.PreCommit1Out) (cids storage2.SectorCids, err error) {
@@ -148,7 +161,12 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 		return storage2.SectorCids{}, err
 	}
 
-	return sb.SealPreCommit2(ctx, sector, phase1Out)
+	startAt := time.Now()
+	cids, err = sb.SealPreCommit2(ctx, sector, phase1Out)
+	log.Infof("================ worker  finished %+v [SealPreCommit2] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+	return cids, err
+	//return sb.SealPreCommit2(ctx, sector, phase1Out)
 }
 
 func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage2.SectorCids) (output storage2.Commit1Out, err error) {
@@ -157,7 +175,31 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 		return nil, err
 	}
 
-	return sb.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
+	startAt := time.Now()
+	out, err := sb.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
+	log.Infof("================ worker  finished %+v [SealCommit1] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+
+	log.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+	l.localStore.RemoveLayersAndTreeCAndD(ctx, sector, l.scfg.SealProofType, stores.FTCache)
+
+	return out, err
+
+	//return sb.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
+}
+
+// this method can only called by worker0
+func (l *LocalWorker) FetchRealData(ctx context.Context, sector abi.SectorID) error {
+	//log.Infof("=========before to do SealCommit2 for sector [%v], delete remote workers' cache layer and tree_d and tree_c files",
+	//	sector)
+	//l.storage.RemoveLayersAndTreeCAndD(ctx,sector,l.scfg.SealProofType,stores.FTCache)
+
+	// fetch cache dir and sealed dir
+	log.Infof("=========before to do SealCommit2 for sector [%v], fetch remote workers' cache layer and tree_d and tree_c files", sector)
+	l.Fetch(ctx, sector, stores.FTCache|stores.FTSealed, stores.PathStorage, stores.AcquireMove)
+
+	log.Infof("=========before to do SealCommit2 for sector [%v], fetch finished", sector)
+	return nil
 }
 
 func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.Commit1Out) (proof storage2.Proof, err error) {
@@ -166,7 +208,13 @@ func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phas
 		return nil, err
 	}
 
-	return sb.SealCommit2(ctx, sector, phase1Out)
+	startAt := time.Now()
+	proof, err = sb.SealCommit2(ctx, sector, phase1Out)
+	log.Infof("================ worker  finished %+v [Commit2] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+
+	return proof, err
+	//return sb.SealCommit2(ctx, sector, phase1Out)
 }
 
 func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage2.Range) error {
@@ -280,9 +328,11 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 		Resources: storiface.WorkerResources{
 			MemPhysical: mem.Total,
 			MemSwap:     mem.VirtualTotal,
-			MemReserved: mem.VirtualUsed + mem.Total - mem.Available, // TODO: sub this process
-			CPUs:        uint64(runtime.NumCPU()),
-			GPUs:        gpus,
+			// 物理内存使用情况,设置一个假内存
+			MemReserved: 2 << 30,
+			//MemReserved: mem.VirtualUsed + mem.Total - mem.Available, // TODO: sub this process
+			CPUs: uint64(runtime.NumCPU()),
+			GPUs: gpus,
 		},
 	}, nil
 }

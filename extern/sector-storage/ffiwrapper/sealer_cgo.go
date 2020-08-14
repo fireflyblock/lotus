@@ -7,11 +7,15 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/ioutil"
 	"math/bits"
+	"net/http"
 	"os"
 	"runtime"
 
+	"github.com/filecoin-project/go-padreader"
 	"github.com/ipfs/go-cid"
+
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
@@ -24,6 +28,8 @@ import (
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/zerocomm"
+
+	"github.com/filecoin-project/go-fil-markets/filestore"
 )
 
 var _ Storage = &Sealer{}
@@ -52,7 +58,20 @@ func (sb *Sealer) NewSector(ctx context.Context, sector abi.SectorID) error {
 	return nil
 }
 
-func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data) (abi.PieceInfo, error) {
+type Reader struct{}
+
+func (Reader) Read(out []byte) (int, error) {
+	for i := range out {
+		out[i] = 0
+	}
+	return len(out), nil
+}
+
+func (sb *Sealer) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
+	return io.LimitReader(Reader{}, int64(size))
+}
+
+func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size
@@ -103,6 +122,31 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		}
 	}
 
+	/////////////////////////////////////////////
+	var file storage.Data
+	if fileName == "_pledgeSector" || fileName == "_filPledgeToDealSector" {
+		file = sb.pledgeReader(pieceSize)
+	} else {
+		/*fs, err := filestore.NewLocalFileStore(filestore.OsPath(filePath))
+		f, err := fs.Open(filestore.Path(fileName))
+		if err != nil {
+			log.Errorf("没有读到piece文件: %+v", err)
+		}
+		paddedReader, paddedSize := padreader.New(f, uint64(f.Size()))
+
+		pieceSize = abi.UnpaddedPieceSize(paddedSize)*/
+		transferData(filePath, fileName)
+		paddedReader, _, err := handlerReader(fileName)
+		//	log.Infof("====== AddPiece--> handlerReader \n  paddedSize:%+v\n  pieceSize:%+v", paddedSize, pieceSize)
+
+		file = paddedReader
+		if err != nil {
+			log.Errorf("====== AddPiece--> handlerReader err: %+v", err)
+		}
+		//file, err = environment.OpenFile(deal.PiecePath)
+	}
+	/////////////////////////////////////////////
+
 	w, err := stagedFile.Writer(storiface.UnpaddedByteIndex(offset).Padded(), pieceSize.Padded())
 	if err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("getting partial file writer: %w", err)
@@ -112,8 +156,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	pr := io.TeeReader(io.LimitReader(file, int64(pieceSize)), pw)
 
-	chunk := abi.PaddedPieceSize(4 << 20)
-
+	chunk := abi.PaddedPieceSize(128 << 20)
 	buf := make([]byte, chunk.Unpadded())
 	var pieceCids []abi.PieceInfo
 
@@ -159,7 +202,9 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 	stagedFile = nil
 
+	log.Infof("======AddPiece -->pieceCids:%+v ", pieceCids)
 	if len(pieceCids) == 1 {
+		log.Infof("======AddPiece -->pieceCids[0]:%+v ", pieceCids[0])
 		return pieceCids[0], nil
 	}
 
@@ -167,6 +212,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	if err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("generate unsealed CID: %w", err)
 	}
+	log.Infof("======AddPiece -->GenerateUnsealedCID return \n pieceCID:%+v ", pieceCID)
 
 	// validate that the pieceCID was properly formed
 	if _, err := commcid.CIDToPieceCommitmentV1(pieceCID); err != nil {
@@ -467,13 +513,18 @@ func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 }
 
 func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (storage.SectorCids, error) {
+	log.Infof("====== SealPreCommit2--> trans params \n sector:%+v\n phase1Out:%+v\n strphase1Out:%+v", sector, phase1Out, string(phase1Out))
+
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector paths: %w", err)
 	}
 	defer done()
+	log.Infof("====== SealPreCommit2--> AcquireSector return \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
 
 	sealedCID, unsealedCID, err := ffi.SealPreCommitPhase2(phase1Out, paths.Cache, paths.Sealed)
+	log.Infof("====== SealPreCommit2--> SealPreCommitPhase2 return \n sealedCID:%+v\n unsealedCID:%+v\n err:%+v", sealedCID, unsealedCID, err)
+
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("presealing sector %d (%s): %w", sector.Number, paths.Unsealed, err)
 	}
@@ -485,7 +536,11 @@ func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 }
 
 func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
+	log.Infof("====== SealCommit1--> trans params \n sector:%+v\n ticket:%+v\n seed:%+v\n pieces:%+v\n cids:%+v", sector, ticket, seed, pieces, cids)
+
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
+	log.Infof("====== SealCommit1--> AcquireSector \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
+
 	if err != nil {
 		return nil, xerrors.Errorf("acquire sector paths: %w", err)
 	}
@@ -670,4 +725,48 @@ func GenerateUnsealedCID(proofType abi.RegisteredSealProof, pieces []abi.PieceIn
 	}
 
 	return ffi.GenerateUnsealedCID(proofType, allPieces)
+}
+func transferData(path, name string) {
+	//log.Info("====== transferData Called")
+	//log.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
+
+	addr := os.Getenv("MINER_LISTEN_ADDR")
+	url := "http://" + addr + "/TransferData"
+	log.Infof("====== transferData get request url --> \n url:%+v ", url)
+
+	repReader := bytes.NewReader([]byte(path))
+	r, err := http.NewRequest("GET", url, repReader)
+	if err != nil {
+		log.Info("====== transferData newrequest err:", err)
+		return
+	}
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		log.Info("====== transferData transfer err:", err)
+		return
+	}
+	response, _ := ioutil.ReadAll(resp.Body)
+
+	//storage
+	tmp := os.Getenv("TMPDIR")
+	err = ioutil.WriteFile(tmp+"/"+name, response, 0755)
+	if err != nil {
+		log.Info("====== transferData transfer resp err:", err)
+	} else {
+		log.Info("====== transferData transfer resp success")
+	}
+}
+
+func handlerReader(name string) (io.Reader, abi.UnpaddedPieceSize, error) {
+	//log.Info("====== handlerReader Called")
+	//log.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
+	tmp := os.Getenv("TMPDIR")
+	store, err := filestore.NewLocalFileStore(filestore.OsPath(tmp))
+	file, err := store.Open(filestore.Path(name))
+	if err != nil {
+		log.Info("====== handlerReader err:", err)
+		return nil, 0, err
+	}
+	reader, size := padreader.New(file, uint64(file.Size()))
+	return reader, size, nil
 }

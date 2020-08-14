@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -58,11 +59,19 @@ type scheduler struct {
 
 	newWorkers chan *workerHandle
 
+	tasks             sync.Map //map[string]*taskCounter
+	taskRecorder      sync.Map //map[abi.SectorID]*sectorTaskRecord
+	workScopeRecorder *ScopeOfWork
+	isExistFreeWorker bool
+
 	watchClosing  chan WorkerID
 	workerClosing chan WorkerID
 
 	schedule       chan *workerRequest
 	windowRequests chan *schedWindowRequest
+
+	// 拉取数据channel
+	transferChannel sync.Map
 
 	// owned by the sh.runSched goroutine
 	schedQueue  *requestQueue
@@ -88,6 +97,9 @@ type workerHandle struct {
 	// stats / tracking
 	wt *workTracker
 
+	taskConf  *TaskConfig
+	WorkScope ScopeType
+
 	// for sync manager goroutine closing
 	cleanupStarted bool
 	closedMgr      chan struct{}
@@ -110,6 +122,8 @@ type activeResources struct {
 	memUsedMax uint64
 	gpuUsed    bool
 	cpuUse     uint64
+
+	cpuCount uint64
 
 	cond *sync.Cond
 }
@@ -143,6 +157,11 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 
 		newWorkers: make(chan *workerHandle),
 
+		tasks:             sync.Map{},
+		taskRecorder:      sync.Map{},
+		workScopeRecorder: &ScopeOfWork{},
+		isExistFreeWorker: true,
+
 		watchClosing:  make(chan WorkerID),
 		workerClosing: make(chan WorkerID),
 
@@ -159,6 +178,17 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 }
 
 func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType sealtasks.TaskType, sel WorkerSelector, prepare WorkerAction, work WorkerAction) error {
+	log.Debugf("========== new req sched, sectorID:%+v, taskType:%+v\n", sector, taskType)
+
+	if taskType == sealtasks.TTAddPiecePl {
+		if !sh.isExistFreeWorker {
+			log.Warnf("============== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v\n", sh.schedQueue.Len(), sector, taskType)
+			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue)
+		} else {
+			taskType = sealtasks.TTAddPiece
+		}
+	}
+
 	ret := make(chan workerResponse)
 
 	select {
@@ -218,12 +248,15 @@ func (sh *scheduler) runSched() {
 		select {
 		case w := <-sh.newWorkers:
 			sh.newWorker(w)
+			sh.isExistFreeWorker = true
 
 		case wid := <-sh.workerClosing:
 			sh.dropWorker(wid)
 
 		case req := <-sh.schedule:
+			log.Debugf("========== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
 			sh.schedQueue.Push(req)
+			go sh.StartStore(req.sector.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
 			sh.trySched()
 
 			if sh.testSync != nil {
@@ -282,20 +315,48 @@ func (sh *scheduler) trySched() {
 
 	windows := make([]schedWindow, len(sh.openWindows))
 	acceptableWindows := make([][]int, sh.schedQueue.Len())
+	acceptableAPWindows := make([]int, 0)
 
 	log.Debugf("SCHED %d queued; %d open windows", sh.schedQueue.Len(), len(windows))
 
 	sh.workersLk.RLock()
 	defer sh.workersLk.RUnlock()
 
-	// Step 1
+	// Step 1   首先先选出合适的windows，一个window表示一个worker及其做过的任务信息
 	for sqi := 0; sqi < sh.schedQueue.Len(); sqi++ {
 		task := (*sh.schedQueue)[sqi]
 		needRes := ResourceTable[task.taskType][sh.spt]
 
+		_, ok := sh.taskRecorder.Load(task.sector)
+		if !ok {
+			sh.taskRecorder.Store(task.sector, sectorTaskRecord{})
+		}
+		tr, _ := sh.taskRecorder.Load(task.sector)
+		taskRd := tr.(sectorTaskRecord)
+
 		task.indexHeap = sqi
 		for wnd, windowRequest := range sh.openWindows {
 			worker := sh.workers[windowRequest.worker]
+
+			hostName, err := os.Hostname()
+			if err != nil {
+				panic(err)
+			}
+
+			//log.Debugf("=============== checkout openWindows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
+			if worker.info.Hostname == hostName {
+				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
+				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch {
+					//log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
+					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+					continue
+				} else {
+					continue
+				}
+			}
+			if task.taskType == sealtasks.TTFinalize {
+				continue
+			}
 
 			// TODO: allow bigger windows
 			if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, worker.info.Resources) {
@@ -314,13 +375,59 @@ func (sh *scheduler) trySched() {
 				continue
 			}
 
-			acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+			if !sh.tryCanHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
+				if task.taskType == sealtasks.TTAddPiece {
+				}
+				log.Warnf("================ [tryCanHandleRequestForTask]  Worker %s processing sectorid(%+v) is not available，taskType:%s", worker.info.Hostname, task.sector, task.taskType)
+				continue
+			}
+
+			switch task.taskType {
+			case sealtasks.TTAddPiece:
+				if taskRd.workerFortask == worker.info.Hostname {
+					log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+					break
+				} else {
+					acceptableAPWindows = append(acceptableAPWindows, wnd)
+					log.Debugf("================ check addpiece, window [%d] in worker [%s] is preparing [AddPiece] in sectorID [%+v] ", wnd, worker.info.Hostname, task.sector)
+				}
+			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+				//log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+				if taskRd.workerFortask == worker.info.Hostname {
+					log.Infof("================ bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+					break
+				}
+			case sealtasks.TTCommit2:
+				//log.Debugf("================ check workScopeRecorder [%+v] ,worker: [%s] ,window [%d] ", sh.workScopeRecorder, worker.info.Hostname, wnd)
+				if sh.workScopeRecorder.search(PRIORITYCOMMIT2, worker.info.Hostname) {
+					//log.Debugf("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
+					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+					break
+				}
+			default:
+				log.Warnf("================ 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配window :%+v", task.taskType, acceptableWindows)
+			}
 		}
 
+		//如果没有合适的window，则跳过这个req，筛选下一个req
 		if len(acceptableWindows[sqi]) == 0 {
-			continue
+			if task.taskType == sealtasks.TTAddPiece {
+				if len(acceptableAPWindows) > 0 {
+					acceptableWindows[sqi] = acceptableAPWindows
+					goto EXCUTEADDPIECE
+				} else {
+					sh.isExistFreeWorker = false
+					log.Debugf("================ CLOSE1 , sectorid(%+v)，taskType:%s", task.sector, task.taskType)
+					continue
+				}
+			}
+			log.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
 		}
 
+	EXCUTEADDPIECE:
+		//筛选worker，首先打乱顺序,然后选择选择资源最优，任务指定的先加入进来的worker优先，也就是index小的表示older
 		// Pick best worker (shuffle in case some workers are equally as good)
 		rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
 			acceptableWindows[sqi][i], acceptableWindows[sqi][j] = acceptableWindows[sqi][j], acceptableWindows[sqi][i]
@@ -348,29 +455,38 @@ func (sh *scheduler) trySched() {
 		})
 	}
 
-	log.Debugf("SCHED windows: %+v", windows)
-	log.Debugf("SCHED Acceptable win: %+v", acceptableWindows)
-
 	// Step 2
 	scheduled := 0
-
+	//第二遍遍历
 	for sqi := 0; sqi < sh.schedQueue.Len(); sqi++ {
 		task := (*sh.schedQueue)[sqi]
 		needRes := ResourceTable[task.taskType][sh.spt]
+		_, ok := sh.taskRecorder.Load(task.sector)
+		if !ok {
+			sh.taskRecorder.Store(task.sector, sectorTaskRecord{})
+		}
+		tr, _ := sh.taskRecorder.Load(task.sector)
+		taskRd := tr.(sectorTaskRecord)
 
 		selectedWindow := -1
+		//遍历acceptableWindows，再次判断结构中的worker资源是否匹配，然后add资源，然后break准备分配
 		for _, wnd := range acceptableWindows[task.indexHeap] {
 			wid := sh.openWindows[wnd].worker
 			wr := sh.workers[wid].info.Resources
 
-			log.Debugf("SCHED try assign sqi:%d sector %d to window %d", sqi, task.sector.Number, wnd)
+			//log.Debugf("SCHED try assign winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
 
 			// TODO: allow bigger windows
 			if !windows[wnd].allocated.canHandleRequest(needRes, wid, wr) {
 				continue
 			}
 
-			log.Debugf("SCHED ASSIGNED sqi:%d sector %d to window %d", sqi, task.sector.Number, wnd)
+			if !sh.canHandleRequestForTask(task.taskType, sh.workers[wid].info.Hostname, task.sector, wid) {
+				log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v\n", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
+				continue
+			}
+
+			log.Debugf("SCHED ASSIGNED winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
 
 			windows[wnd].allocated.add(wr, needRes)
 
@@ -384,7 +500,16 @@ func (sh *scheduler) trySched() {
 		}
 
 		windows[selectedWindow].todo = append(windows[selectedWindow].todo, task)
+		log.Debugf("============== select window to do task ->  window [%d] , worker [%s] , workerID [%+v] ,sectorID [%+v] ,type [%+v] \n",
+			selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector, task.taskType)
 
+		if task.taskType == sealtasks.TTAddPiece {
+			taskRd.taskStatus = ADDPIECE_WAITING
+			taskRd.workerFortask = sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname
+			sh.taskRecorder.Store(task.sector, taskRd)
+			log.Debugf("================ start bind ,window [%d] , worker [%s] , workerID [%+v] , sectorID [%+v] ,taskRecorder: [%+v] \n",
+				selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector, sh.taskRecorder)
+		}
 		sh.schedQueue.Remove(sqi)
 		sqi--
 		scheduled++
@@ -408,11 +533,13 @@ func (sh *scheduler) trySched() {
 		window := window // copy
 		select {
 		case sh.openWindows[wnd].done <- &window:
+			log.Debugf("============== done <- allocated:%+v,todo:%+v,wnd:%+v,", &window.allocated, &window.todo, wnd)
 		default:
 			log.Error("expected sh.openWindows[wnd].done to be buffered")
 		}
 	}
 
+	//踢出已经分配过任务的window，统计出新的openwindows
 	// Rewrite sh.openWindows array, removing scheduled windows
 	newOpenWindows := make([]*schedWindowRequest, 0, len(sh.openWindows)-len(scheduledWindows))
 	for wnd, window := range sh.openWindows {
@@ -437,6 +564,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 		worker, found := sh.workers[wid]
 		sh.workersLk.RUnlock()
 
+		//同意关闭goroutine跟踪？
 		ready.Done()
 
 		if !found {
@@ -451,6 +579,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 
 		var activeWindows []*schedWindow
 
+		//关闭worker
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
@@ -465,6 +594,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 			// TODO: close / return all queued tasks
 		}()
 
+		//先给新worker注册两个处理窗口
 		for {
 			// ask for more windows if we need them
 			for ; windowsRequested < SchedWindows; windowsRequested++ {
@@ -473,6 +603,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 					worker: wid,
 					done:   scheduledWindows,
 				}:
+					//log.Debugf("============== new scheduledWindows for worker:%+v,workerID:%+v", scheduledWindows, wid)
 				case <-sh.closing:
 					return
 				case <-workerClosing:
@@ -482,8 +613,10 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 				}
 			}
 
+			//接收trysched中done传入的req
 			select {
 			case w := <-scheduledWindows:
+				//log.Debugf("============== 接收 trySched 中传入的 done <-window w.allocated:%+v,w.todo:%+v", w.allocated, w.todo)
 				activeWindows = append(activeWindows, w)
 			case <-taskDone:
 				log.Debugw("task done", "workerid", wid)
@@ -496,9 +629,12 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 			}
 
 		assignLoop:
+			//分配window去做req
+			//监听是否有新任务分配，如果有则变更windowsRequested的数量，进入新的循环，创建新的window，保持一直有windowsRequested数量个window
 			// process windows in order
 			for len(activeWindows) > 0 {
 				// process tasks within a window in order
+				//最终分配req到worker
 				for len(activeWindows[0].todo) > 0 {
 					todo := activeWindows[0].todo[0]
 					needRes := ResourceTable[todo.taskType][sh.spt]
@@ -535,6 +671,59 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 	}()
 }
 
+func (sh *scheduler) updateTransforCount(updatetype int) {
+	// 记录等待传输的数量
+	tc, _ := sh.transferChannel.LoadOrStore("wCount", 0)
+	//if !ok {
+	//	log.Errorf("======updateTransforCount load wCount error\n")
+	//	return
+	//}
+	wCount, _ := tc.(int)
+
+	if updatetype == 1 {
+		wCount += 1
+	} else {
+		wCount -= 1
+	}
+
+	sh.transferChannel.Store("wCount", wCount)
+	log.Infof("========total wait transforing count is :%d\n", wCount)
+}
+
+// 拉取数据
+func (sh *scheduler) tryFetchData(wid WorkerID, req *workerRequest) {
+	// 开始调度C2 再去拉取数据
+	if req.taskType != sealtasks.TTCommit2 {
+		return
+	}
+
+	log.Infof("=========before sector(%+v) to do SealCommit2 tryFetchData", req.sector)
+
+	// transferChannel存储key：wid，value：channel
+	// 存储channel用于计算任务完成后检测传输是否完成，如果未完成则等待传输完成。
+	tch := make(chan abi.SectorID)
+	sh.transferChannel.Store(req.sector, tch)
+
+	// 更新传输任务等待状态
+	sh.updateTransforCount(1)
+
+	// 默认使用miner拉取
+	sh.workersLk.Lock()
+	w := sh.workers[WorkerID(0)]
+	sh.workersLk.Unlock()
+
+	// 执行拉取
+	transforStartAt := time.Now()
+	_ = w.w.FetchRealData(req.ctx, req.sector)
+	log.Infof("=========sector(%+v) transfor cost time : %s", req.sector, time.Now().Sub(transforStartAt))
+	//time.Sleep(time.Minute * 1)
+
+	// 写入数据完成信号
+	tch <- req.sector
+	//log.Info("===============传送完成--测试测试。。。。。。。。。。。。。")
+
+}
+
 func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *workerHandle, req *workerRequest) error {
 	needRes := ResourceTable[req.taskType][sh.spt]
 
@@ -543,6 +732,9 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 	w.lk.Unlock()
 
 	go func() {
+		// 拉取数据
+		go sh.tryFetchData(wid, req)
+
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()
 
@@ -550,6 +742,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			w.lk.Lock()
 			w.preparing.free(w.info.Resources, needRes)
 			w.lk.Unlock()
+			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 			sh.workersLk.Unlock()
 
 			select {
@@ -581,6 +774,29 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			}
 
 			err = req.work(req.ctx, w.wt.worker(w.w))
+
+			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+			// 检测C2任务是否完成，完成则返回，否则等待
+			if req.taskType == sealtasks.TTCommit2 {
+				log.Warnf("=======sector(%+v) finished SealCommit2 task, check transfer is finish...", req.sector)
+				tch, ok := sh.transferChannel.Load(req.sector)
+				if ok {
+					tch1 := tch.(chan abi.SectorID)
+					select {
+					case sid := <-tch1:
+						sh.transferChannel.Delete(req.sector)
+						sh.updateTransforCount(0)
+						if sid != req.sector {
+							log.Errorf("===========maybe some error when transfer process\n")
+						}
+						log.Infof("========receive sector[%+v] transfer finished signal", req.sector)
+					}
+
+				} else {
+					// TODO 告警，sector C2任务完成确没有传输数据的channel，需要检查sealed和cache数据
+					log.Errorf("========sector(%+v) finished SealPrecommit2,but not found transfer channel. check data!!!!", req.sector)
+				}
+			}
 
 			select {
 			case req.ret <- workerResponse{err: err}:

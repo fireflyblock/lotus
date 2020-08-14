@@ -18,6 +18,9 @@ import (
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/storiface"
+
+	"github.com/filecoin-project/go-fil-markets/filestore"
+	"github.com/filecoin-project/go-padreader"
 )
 
 var log = logging.Logger("sbmock")
@@ -76,8 +79,31 @@ func (mgr *SectorMgr) NewSector(ctx context.Context, sector abi.SectorID) error 
 	return nil
 }
 
-func (mgr *SectorMgr) AddPiece(ctx context.Context, sectorId abi.SectorID, existingPieces []abi.UnpaddedPieceSize, size abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+func (mgr *SectorMgr) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
+	return io.LimitReader(ffiwrapper.Reader{}, int64(size))
+}
+
+func (mgr *SectorMgr) AddPiece(ctx context.Context, sectorId abi.SectorID, existingPieces []abi.UnpaddedPieceSize, size abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 	log.Warn("Add piece: ", sectorId, size, mgr.proofType)
+
+	//插入转换函数 ++++++++++++++++++++++++++++++++++++++++
+	var r io.Reader
+	if fileName == "_pledgeSector" {
+		r = mgr.pledgeReader(size)
+	} else {
+		fs, err := filestore.NewLocalFileStore(filestore.OsPath(filePath))
+		f, _ := fs.Open(filestore.Path(fileName))
+
+		paddedReader, paddedSize := padreader.New(f, uint64(f.Size()))
+
+		size = abi.UnpaddedPieceSize(paddedSize)
+		r = paddedReader
+		//pieceSize abi.UnpaddedPieceSize, pieceData io.Reader
+		if err != nil {
+			log.Errorf("closing staged file: %+v", err)
+		}
+		//file, err = environment.OpenFile(deal.PiecePath)
+	}
 
 	var b bytes.Buffer
 	tr := io.TeeReader(r, &b)

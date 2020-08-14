@@ -3,13 +3,15 @@ package sectorstorage
 import (
 	"context"
 	"errors"
-	"github.com/filecoin-project/sector-storage/fsutil"
 	"io"
 	"net/http"
+	"time"
+
+	"github.com/filecoin-project/sector-storage/fsutil"
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/mitchellh/go-homedir"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/specs-actors/actors/abi"
@@ -31,6 +33,9 @@ type Worker interface {
 	ffiwrapper.StorageSealer
 
 	MoveStorage(ctx context.Context, sector abi.SectorID) error
+
+	// FetchRealData get real useful data
+	FetchRealData(ctx context.Context, id abi.SectorID) error
 
 	Fetch(ctx context.Context, s abi.SectorID, ft stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error
 	UnsealPiece(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
@@ -114,6 +119,10 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 		Prover: prover,
 	}
 
+	//err = m.sched.StartLoad()
+	//if err != nil {
+	//	return  nil,xerrors.Errorf("========== start load task record err: %w", err)
+	//}
 	go m.sched.runSched()
 
 	localTasks := []sealtasks.TaskType{
@@ -166,6 +175,23 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 	if err != nil {
 		return xerrors.Errorf("getting worker info: %w", err)
 	}
+	scope, err := GetWorkScope(ctx, w)
+	if err != nil {
+		return err
+	}
+
+	path, err := w.Paths(ctx)
+	fsS, err := m.storage.FsStat(ctx, path[0].ID)
+	if err != nil {
+		return err
+	}
+
+	//计算worker配置信息
+	tc := CalculateResources(info.Resources, fsS.Available)
+	log.Debugf("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
+	if scope == PRIORITYCOMMIT2 {
+		tc.Commit2 = 10000
+	}
 
 	m.sched.newWorkers <- &workerHandle{
 		w: w,
@@ -175,7 +201,11 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		info:      info,
 		preparing: &activeResources{},
 		active:    &activeResources{},
+		taskConf:  tc,
+		WorkScope: scope,
 	}
+	m.sched.workScopeRecorder.append(scope, info.Hostname)
+	//log.Debugf("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
 	return nil
 }
 
@@ -281,7 +311,7 @@ func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
 	return nil
 }
 
-func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -297,13 +327,37 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 	}
 
+	var tt sealtasks.TaskType
+	if fileName == "_pledgeSector" {
+		tt = sealtasks.TTAddPiecePl
+	} else {
+		tt = sealtasks.TTAddPiece
+	}
+
 	var out abi.PieceInfo
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
-		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r)
+	err = m.sched.Schedule(ctx, sector, tt, selector, schedNop, func(ctx context.Context, w Worker) error {
+		wInfo, _ := w.Info(ctx)
+		_, ok := m.sched.taskRecorder.Load(sector)
+		if !ok {
+			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+		}
+		tr, _ := m.sched.taskRecorder.Load(sector)
+		taskRd := tr.(sectorTaskRecord)
+
+		taskRd.taskStatus = ADDPIECE_COMPUTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is computing AddPiece in sectorID[%+v]", wInfo.Hostname, sector)
+		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
+		p, err := w.AddPiece(ctx, sector, existingPieces, sz, filePath, fileName)
 		if err != nil {
 			return err
 		}
 		out = p
+		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+		//任务结束，更改taskRecorder状态
+		taskRd.taskStatus = PRE1_WAITTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -322,12 +376,31 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	selector := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathSealing)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	//err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
+		wInfo, _ := w.Info(ctx)
+		_, ok := m.sched.taskRecorder.Load(sector)
+		if !ok {
+			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+		}
+		tr, _ := m.sched.taskRecorder.Load(sector)
+		taskRd := tr.(sectorTaskRecord)
+
+		taskRd.taskStatus = PRE1_COMPUTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
 		if err != nil {
 			return err
 		}
 		out = p
+		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+
+		//任务结束，更改taskRecorder状态
+		taskRd.taskStatus = PRE2_WAITING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -344,12 +417,35 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 
 	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, true)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	//err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
+		wInfo, _ := w.Info(ctx)
+		defer func() {
+			m.sched.isExistFreeWorker = true
+			log.Debugf("================ SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+		}()
+		_, ok := m.sched.taskRecorder.Load(sector)
+		if !ok {
+			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+		}
+		tr, _ := m.sched.taskRecorder.Load(sector)
+		taskRd := tr.(sectorTaskRecord)
+
+		taskRd.taskStatus = PRE2_COMPUTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
 			return err
 		}
 		out = p
+		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+
+		//任务结束，更改taskRecorder状态
+		taskRd.taskStatus = COMMIT1_WAITTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -368,12 +464,31 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	// generally very cheap / fast, and transferring data is not worth the effort
 	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, false)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	//err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
+		wInfo, _ := w.Info(ctx)
+		_, ok := m.sched.taskRecorder.Load(sector)
+		if !ok {
+			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+		}
+		tr, _ := m.sched.taskRecorder.Load(sector)
+		taskRd := tr.(sectorTaskRecord)
+
+		taskRd.taskStatus = COMMIT1_COMPUTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
 		if err != nil {
 			return err
 		}
 		out = p
+		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+
+		//任务结束，更改taskRecorder状态
+		taskRd.taskStatus = COMMIT2_WAITTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -383,11 +498,34 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	selector := newTaskSelector()
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
+		wInfo, _ := w.Info(ctx)
+		defer func() {
+			m.sched.isExistFreeWorker = true
+			log.Debugf("================ SealCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+		}()
+
+		_, ok := m.sched.taskRecorder.Load(sector)
+		if !ok {
+			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+		}
+		tr, _ := m.sched.taskRecorder.Load(sector)
+		taskRd := tr.(sectorTaskRecord)
+
+		taskRd.taskStatus = COMMIT2_COMPUTING
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit2(ctx, sector, phase1Out)
 		if err != nil {
 			return err
 		}
 		out = p
+		go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+
+		//任务结束，更改taskRecorder状态
+		taskRd.taskStatus = TRANSFOR_FINISHED
+		m.sched.taskRecorder.Store(sector, taskRd)
+		log.Debugf("================ worker %s is TRANSFOR_FINISHED in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -398,27 +536,30 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTSealed|stores.FTUnsealed|stores.FTCache); err != nil {
-		return xerrors.Errorf("acquiring sector lock: %w", err)
-	}
-
-	unsealed := stores.FTUnsealed
-	{
-		unsealedStores, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
-		if err != nil {
-			return xerrors.Errorf("finding unsealed sector: %w", err)
-		}
-
-		if len(unsealedStores) == 0 { // Is some edge-cases unsealed sector may not exist already, that's fine
-			unsealed = stores.FTNone
-		}
-	}
+	//if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTSealed|stores.FTUnsealed|stores.FTCache); err != nil {
+	//	return xerrors.Errorf("acquiring sector lock: %w", err)
+	//}
+	//
+	//unsealed := stores.FTUnsealed
+	//{
+	//	unsealedStores, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
+	//	if err != nil {
+	//		return xerrors.Errorf("finding unsealed sector: %w", err)
+	//	}
+	//
+	//	if len(unsealedStores) == 0 { // Is some edge-cases unsealed sector may not exist already, that's fine
+	//		unsealed = stores.FTNone
+	//	}
+	//}
 
 	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, false)
 
 	err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
-		schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
+		//schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
+		schedNop,
 		func(ctx context.Context, w Worker) error {
+			wInfo, _ := w.Info(ctx)
+			log.Debugf("================ worker %s start do %s for sector %d ", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			return w.FinalizeSector(ctx, sector, keepUnsealed)
 		})
 	if err != nil {
@@ -426,17 +567,24 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	}
 
 	fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
-	moveUnsealed := unsealed
-	{
-		if len(keepUnsealed) == 0 {
-			moveUnsealed = stores.FTNone
-		}
-	}
+	//moveUnsealed := unsealed
+	//{
+	//	if len(keepUnsealed) == 0 {
+	//		moveUnsealed = stores.FTNone
+	//	}
+	//}
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
-		schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
+		//schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
+		schedNop,
 		func(ctx context.Context, w Worker) error {
-			return w.MoveStorage(ctx, sector)
+			err := w.MoveStorage(ctx, sector)
+			if err != nil {
+				return err
+			}
+			//delete after sector is executed
+			m.sched.taskRecorder.Delete(sector)
+			return nil
 		})
 	if err != nil {
 		return xerrors.Errorf("moving sector to storage: %w", err)
