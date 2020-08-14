@@ -501,6 +501,13 @@ func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID,
 			}
 		}
 
+		// delete unseal
+		spath = filepath.Join(p.local, "unsealed", SectorName(sid))
+		log.Infof("remove %s", spath)
+		if err := os.RemoveAll(spath); err != nil {
+			log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+		}
+
 	}
 	log.Infof("======== who call me ??????????????????????????")
 	return nil
