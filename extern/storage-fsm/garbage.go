@@ -16,6 +16,9 @@ func (m *Sealing) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 }
 
 func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
+	// 说明
+	// 当len(existingPieceSizes)>0 && len(sizes)>0时表明是deal发单后需要填充sector剩余空间。否则是纯垃圾sector
+	// 原因参考pledgeSector调用即可明白
 	if len(sizes) == 0 {
 		return nil, nil
 	}
@@ -23,15 +26,31 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 	log.Infof("Pledge %d, contains %+v", sectorID, existingPieceSizes)
 
 	out := make([]abi.PieceInfo, len(sizes))
-	for i, size := range sizes {
-		ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, m.pledgeReader(size))
-		if err != nil {
-			return nil, xerrors.Errorf("add piece: %w", err)
+	if len(existingPieceSizes) > 0 && len(sizes) > 0 {
+		log.Infof("fil deal sector(%+v) with pledge, contains %+v", sectorID, existingPieceSizes)
+		for i, size := range sizes {
+			log.Infof("========== Range AddPiece %d, sizes %+v, size %+v", sectorID, len(sizes), size)
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, "", "_filPledgeToDealSector")
+			if err != nil {
+				return nil, xerrors.Errorf("add piece: %w", err)
+			}
+
+			existingPieceSizes = append(existingPieceSizes, size)
+
+			out[i] = ppi
 		}
+	} else {
+		log.Infof("pure pledge sector(%+v)", sectorID)
+		for i, size := range sizes {
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, "", "_pledgeSector")
+			if err != nil {
+				return nil, xerrors.Errorf("add piece: %w", err)
+			}
 
-		existingPieceSizes = append(existingPieceSizes, size)
+			existingPieceSizes = append(existingPieceSizes, size)
 
-		out[i] = ppi
+			out[i] = ppi
+		}
 	}
 
 	return out, nil
