@@ -571,61 +571,62 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 }
 
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
-	if len(keepUnsealed) > 0 {
-		maxPieceSize := abi.PaddedPieceSize(sb.ssize)
+	log.Info("======== do FinalizeSector skip check keepUnsealed ")
+	//if len(keepUnsealed) > 0 {
+	//	maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
-		sr := pieceRun(0, maxPieceSize)
+	//	sr := pieceRun(0, maxPieceSize)
 
-		for _, s := range keepUnsealed {
-			si := &rlepluslazy.RunSliceIterator{}
-			if s.Offset != 0 {
-				si.Runs = append(si.Runs, rlepluslazy.Run{Val: false, Len: uint64(s.Offset)})
-			}
-			si.Runs = append(si.Runs, rlepluslazy.Run{Val: true, Len: uint64(s.Size)})
+	//	for _, s := range keepUnsealed {
+	//		si := &rlepluslazy.RunSliceIterator{}
+	//		if s.Offset != 0 {
+	//			si.Runs = append(si.Runs, rlepluslazy.Run{Val: false, Len: uint64(s.Offset)})
+	//		}
+	//		si.Runs = append(si.Runs, rlepluslazy.Run{Val: true, Len: uint64(s.Size)})
 
-			var err error
-			sr, err = rlepluslazy.Subtract(sr, si)
-			if err != nil {
-				return err
-			}
-		}
+	//		var err error
+	//		sr, err = rlepluslazy.Subtract(sr, si)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
 
-		paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, 0, stores.PathStorage)
-		if err != nil {
-			return xerrors.Errorf("acquiring sector cache path: %w", err)
-		}
-		defer done()
+	//	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, 0, stores.PathStorage)
+	//	if err != nil {
+	//		return xerrors.Errorf("acquiring sector cache path: %w", err)
+	//	}
+	//	defer done()
 
-		pf, err := openPartialFile(maxPieceSize, paths.Unsealed)
-		if xerrors.Is(err, os.ErrNotExist) {
-			return xerrors.Errorf("opening partial file: %w", err)
-		}
+	//	pf, err := openPartialFile(maxPieceSize, paths.Unsealed)
+	//	if xerrors.Is(err, os.ErrNotExist) {
+	//		return xerrors.Errorf("opening partial file: %w", err)
+	//	}
 
-		var at uint64
-		for sr.HasNext() {
-			r, err := sr.NextRun()
-			if err != nil {
-				_ = pf.Close()
-				return err
-			}
+	//	var at uint64
+	//	for sr.HasNext() {
+	//		r, err := sr.NextRun()
+	//		if err != nil {
+	//			_ = pf.Close()
+	//			return err
+	//		}
 
-			offset := at
-			at += r.Len
-			if !r.Val {
-				continue
-			}
+	//		offset := at
+	//		at += r.Len
+	//		if !r.Val {
+	//			continue
+	//		}
 
-			err = pf.Free(storiface.PaddedByteIndex(abi.UnpaddedPieceSize(offset).Padded()), abi.UnpaddedPieceSize(r.Len).Padded())
-			if err != nil {
-				_ = pf.Close()
-				return xerrors.Errorf("free partial file range: %w", err)
-			}
-		}
+	//		err = pf.Free(storiface.PaddedByteIndex(abi.UnpaddedPieceSize(offset).Padded()), abi.UnpaddedPieceSize(r.Len).Padded())
+	//		if err != nil {
+	//			_ = pf.Close()
+	//			return xerrors.Errorf("free partial file range: %w", err)
+	//		}
+	//	}
 
-		if err := pf.Close(); err != nil {
-			return err
-		}
-	}
+	//	if err := pf.Close(); err != nil {
+	//		return err
+	//	}
+	//}
 
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache, 0, stores.PathStorage)
 	if err != nil {
