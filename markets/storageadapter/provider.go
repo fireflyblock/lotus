@@ -80,7 +80,7 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 		Value:  types.NewInt(0),
 		Method: builtin.MethodsMarket.PublishStorageDeals,
 		Params: params,
-	})
+	}, nil)
 	if err != nil {
 		return cid.Undef, err
 	}
@@ -184,7 +184,7 @@ func (n *ProviderNodeAdapter) AddFunds(ctx context.Context, addr address.Address
 		From:   addr,
 		Value:  amount,
 		Method: builtin.MethodsMarket.AddBalance,
-	})
+	}, nil)
 	if err != nil {
 		return cid.Undef, err
 	}
@@ -386,6 +386,11 @@ func (n *ProviderNodeAdapter) OnDealExpiredOrSlashed(ctx context.Context, dealID
 
 	// Called immediately to check if the deal has already expired or been slashed
 	checkFunc := func(ts *types.TipSet) (done bool, more bool, err error) {
+		if ts == nil {
+			// keep listening for events
+			return false, true, nil
+		}
+
 		// Check if the deal has already expired
 		if sd.Proposal.EndEpoch <= ts.Height() {
 			onDealExpired(nil)
