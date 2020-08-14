@@ -237,6 +237,7 @@ func (m *Sealing) handleWaitSeed(ctx statemachine.Context, sector SectorInfo) er
 	}
 
 	randHeight := pci.PreCommitEpoch + miner.PreCommitChallengeDelay
+	log.Infof("========== RandHeight PreCommitEpoch %+v, PreCommitChallengeDelay %+v", pci.PreCommitEpoch, miner.PreCommitChallengeDelay)
 
 	err = m.events.ChainAt(func(ectx context.Context, _ TipSetToken, curH abi.ChainEpoch) error {
 		// in case of null blocks the randomness can land after the tipset we

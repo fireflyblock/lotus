@@ -127,13 +127,16 @@ func (m *Sealing) Run(ctx context.Context) error {
 func (m *Sealing) Stop(ctx context.Context) error {
 	return m.sectors.Stop(ctx)
 }
-func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+
 	log.Infof("Adding piece for deal %d", d.DealID)
 	if (padreader.PaddedSize(uint64(size))) != size {
+		log.Warn("====== AddPieceToAnySector (padreader.PaddedSize(uint64(size))) != size")
 		return 0, 0, xerrors.Errorf("cannot allocate unpadded piece")
 	}
 
-	if size > abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded() {
+	if size > abi.UnpaddedPieceSize(m.sealer.SectorSize()) {
+		log.Warn("====== AddPieceToAnySector size > abi.UnpaddedPieceSize(m.sealer.SectorSize())")
 		return 0, 0, xerrors.Errorf("piece cannot fit into a sector")
 	}
 
@@ -146,7 +149,11 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	for _, p := range pads {
-		err = m.addPiece(ctx, sid, p.Unpadded(), m.pledgeReader(p.Unpadded()), nil)
+		//err = m.addPiece(ctx, sid, p.Unpadded(), m.pledgeReader(p.Unpadded()), nil)
+		log.Infof("====== AddPieceToAnySector--> range pads  \n p:+%v ", p)
+		//log.Info("====== AddPieceToAnySector--> will to pledge")
+
+		err = m.addPiece(ctx, sid, p.Unpadded(), "", "_pledgeSector", nil)
 		if err != nil {
 			m.unsealedInfoMap.mux.Unlock()
 			return 0, 0, xerrors.Errorf("writing pads: %w", err)
@@ -154,7 +161,9 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	offset := m.unsealedInfoMap.infos[sid].stored
-	err = m.addPiece(ctx, sid, size, r, &d)
+	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:+%v ", offset)
+
+	err = m.addPiece(ctx, sid, size, filePath, fileName, &d)
 
 	if err != nil {
 		m.unsealedInfoMap.mux.Unlock()
@@ -162,19 +171,47 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	m.unsealedInfoMap.mux.Unlock()
-	if m.unsealedInfoMap.infos[sid].numDeals == getDealPerSectorLimit(m.sealer.SectorSize()) {
-		if err := m.StartPacking(sid); err != nil {
-			return 0, 0, xerrors.Errorf("start packing: %w", err)
-		}
+	//if m.unsealedInfoMap.infos[sid].numDeals == getDealPerSectorLimit(m.sealer.SectorSize()) {
+	m.StartPacking(sid)
+	//}
+
+	return sid, abi.PaddedPieceSize(offset), nil
+}
+
+func dealIo(r io.Reader) (path, name string) {
+	var filePath string = "/Users/jiaxingsun/go/src/github.com/lotus/node1/"
+	var fileName string = "data.txt"
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(r)
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Println("open===============", err)
+		return "", ""
 	}
 
-	return sid, offset, nil
+	n, err := file.Write(buf.Bytes())
+	if err != nil {
+		fmt.Println("write===============", err)
+		return "", ""
+	}
+	fmt.Println("write n ===============", n)
+	return filePath, fileName
 }
 
 // Caller should hold m.unsealedInfoMap.mux
-func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, r io.Reader, di *DealInfo) error {
+func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, filePath, fileName string, di *DealInfo) error {
+	//log.Info("====== addPiece Called")
+	log.Infof("====== addPiece-->trans params \n filepath:%+v \n fileName:+%v", filePath, fileName)
+
 	log.Infof("Adding piece to sector %d", sectorID)
-	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, r)
+
+	//插入转换函数 ++++++++++++++++++++++++++++++++++++++++
+	//filePath, fileName := dealIo(r)
+	if filePath == "" {
+		return xerrors.Errorf("转化错误=====》: %w", errors.New("发单传入路径有误"))
+	}
+
+	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, filePath, fileName)
 	if err != nil {
 		return xerrors.Errorf("writing piece: %w", err)
 	}
@@ -272,18 +309,18 @@ func (m *Sealing) newSector() (abi.SectorNumber, error) {
 		return 0, xerrors.Errorf("starting the sector fsm: %w", err)
 	}
 
-	sd, err := m.getSealDelay()
+	_, err = m.getSealDelay()
 	if err != nil {
 		return 0, xerrors.Errorf("getting the sealing delay: %w", err)
 	}
 
-	if sd > 0 {
+	/*	if sd > 0 {
 		timer := time.NewTimer(sd)
 		go func() {
 			<-timer.C
 			m.StartPacking(sid)
 		}()
-	}
+	}*/
 
 	return sid, nil
 }
