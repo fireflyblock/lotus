@@ -1,10 +1,13 @@
 package sealing
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"os"
 	"sync"
-	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -74,8 +77,8 @@ type Sealing struct {
 }
 
 type FeeConfig struct {
-	MaxPreCommitGasFee  abi.TokenAmount
-	MaxCommitGasFee     abi.TokenAmount
+	MaxPreCommitGasFee abi.TokenAmount
+	MaxCommitGasFee    abi.TokenAmount
 }
 
 type UnsealedSectorMap struct {

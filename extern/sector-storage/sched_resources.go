@@ -124,7 +124,7 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 	if sh.workers[wid].taskConf == nil {
 		sh.workers[wid].taskConf = &TaskConfig{}
 	}
-	log.Infof("========== try check taskConfig, workerHostName: [%+v] ,tasks: [%+v] , taskConf: [%+v] ", workerHostName, v.(*taskCounter), sh.workers[wid].taskConf)
+	//log.Infof("========== try check taskConfig, workerHostName: [%+v] ,tasks: [%+v] , taskConf: [%+v] ", workerHostName, v.(*taskCounter), sh.workers[wid].taskConf)
 	//log.Infof("========== sectorFilter 1: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
 	//log.Infof("========== sectorFilter 2: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2))
 	switch taskType {
@@ -179,7 +179,7 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 	v.(*taskCounter).tasksLK.Lock()
 	defer v.(*taskCounter).tasksLK.Unlock()
 
-	log.Infof("========== check taskConfig, workerHostName: [%+v] , sectorID: [%+v] , tasks: [%+v] ,taskConf: [%+v] ", workerHostName, sectorID, v.(*taskCounter), sh.workers[wid].taskConf)
+	//log.Infof("========== check taskConfig, workerHostName: [%+v] , sectorID: [%+v] , tasks: [%+v] ,taskConf: [%+v] ", workerHostName, sectorID, v.(*taskCounter), sh.workers[wid].taskConf)
 	if sh.tryCanHandleRequestForTask(taskType, workerHostName, sectorID, wid) {
 		switch taskType {
 		case sealtasks.TTAddPiece:

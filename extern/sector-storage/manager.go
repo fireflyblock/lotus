@@ -191,6 +191,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 	log.Debugf("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	if scope == PRIORITYCOMMIT2 {
 		tc.Commit2 = 10000
+		log.Debugf("================ c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
 	}
 
 	m.sched.newWorkers <- &workerHandle{
@@ -205,7 +206,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		WorkScope: scope,
 	}
 	m.sched.workScopeRecorder.append(scope, info.Hostname)
-	//log.Debugf("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
+	log.Debugf("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
 	return nil
 }
 
