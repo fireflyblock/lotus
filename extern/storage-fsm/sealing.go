@@ -204,9 +204,9 @@ func dealIo(r io.Reader) (path, name string) {
 // Caller should hold m.unsealedInfoMap.mux
 func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, filePath, fileName string, di *DealInfo) error {
 	//log.Info("====== addPiece Called")
-	log.Infof("====== addPiece-->trans params \n filepath:%+v \n fileName:+%v", filePath, fileName)
+	log.Infof("====== addPiece(%+v)-->trans params --> filepath:%+v --> fileName:+%v", sectorID, filePath, fileName)
 
-	log.Infof("Adding piece to sector %d", sectorID)
+	//log.Infof("Adding piece to sector %d", sectorID)
 
 	//插入转换函数 ++++++++++++++++++++++++++++++++++++++++
 	//filePath, fileName := dealIo(r)

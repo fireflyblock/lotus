@@ -575,21 +575,22 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	//	}
 	//}
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
-		//schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
-		schedNop,
-		func(ctx context.Context, w Worker) error {
-			err := w.MoveStorage(ctx, sector)
-			if err != nil {
-				return err
-			}
-			//delete after sector is executed
-			m.sched.taskRecorder.Delete(sector)
-			return nil
-		})
-	if err != nil {
-		return xerrors.Errorf("moving sector to storage: %w", err)
-	}
+	// 禁止拉取数据,修复FinalizeFaild
+	//err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
+	//	//schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
+	//	schedNop,
+	//	func(ctx context.Context, w Worker) error {
+	//		err := w.MoveStorage(ctx, sector)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		//delete after sector is executed
+	//		m.sched.taskRecorder.Delete(sector)
+	//		return nil
+	//	})
+	//if err != nil {
+	//	return xerrors.Errorf("moving sector to storage: %w", err)
+	//}
 
 	return nil
 }
