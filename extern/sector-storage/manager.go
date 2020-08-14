@@ -560,8 +560,9 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		schedNop,
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
-			log.Debugf("================ worker %s start do %s for sector %d ", wInfo.Hostname, sealtasks.TTFinalize, sector)
-			return w.FinalizeSector(ctx, sector, keepUnsealed)
+			log.Debugf("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
+			//return w.FinalizeSector(ctx, sector, keepUnsealed)
+			return w.FinalizeSector(ctx, sector, []storage.Range{})
 		})
 	if err != nil {
 		return err
