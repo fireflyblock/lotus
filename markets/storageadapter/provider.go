@@ -5,7 +5,7 @@ package storageadapter
 import (
 	"bytes"
 	"context"
-	"os"
+	"io"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -87,14 +87,14 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 	return smsg.Cid(), nil
 }
 
-func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, fileName string) (*storagemarket.PackingResult, error) {
+func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {
 	//	log.Info("====== OnDealComplete Called")
 
-	path := os.Getenv("LOTUS_STORAGE_PATH")
-	filePath := path + "/" + fileName
+	//path := os.Getenv("LOTUS_STORAGE_PATH")
+	//filePath := path + "/" + fileName
 	//log.Infof("====== OnDealComplete --> \n filePath:%+v \n fileName: %+v",filePath,fileName)
 
-	p, offset, err := n.secb.AddPiece(ctx, pieceSize, filePath, fileName, sealing.DealInfo{
+	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sealing.DealInfo{
 		DealID: deal.DealID,
 		DealSchedule: sealing.DealSchedule{
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,

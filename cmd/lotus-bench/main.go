@@ -190,7 +190,9 @@ var parellelAddPieceCmd = &cli.Command{
 					Number: i,
 				}
 				start := time.Now()
-				_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
+				//r := rand.New(rand.NewSource(100 + int64(i)))
+				//_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
+				_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), nil, "_pledgeSector")
 				if err != nil {
 					log.Error(err)
 				}
@@ -599,7 +601,8 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 
 		//r := rand.New(rand.NewSource(100 + int64(i)))
 
-		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
+		//pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
+		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), nil, "_pledgeSector")
 		if err != nil {
 			return nil, nil, err
 		}

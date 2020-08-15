@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"io"
 	"sync"
 
 	"github.com/ipfs/go-datastore"
@@ -95,9 +96,9 @@ func (st *SectorBlocks) writeRef(dealID abi.DealID, sectorID abi.SectorNumber, o
 	return st.keys.Put(DealIDToDsKey(dealID), newRef) // TODO: batch somehow
 }
 
-func (st *SectorBlocks) AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-
-	sn, offset, err := st.Miner.AddPieceToAnySector(ctx, size, filePath, fileName, d)
+//func (st *SectorBlocks) AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (st *SectorBlocks) AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	sn, offset, err := st.Miner.AddPieceToAnySector(ctx, size, r, d)
 	if err != nil {
 		return 0, 0, err
 	}

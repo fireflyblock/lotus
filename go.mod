@@ -149,4 +149,4 @@ replace github.com/dgraph-io/badger/v2 => github.com/dgraph-io/badger/v2 v2.0.1-
 
 replace github.com/filecoin-project/specs-storage => ../specs-storage
 
-replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets
+//replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets

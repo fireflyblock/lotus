@@ -2,18 +2,14 @@ package sealing
 
 import (
 	"context"
-	"io"
-
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/specs-actors/actors/abi"
-
-	nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
+	"golang.org/x/xerrors"
+	//nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
 )
 
-func (m *Sealing) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
-	return io.LimitReader(&nr.Reader{}, int64(size))
-}
+//func (m *Sealing) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
+//	return io.LimitReader(&nr.Reader{}, int64(size))
+//}
 
 func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
 	// 说明
@@ -27,7 +23,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 
 	out := make([]abi.PieceInfo, len(sizes))
 	//for i, size := range sizes {
-	//	ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, NewNullReader(size))
+	//	ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, NewNullReader(size),"")
 	//	if err != nil {
 	//		return nil, xerrors.Errorf("add piece: %w", err)
 	//	}
@@ -41,7 +37,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 		log.Infof("fil deal sector(%+v) with pledge, contains %+v", sectorID, existingPieceSizes)
 		for i, size := range sizes {
 			log.Infof("========== Range AddPiece %d, sizes %+v, size %+v", sectorID, len(sizes), size)
-			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, "", "_filPledgeToDealSector")
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, nil, "_filPledgeToDealSector")
 			if err != nil {
 				return nil, xerrors.Errorf("add piece: %w", err)
 			}
@@ -53,7 +49,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 	} else {
 		log.Infof("pure pledge sector(%+v)", sectorID)
 		for i, size := range sizes {
-			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, "", "_pledgeSector")
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, nil, "_pledgeSector")
 			if err != nil {
 				return nil, xerrors.Errorf("add piece: %w", err)
 			}

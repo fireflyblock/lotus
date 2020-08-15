@@ -7,13 +7,13 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
+	//"io/ioutil"
 	"math/bits"
-	"net/http"
+	//"net/http"
 	"os"
 	"runtime"
 
-	"github.com/filecoin-project/go-padreader"
+	//"github.com/filecoin-project/go-padreader"
 	"github.com/ipfs/go-cid"
 
 	"golang.org/x/xerrors"
@@ -28,8 +28,7 @@ import (
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/zerocomm"
-
-	"github.com/filecoin-project/go-fil-markets/filestore"
+	//"github.com/filecoin-project/go-fil-markets/filestore"
 )
 
 var _ Storage = &Sealer{}
@@ -71,7 +70,8 @@ func (sb *Sealer) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(Reader{}, int64(size))
 }
 
-func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+//func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data, apType string) (abi.PieceInfo, error) {
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size
@@ -123,28 +123,19 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	/////////////////////////////////////////////
-	var file storage.Data
-	if fileName == "_pledgeSector" || fileName == "_filPledgeToDealSector" {
+	//var file storage.Data
+	if apType == "_pledgeSector" || apType == "_filPledgeToDealSector" {
+		//file=sealing.NewNullReader(pieceSize)
 		file = sb.pledgeReader(pieceSize)
-	} else {
-		/*fs, err := filestore.NewLocalFileStore(filestore.OsPath(filePath))
-		f, err := fs.Open(filestore.Path(fileName))
-		if err != nil {
-			log.Errorf("没有读到piece文件: %+v", err)
-		}
-		paddedReader, paddedSize := padreader.New(f, uint64(f.Size()))
-
-		pieceSize = abi.UnpaddedPieceSize(paddedSize)*/
-		transferData(filePath, fileName)
-		paddedReader, _, err := handlerReader(fileName)
-		//	log.Infof("====== AddPiece--> handlerReader \n  paddedSize:%+v\n  pieceSize:%+v", paddedSize, pieceSize)
-
-		file = paddedReader
-		if err != nil {
-			log.Errorf("====== AddPiece--> handlerReader err: %+v", err)
-		}
-		//file, err = environment.OpenFile(deal.PiecePath)
 	}
+	//else {
+	//	transferData(filePath, fileName)
+	//	paddedReader, _, err := handlerReader(fileName)
+	//	file = paddedReader
+	//	if err != nil {
+	//		log.Errorf("====== AddPiece--> handlerReader err: %+v", err)
+	//	}
+	//}
 	/////////////////////////////////////////////
 
 	w, err := stagedFile.Writer(storiface.UnpaddedByteIndex(offset).Padded(), pieceSize.Padded())
@@ -727,47 +718,48 @@ func GenerateUnsealedCID(proofType abi.RegisteredSealProof, pieces []abi.PieceIn
 
 	return ffi.GenerateUnsealedCID(proofType, allPieces)
 }
-func transferData(path, name string) {
-	//log.Info("====== transferData Called")
-	//log.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
 
-	addr := os.Getenv("MINER_LISTEN_ADDR")
-	url := "http://" + addr + "/TransferData"
-	log.Infof("====== transferData get request url --> \n url:%+v ", url)
+//func transferData(path, name string) {
+//	//log.Info("====== transferData Called")
+//	//log.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
+//
+//	addr := os.Getenv("MINER_LISTEN_ADDR")
+//	url := "http://" + addr + "/TransferData"
+//	log.Infof("====== transferData get request url --> \n url:%+v ", url)
+//
+//	repReader := bytes.NewReader([]byte(path))
+//	r, err := http.NewRequest("GET", url, repReader)
+//	if err != nil {
+//		log.Info("====== transferData newrequest err:", err)
+//		return
+//	}
+//	resp, err := http.DefaultClient.Do(r)
+//	if err != nil {
+//		log.Info("====== transferData transfer err:", err)
+//		return
+//	}
+//	response, _ := ioutil.ReadAll(resp.Body)
+//
+//	//storage
+//	tmp := os.Getenv("TMPDIR")
+//	err = ioutil.WriteFile(tmp+"/"+name, response, 0755)
+//	if err != nil {
+//		log.Info("====== transferData transfer resp err:", err)
+//	} else {
+//		log.Info("====== transferData transfer resp success")
+//	}
+//}
 
-	repReader := bytes.NewReader([]byte(path))
-	r, err := http.NewRequest("GET", url, repReader)
-	if err != nil {
-		log.Info("====== transferData newrequest err:", err)
-		return
-	}
-	resp, err := http.DefaultClient.Do(r)
-	if err != nil {
-		log.Info("====== transferData transfer err:", err)
-		return
-	}
-	response, _ := ioutil.ReadAll(resp.Body)
-
-	//storage
-	tmp := os.Getenv("TMPDIR")
-	err = ioutil.WriteFile(tmp+"/"+name, response, 0755)
-	if err != nil {
-		log.Info("====== transferData transfer resp err:", err)
-	} else {
-		log.Info("====== transferData transfer resp success")
-	}
-}
-
-func handlerReader(name string) (io.Reader, abi.UnpaddedPieceSize, error) {
-	//log.Info("====== handlerReader Called")
-	//log.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
-	tmp := os.Getenv("TMPDIR")
-	store, err := filestore.NewLocalFileStore(filestore.OsPath(tmp))
-	file, err := store.Open(filestore.Path(name))
-	if err != nil {
-		log.Info("====== handlerReader err:", err)
-		return nil, 0, err
-	}
-	reader, size := padreader.New(file, uint64(file.Size()))
-	return reader, size, nil
-}
+//func handlerReader(name string) (io.Reader, abi.UnpaddedPieceSize, error) {
+//	//log.Info("====== handlerReader Called")
+//	//log.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
+//	tmp := os.Getenv("TMPDIR")
+//	store, err := filestore.NewLocalFileStore(filestore.OsPath(tmp))
+//	file, err := store.Open(filestore.Path(name))
+//	if err != nil {
+//		log.Info("====== handlerReader err:", err)
+//		return nil, 0, err
+//	}
+//	reader, size := padreader.New(file, uint64(file.Size()))
+//	return reader, size, nil
+//}

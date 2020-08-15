@@ -312,7 +312,8 @@ func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
 	return nil
 }
 
-func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+//func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -329,7 +330,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	var tt sealtasks.TaskType
-	if fileName == "_pledgeSector" {
+	if apType == "_pledgeSector" {
 		tt = sealtasks.TTAddPiecePl
 	} else {
 		tt = sealtasks.TTAddPiece
@@ -349,7 +350,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		m.sched.taskRecorder.Store(sector, taskRd)
 		log.Debugf("================ worker %s is computing AddPiece in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.AddPiece(ctx, sector, existingPieces, sz, filePath, fileName)
+		//p, err := w.AddPiece(ctx, sector, existingPieces, sz, filePath, fileName)
+		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r, apType)
 		if err != nil {
 			return err
 		}
