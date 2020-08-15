@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	//"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -131,13 +132,14 @@ func (m *Sealing) Stop(ctx context.Context) error {
 	return m.sectors.Stop(ctx)
 }
 func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-
+//func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	log.Infof("Adding piece for deal %d", d.DealID)
 	if (padreader.PaddedSize(uint64(size))) != size {
 		log.Warn("====== AddPieceToAnySector (padreader.PaddedSize(uint64(size))) != size")
 		return 0, 0, xerrors.Errorf("cannot allocate unpadded piece")
 	}
 
+	//if size > abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded() {
 	if size > abi.UnpaddedPieceSize(m.sealer.SectorSize()) {
 		log.Warn("====== AddPieceToAnySector size > abi.UnpaddedPieceSize(m.sealer.SectorSize())")
 		return 0, 0, xerrors.Errorf("piece cannot fit into a sector")
@@ -152,10 +154,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	for _, p := range pads {
-		//err = m.addPiece(ctx, sid, p.Unpadded(), m.pledgeReader(p.Unpadded()), nil)
-		log.Infof("====== AddPieceToAnySector--> range pads  \n p:+%v ", p)
-		//log.Info("====== AddPieceToAnySector--> will to pledge")
-
+		//err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
 		err = m.addPiece(ctx, sid, p.Unpadded(), "", "_pledgeSector", nil)
 		if err != nil {
 			m.unsealedInfoMap.mux.Unlock()
@@ -167,6 +166,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:+%v ", offset)
 
 	err = m.addPiece(ctx, sid, size, filePath, fileName, &d)
+	//err = m.addPiece(ctx, sid, size, r, &d)
 
 	if err != nil {
 		m.unsealedInfoMap.mux.Unlock()
@@ -178,31 +178,43 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	m.StartPacking(sid)
 	//}
 
+	//if m.unsealedInfoMap.infos[sid].numDeals == getDealPerSectorLimit(m.sealer.SectorSize()) {
+	//	if err := m.StartPacking(sid); err != nil {
+	//		return 0, 0, xerrors.Errorf("start packing: %w", err)
+	//	}
+	//}
+	//
+	//return sid, offset, nil
+
+
 	return sid, abi.PaddedPieceSize(offset), nil
 }
 
-func dealIo(r io.Reader) (path, name string) {
-	var filePath string = "/Users/jiaxingsun/go/src/github.com/lotus/node1/"
-	var fileName string = "data.txt"
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(r)
-	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		fmt.Println("open===============", err)
-		return "", ""
-	}
-
-	n, err := file.Write(buf.Bytes())
-	if err != nil {
-		fmt.Println("write===============", err)
-		return "", ""
-	}
-	fmt.Println("write n ===============", n)
-	return filePath, fileName
-}
+//func dealIo(r io.Reader) (path, name string) {
+//	var filePath string = "/Users/jiaxingsun/go/src/github.com/lotus/node1/"
+//	var fileName string = "data.txt"
+//	buf := new(bytes.Buffer)
+//	buf.ReadFrom(r)
+//	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0600)
+//	if err != nil {
+//		fmt.Println("open===============", err)
+//		return "", ""
+//	}
+//
+//	n, err := file.Write(buf.Bytes())
+//	if err != nil {
+//		fmt.Println("write===============", err)
+//		return "", ""
+//	}
+//	fmt.Println("write n ===============", n)
+//	return filePath, fileName
+//}
 
 // Caller should hold m.unsealedInfoMap.mux
 func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, filePath, fileName string, di *DealInfo) error {
+	//log.Infof("Adding piece to sector %d", sectorID)
+	//ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, r)
+
 	//log.Info("====== addPiece Called")
 	log.Infof("====== addPiece(%+v)-->trans params --> filepath:%+v --> fileName:+%v", sectorID, filePath, fileName)
 
