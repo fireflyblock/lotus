@@ -37,7 +37,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 		log.Infof("fil deal sector(%+v) with pledge, contains %+v", sectorID, existingPieceSizes)
 		for i, size := range sizes {
 			log.Infof("========== Range AddPiece %d, sizes %+v, size %+v", sectorID, len(sizes), size)
-			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, nil, "_filPledgeToDealSector")
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, NewNullReader(0), "_filPledgeToDealSector")
 			if err != nil {
 				return nil, xerrors.Errorf("add piece: %w", err)
 			}
@@ -49,7 +49,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 	} else {
 		log.Infof("pure pledge sector(%+v)", sectorID)
 		for i, size := range sizes {
-			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, nil, "_pledgeSector")
+			ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, NewNullReader(0), "_pledgeSector")
 			if err != nil {
 				return nil, xerrors.Errorf("add piece: %w", err)
 			}
