@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -164,233 +165,6 @@ var runCmd = &cli.Command{
 			}
 		}
 
-		// Connect to storage-miner
-		var nodeApi api.StorageMiner
-		var closer func()
-		var err error
-		for {
-			nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx)
-			if err == nil {
-				break
-			}
-			fmt.Printf("\r\x1b[0KConnecting to miner API... (%s)", err)
-			time.Sleep(time.Second)
-			continue
-		}
-
-		defer closer()
-		ctx := lcli.ReqContext(cctx)
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		v, err := nodeApi.Version(ctx)
-		if err != nil {
-			return err
-		}
-		if v.APIVersion != build.APIVersion {
-			return xerrors.Errorf("lotus-miner API version doesn't match: local: ", api.Version{APIVersion: build.APIVersion})
-		}
-		log.Infof("Remote version %s", v)
-
-		watchMinerConn(ctx, cctx, nodeApi)
-
-		// Check params
-
-		act, err := nodeApi.ActorAddress(ctx)
-		if err != nil {
-			return err
-		}
-		ssize, err := nodeApi.ActorSectorSize(ctx, act)
-		if err != nil {
-			return err
-		}
-
-		if cctx.Bool("commit") {
-			if err := paramfetch.GetParams(ctx, build.ParametersJSON(), uint64(ssize)); err != nil {
-				return xerrors.Errorf("get params: %w", err)
-			}
-		}
-
-		var taskTypes []sealtasks.TaskType
-
-		taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTFinalize)
-
-		if cctx.Bool("addpiece") {
-			taskTypes = append(taskTypes, sealtasks.TTAddPiece)
-		}
-		if cctx.Bool("precommit1") {
-			taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
-		}
-		if cctx.Bool("unseal") {
-			taskTypes = append(taskTypes, sealtasks.TTUnseal)
-		}
-		if cctx.Bool("precommit2") {
-			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
-		}
-		if cctx.Bool("commit1") {
-			taskTypes = append(taskTypes, sealtasks.TTCommit1)
-		}
-		if cctx.Bool("commit2") {
-			taskTypes = append(taskTypes, sealtasks.TTCommit2)
-		}
-
-		if len(taskTypes) == 0 {
-			return xerrors.Errorf("no task types specified")
-		}
-
-		// Open repo
-
-		repoPath := cctx.String(FlagWorkerRepo)
-		r, err := repo.NewFS(repoPath)
-		if err != nil {
-			return err
-		}
-
-		ok, err := r.Exists()
-		if err != nil {
-			return err
-		}
-		if !ok {
-			if err := r.Init(repo.Worker); err != nil {
-				return err
-			}
-
-			lr, err := r.Lock(repo.Worker)
-			if err != nil {
-				return err
-			}
-
-			var localPaths []stores.LocalPath
-
-			if !cctx.Bool("no-local-storage") {
-				b, err := json.MarshalIndent(&stores.LocalStorageMeta{
-					ID:       stores.ID(uuid.New().String()),
-					Weight:   10,
-					CanSeal:  true,
-					CanStore: false,
-				}, "", "  ")
-				if err != nil {
-					return xerrors.Errorf("marshaling storage config: %w", err)
-				}
-
-				if err := ioutil.WriteFile(filepath.Join(lr.Path(), "sectorstore.json"), b, 0644); err != nil {
-					return xerrors.Errorf("persisting storage metadata (%s): %w", filepath.Join(lr.Path(), "sectorstore.json"), err)
-				}
-
-				localPaths = append(localPaths, stores.LocalPath{
-					Path: lr.Path(),
-				})
-			}
-
-			if err := lr.SetStorage(func(sc *stores.StorageConfig) {
-				sc.StoragePaths = append(sc.StoragePaths, localPaths...)
-			}); err != nil {
-				return xerrors.Errorf("set storage config: %w", err)
-			}
-
-			{
-				// init datastore for r.Exists
-				_, err := lr.Datastore("/metadata")
-				if err != nil {
-					return err
-				}
-			}
-			if err := lr.Close(); err != nil {
-				return xerrors.Errorf("close repo: %w", err)
-			}
-		}
-
-		lr, err := r.Lock(repo.Worker)
-		if err != nil {
-			return err
-		}
-
-		log.Info("Opening local storage; connecting to master")
-		const unspecifiedAddress = "0.0.0.0"
-		address := cctx.String("listen")
-		addressSlice := strings.Split(address, ":")
-		if ip := net.ParseIP(addressSlice[0]); ip != nil {
-			if ip.String() == unspecifiedAddress {
-				timeout, err := time.ParseDuration(cctx.String("timeout"))
-				if err != nil {
-					return err
-				}
-				rip, err := extractRoutableIP(timeout)
-				if err != nil {
-					return err
-				}
-				address = rip + ":" + addressSlice[1]
-			}
-		}
-
-		localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"})
-		if err != nil {
-			return err
-		}
-
-		// Setup remote sector store
-		spt, err := ffiwrapper.SealProofTypeFromSectorSize(ssize)
-		if err != nil {
-			return xerrors.Errorf("getting proof type: %w", err)
-		}
-
-		sminfo, err := lcli.GetAPIInfo(cctx, repo.StorageMiner)
-		if err != nil {
-			return xerrors.Errorf("could not get api info: %w", err)
-		}
-
-		remote := stores.NewRemote(localStore, nodeApi, sminfo.AuthHeader(), cctx.Int("parallel-fetch-limit"))
-
-		// Create / expose the worker
-
-		workerApi := &worker{
-			LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
-				SealProof: spt,
-				TaskTypes: taskTypes,
-			}, remote, localStore, nodeApi),
-		}
-
-		mux := mux.NewRouter()
-
-		log.Info("Setting up control endpoint at " + address)
-
-		readerHandler, readerServerOpt := rpcenc.ReaderParamDecoder()
-		rpcServer := jsonrpc.NewServer(readerServerOpt)
-		rpcServer.Register("Filecoin", apistruct.PermissionedWorkerAPI(workerApi))
-
-		mux.Handle("/rpc/v0", rpcServer)
-		mux.Handle("/rpc/streams/v0/push/{uuid}", readerHandler)
-		mux.PathPrefix("/remote").HandlerFunc((&stores.FetchHandler{Local: localStore}).ServeHTTP)
-		mux.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
-
-		ah := &auth.Handler{
-			Verify: nodeApi.AuthVerify,
-			Next:   mux.ServeHTTP,
-		}
-
-		srv := &http.Server{
-			Handler: ah,
-			BaseContext: func(listener net.Listener) context.Context {
-				return ctx
-			},
-		}
-
-		go func() {
-			<-ctx.Done()
-			log.Warn("Shutting down...")
-			if err := srv.Shutdown(context.TODO()); err != nil {
-				log.Errorf("shutting down RPC server failed: %s", err)
-			}
-			log.Warn("Graceful shutdown successful")
-		}()
-
-		nl, err := net.Listen("tcp", address)
-		if err != nil {
-			return err
-		}
-
-		log.Info("Waiting for tasks")
-
 		//判断生成哪种 worker
 		// 为空 默认
 		// Miner miner-worker
@@ -399,6 +173,233 @@ var runCmd = &cli.Command{
 
 		switch workerType {
 		case "", "MINER":
+			// Connect to storage-miner
+			var nodeApi api.StorageMiner
+			var closer func()
+			var err error
+			for {
+				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx)
+				if err == nil {
+					break
+				}
+				fmt.Printf("\r\x1b[0KConnecting to miner API... (%s)", err)
+				time.Sleep(time.Second)
+				continue
+			}
+
+			defer closer()
+			ctx := lcli.ReqContext(cctx)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			v, err := nodeApi.Version(ctx)
+			if err != nil {
+				return err
+			}
+			if v.APIVersion != build.APIVersion {
+				return xerrors.Errorf("lotus-miner API version doesn't match: local: ", api.Version{APIVersion: build.APIVersion})
+			}
+			log.Infof("Remote version %s", v)
+
+			watchMinerConn(ctx, cctx, nodeApi)
+
+			// Check params
+
+			act, err := nodeApi.ActorAddress(ctx)
+			if err != nil {
+				return err
+			}
+			ssize, err := nodeApi.ActorSectorSize(ctx, act)
+			if err != nil {
+				return err
+			}
+
+			if cctx.Bool("commit") {
+				if err := paramfetch.GetParams(ctx, build.ParametersJSON(), uint64(ssize)); err != nil {
+					return xerrors.Errorf("get params: %w", err)
+				}
+			}
+
+			var taskTypes []sealtasks.TaskType
+
+			taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTFinalize)
+
+			if cctx.Bool("addpiece") {
+				taskTypes = append(taskTypes, sealtasks.TTAddPiece)
+			}
+			if cctx.Bool("precommit1") {
+				taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
+			}
+			if cctx.Bool("unseal") {
+				taskTypes = append(taskTypes, sealtasks.TTUnseal)
+			}
+			if cctx.Bool("precommit2") {
+				taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
+			}
+			if cctx.Bool("commit1") {
+				taskTypes = append(taskTypes, sealtasks.TTCommit1)
+			}
+			if cctx.Bool("commit2") {
+				taskTypes = append(taskTypes, sealtasks.TTCommit2)
+			}
+
+			if len(taskTypes) == 0 {
+				return xerrors.Errorf("no task types specified")
+			}
+
+			// Open repo
+
+			repoPath := cctx.String(FlagWorkerRepo)
+			r, err := repo.NewFS(repoPath)
+			if err != nil {
+				return err
+			}
+
+			ok, err := r.Exists()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				if err := r.Init(repo.Worker); err != nil {
+					return err
+				}
+
+				lr, err := r.Lock(repo.Worker)
+				if err != nil {
+					return err
+				}
+
+				var localPaths []stores.LocalPath
+
+				if !cctx.Bool("no-local-storage") {
+					b, err := json.MarshalIndent(&stores.LocalStorageMeta{
+						ID:       stores.ID(uuid.New().String()),
+						Weight:   10,
+						CanSeal:  true,
+						CanStore: false,
+					}, "", "  ")
+					if err != nil {
+						return xerrors.Errorf("marshaling storage config: %w", err)
+					}
+
+					if err := ioutil.WriteFile(filepath.Join(lr.Path(), "sectorstore.json"), b, 0644); err != nil {
+						return xerrors.Errorf("persisting storage metadata (%s): %w", filepath.Join(lr.Path(), "sectorstore.json"), err)
+					}
+
+					localPaths = append(localPaths, stores.LocalPath{
+						Path: lr.Path(),
+					})
+				}
+
+				if err := lr.SetStorage(func(sc *stores.StorageConfig) {
+					sc.StoragePaths = append(sc.StoragePaths, localPaths...)
+				}); err != nil {
+					return xerrors.Errorf("set storage config: %w", err)
+				}
+
+				{
+					// init datastore for r.Exists
+					_, err := lr.Datastore("/metadata")
+					if err != nil {
+						return err
+					}
+				}
+				if err := lr.Close(); err != nil {
+					return xerrors.Errorf("close repo: %w", err)
+				}
+			}
+
+			lr, err := r.Lock(repo.Worker)
+			if err != nil {
+				return err
+			}
+
+			log.Info("Opening local storage; connecting to master")
+			const unspecifiedAddress = "0.0.0.0"
+			address := cctx.String("listen")
+			addressSlice := strings.Split(address, ":")
+			if ip := net.ParseIP(addressSlice[0]); ip != nil {
+				if ip.String() == unspecifiedAddress {
+					timeout, err := time.ParseDuration(cctx.String("timeout"))
+					if err != nil {
+						return err
+					}
+					rip, err := extractRoutableIP(timeout)
+					if err != nil {
+						return err
+					}
+					address = rip + ":" + addressSlice[1]
+				}
+			}
+
+			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"})
+			if err != nil {
+				return err
+			}
+
+			// Setup remote sector store
+			spt, err := ffiwrapper.SealProofTypeFromSectorSize(ssize)
+			if err != nil {
+				return xerrors.Errorf("getting proof type: %w", err)
+			}
+
+			sminfo, err := lcli.GetAPIInfo(cctx, repo.StorageMiner)
+			if err != nil {
+				return xerrors.Errorf("could not get api info: %w", err)
+			}
+
+			remote := stores.NewRemote(localStore, nodeApi, sminfo.AuthHeader(), cctx.Int("parallel-fetch-limit"))
+
+			// Create / expose the worker
+
+			workerApi := &worker{
+				LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
+					SealProof: spt,
+					TaskTypes: taskTypes,
+				}, remote, localStore, nodeApi),
+			}
+
+			mux := mux.NewRouter()
+
+			log.Info("Setting up control endpoint at " + address)
+
+			readerHandler, readerServerOpt := rpcenc.ReaderParamDecoder()
+			rpcServer := jsonrpc.NewServer(readerServerOpt)
+			rpcServer.Register("Filecoin", apistruct.PermissionedWorkerAPI(workerApi))
+
+			mux.Handle("/rpc/v0", rpcServer)
+			mux.Handle("/rpc/streams/v0/push/{uuid}", readerHandler)
+			mux.PathPrefix("/remote").HandlerFunc((&stores.FetchHandler{Local: localStore}).ServeHTTP)
+			mux.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
+
+			ah := &auth.Handler{
+				Verify: nodeApi.AuthVerify,
+				Next:   mux.ServeHTTP,
+			}
+
+			srv := &http.Server{
+				Handler: ah,
+				BaseContext: func(listener net.Listener) context.Context {
+					return ctx
+				},
+			}
+
+			go func() {
+				<-ctx.Done()
+				log.Warn("Shutting down...")
+				if err := srv.Shutdown(context.TODO()); err != nil {
+					log.Errorf("shutting down RPC server failed: %s", err)
+				}
+				log.Warn("Graceful shutdown successful")
+			}()
+
+			nl, err := net.Listen("tcp", address)
+			if err != nil {
+				return err
+			}
+
+			log.Info("Waiting for tasks")
+
 			go func() {
 				if err := nodeApi.WorkerConnect(ctx, "ws://"+address+"/rpc/v0"); err != nil {
 					log.Errorf("Registering worker failed: %+v", err)
@@ -407,11 +408,18 @@ var runCmd = &cli.Command{
 				}
 				log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
 			}()
+
+			return srv.Serve(nl)
+
 		case "DOCKER":
 			sectorstorage.GrpcInit()
-		}
+			sig := make(chan os.Signal, 2)
+			signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
+			<-sig
 
-		return srv.Serve(nl)
+			return nil
+		}
+		return nil
 	},
 }
 
