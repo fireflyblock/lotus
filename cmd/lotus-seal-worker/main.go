@@ -391,14 +391,25 @@ var runCmd = &cli.Command{
 
 		log.Info("Waiting for tasks")
 
-		go func() {
-			if err := nodeApi.WorkerConnect(ctx, "ws://"+address+"/rpc/v0"); err != nil {
-				log.Errorf("Registering worker failed: %+v", err)
-				cancel()
-				return
-			}
-			log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
-		}()
+		//判断生成哪种 worker
+		// 为空 默认
+		// Miner miner-worker
+		// Docker docker-worker
+		workerType := os.Getenv("LOTUS_WORKER_TYPE")
+
+		switch workerType {
+		case "", "MINER":
+			go func() {
+				if err := nodeApi.WorkerConnect(ctx, "ws://"+address+"/rpc/v0"); err != nil {
+					log.Errorf("Registering worker failed: %+v", err)
+					cancel()
+					return
+				}
+				log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
+			}()
+		case "DOCKER":
+			sectorstorage.GrpcInit()
+		}
 
 		return srv.Serve(nl)
 	},

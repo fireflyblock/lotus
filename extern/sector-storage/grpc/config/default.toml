@@ -1,0 +1,7 @@
+[GRPC]
+ip = "localhost"
+port = ":50001"
+
+[LOCALHOST]
+port = ":50002"
+
