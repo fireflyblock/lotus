@@ -16,6 +16,7 @@ var log = logging.Logger("miner_worker")
 
 func init() {
 	config.Init()
+	ConnectTest()
 }
 
 func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
