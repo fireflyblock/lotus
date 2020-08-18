@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/filecoin-project/sector-storage/miner"
 	"io"
 	//"io/ioutil"
 	"math/bits"
@@ -559,7 +560,22 @@ func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 }
 
 func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (storage.Proof, error) {
-	return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
+	workerType := os.Getenv("LOTUS_WORKER_TYPE")
+	switch workerType {
+	case "", "DOCKER":
+		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
+	case "MINER":
+		log.Info("start SealCommit2 grpc c2! sector Number ", sector.Number)
+		result, err := miner.C2RPC(phase1Out, uint64(sector.Number), uint64(sector.Miner))
+		if err != nil {
+			log.Errorf("grpc err: %s", err.Error())
+			return []byte{}, err
+		}
+		log.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
+		return result.Message, nil
+	default:
+		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
+	}
 }
 
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {

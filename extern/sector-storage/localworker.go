@@ -2,6 +2,7 @@ package sectorstorage
 
 import (
 	"context"
+	"github.com/filecoin-project/sector-storage/docker"
 	"io"
 	"os"
 	"runtime"
@@ -62,6 +63,10 @@ func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, 
 type localWorkerPathProvider struct {
 	w  *LocalWorker
 	op stores.AcquireMode
+}
+
+func GrpcInit() {
+	docker.Init()
 }
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {

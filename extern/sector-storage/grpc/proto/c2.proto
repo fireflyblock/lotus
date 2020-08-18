@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+option go_package = "grpc/proto";
+
+package proto;
+
+service Connect {
+    rpc ConnectTest (ConnectRequest) returns (ConnectReply) {
+    }
+}
+
+service C2 {
+    rpc C2Client (Request) returns (Reply) {
+    }
+}
+
+service Machine {
+    rpc Registered (RegisteredRequest) returns (RegisteredReply) {
+    }
+}
+
+message Request {
+    uint64 actorID = 1;
+    uint64 SectorNumber = 2;
+    bytes commit1Out = 3;
+}
+
+message Reply {
+    bytes message = 1;
+    string error = 2;
+}
+
+message RegisteredRequest {
+    string IP = 1;
+    string Port = 2;
+    string Host = 3;
+}
+
+message RegisteredReply {
+    bool message = 1;
+}
+
+message ConnectRequest {
+}
+
+message ConnectReply {
+    bool message = 1;
+}
