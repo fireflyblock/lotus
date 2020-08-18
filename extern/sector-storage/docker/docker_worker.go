@@ -13,10 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-func init() {
-	config.Init()
-}
-
 var log = logging.Logger("docker_worker")
 
 var options = []grpc.ServerOption{
@@ -26,6 +22,7 @@ var options = []grpc.ServerOption{
 
 func Init() {
 	log.Info("grpc server docker worker start!")
+	config.Init()
 	service.Registered()
 
 	port := config.C.LOCALHOST.Port

@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"github.com/filecoin-project/sector-storage/docker"
+	"github.com/filecoin-project/sector-storage/miner"
 	"io"
 	"os"
 	"runtime"
@@ -43,6 +44,8 @@ type LocalWorker struct {
 }
 
 func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex) *LocalWorker {
+	miner.ConnectTest()
+
 	acceptTasks := map[sealtasks.TaskType]struct{}{}
 	for _, taskType := range wcfg.TaskTypes {
 		acceptTasks[taskType] = struct{}{}

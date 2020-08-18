@@ -14,11 +14,6 @@ const MsgSize = 4 * 1024 * 1024 * 7
 
 var log = logging.Logger("miner_worker")
 
-func init() {
-	config.Init()
-	ConnectTest()
-}
-
 func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 	log.Infof("c2 grpc start, sector id %d", Number)
 	address := config.C.GRPC.IP + config.C.GRPC.Port
@@ -42,6 +37,7 @@ func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 }
 
 func ConnectTest() {
+	config.Init()
 	address := config.C.GRPC.IP + config.C.GRPC.Port
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
