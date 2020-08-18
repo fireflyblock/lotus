@@ -267,7 +267,7 @@ var runCmd = &cli.Command{
 					ID:       stores.ID(uuid.New().String()),
 					Weight:   10,
 					CanSeal:  true,
-					CanStore: false,
+					CanStore: true,
 				}, "", "  ")
 				if err != nil {
 					return xerrors.Errorf("marshaling storage config: %w", err)

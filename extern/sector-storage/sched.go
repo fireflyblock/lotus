@@ -3,9 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
-	"sort"
 	"sync"
 	"time"
 
@@ -315,7 +313,7 @@ func (sh *scheduler) trySched() {
 
 	windows := make([]schedWindow, len(sh.openWindows))
 	acceptableWindows := make([][]int, sh.schedQueue.Len())
-	acceptableAPWindows := make([]int, 0)
+	acceptableAPWindows := make([][]int, sh.schedQueue.Len())
 
 	log.Debugf("SCHED %d queued; %d open windows", sh.schedQueue.Len(), len(windows))
 
@@ -325,7 +323,7 @@ func (sh *scheduler) trySched() {
 	// Step 1   首先先选出合适的windows，一个window表示一个worker及其做过的任务信息
 	for sqi := 0; sqi < sh.schedQueue.Len(); sqi++ {
 		task := (*sh.schedQueue)[sqi]
-		needRes := ResourceTable[task.taskType][sh.spt]
+		//needRes := ResourceTable[task.taskType][sh.spt]
 
 		_, ok := sh.taskRecorder.Load(task.sector)
 		if !ok {
@@ -335,7 +333,13 @@ func (sh *scheduler) trySched() {
 		taskRd := tr.(sectorTaskRecord)
 
 		task.indexHeap = sqi
+
+
+	SelectWindowLoop:
 		for wnd, windowRequest := range sh.openWindows {
+			if task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal   {
+				log.Debugf("================ trySched unseal1 sector:%+v\n",  task.sector)
+			}
 			worker := sh.workers[windowRequest.worker]
 
 			hostName, err := os.Hostname()
@@ -343,42 +347,18 @@ func (sh *scheduler) trySched() {
 				panic(err)
 			}
 
-			//log.Debugf("=============== checkout openWindows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
+			//1.deal Finalize/Fetch
 			if worker.info.Hostname == hostName {
 				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
 				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch {
-					//log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
+					log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
 					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-					continue
+					break
 				} else {
 					continue
 				}
 			}
-			if task.taskType == sealtasks.TTFinalize {
-				continue
-			}
-
-			// TODO: allow bigger windows
-			if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, worker.info.Resources) {
-				continue
-			}
-
-			rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
-			ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
-			cancel()
-			if err != nil {
-				log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
-				continue
-			}
-
-			if !ok {
-				continue
-			}
-
-			if !sh.tryCanHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
-				if task.taskType == sealtasks.TTAddPiece {
-				}
-				log.Warnf("================ [tryCanHandleRequestForTask]  Worker %s processing sectorid(%+v) is not available，taskType:%s", worker.info.Hostname, task.sector, task.taskType)
+			if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch  {
 				continue
 			}
 
@@ -386,28 +366,77 @@ func (sh *scheduler) trySched() {
 			case sealtasks.TTAddPiece:
 				if taskRd.workerFortask == worker.info.Hostname {
 					log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
-					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-					break
+					goto Judge
 				} else {
-					acceptableAPWindows = append(acceptableAPWindows, wnd)
+					rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
+					ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
+					cancel()
+					if err != nil {
+						log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+						continue
+					}
+
+					if !ok {
+						continue
+					}
+					if !sh.tryCanHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
+						log.Warnf("================ [tryCanHandleRequestForTask]  Worker %s processing sectorid(%+v) is not available，taskType:%s", worker.info.Hostname, task.sector, task.taskType)
+						continue
+					}
+					acceptableAPWindows[sqi] = append(acceptableAPWindows[sqi], wnd)
 					log.Debugf("================ check addpiece, window [%d] in worker [%s] is preparing [AddPiece] in sectorID [%+v] ", wnd, worker.info.Hostname, task.sector)
+					continue
 				}
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-				//log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+				log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 				if taskRd.workerFortask == worker.info.Hostname {
 					log.Infof("================ bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
-					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-					break
+					goto Judge
+				}else {
+					continue
 				}
 			case sealtasks.TTCommit2:
-				//log.Debugf("================ check workScopeRecorder [%+v] ,worker: [%s] ,window [%d] ", sh.workScopeRecorder, worker.info.Hostname, wnd)
+				log.Debugf("================ check workScopeRecorder [%+v] ,worker: [%s] ,window [%d] ", sh.workScopeRecorder, worker.info.Hostname, wnd)
 				if sh.workScopeRecorder.search(PRIORITYCOMMIT2, worker.info.Hostname) {
-					//log.Debugf("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
-					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-					break
+					log.Debugf("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
+					goto Judge
+				}else {
+					continue
 				}
+			case sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
+				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+				log.Debugf("================ trySched unseal sector:%+v\n",  task.sector)
+				break SelectWindowLoop
 			default:
 				log.Warnf("================ 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配window :%+v", task.taskType, acceptableWindows)
+				break SelectWindowLoop
+			}
+
+		Judge:
+			{
+				// TODO: allow bigger windows
+				//if !windows[wnd].allocated.canHandleRequest(needRes, windowRequest.worker, worker.info.Resources) {
+				//	continue
+				//}
+
+				rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
+				ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
+				cancel()
+				if err != nil {
+					log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+					continue
+				}
+
+				if !ok {
+					continue
+				}
+
+				if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
+					log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, windowRequest.worker, worker.info.Hostname, task.sector, task.taskType, sqi)
+					continue
+				}
+				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+				break
 			}
 		}
 
@@ -415,44 +444,44 @@ func (sh *scheduler) trySched() {
 		if len(acceptableWindows[sqi]) == 0 {
 			if task.taskType == sealtasks.TTAddPiece {
 				if len(acceptableAPWindows) > 0 {
-					acceptableWindows[sqi] = acceptableAPWindows
-					goto EXCUTEADDPIECE
+					acceptableWindows[sqi] = acceptableAPWindows[sqi]
+					//goto EXCUTEADDPIECE
 				} else {
 					sh.isExistFreeWorker = false
-					log.Debugf("================ CLOSE1 , sectorid(%+v)，taskType:%s", task.sector, task.taskType)
+					log.Debugf("================ CLOSE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
 					continue
 				}
 			}
 			log.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
 		}
 
-	EXCUTEADDPIECE:
+	//EXCUTEADDPIECE:
 		//筛选worker，首先打乱顺序,然后选择选择资源最优，任务指定的先加入进来的worker优先，也就是index小的表示older
 		// Pick best worker (shuffle in case some workers are equally as good)
-		rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
-			acceptableWindows[sqi][i], acceptableWindows[sqi][j] = acceptableWindows[sqi][j], acceptableWindows[sqi][i]
-		})
-		sort.SliceStable(acceptableWindows[sqi], func(i, j int) bool {
-			wii := sh.openWindows[acceptableWindows[sqi][i]].worker
-			wji := sh.openWindows[acceptableWindows[sqi][j]].worker
-
-			if wii == wji {
-				// for the same worker prefer older windows
-				return acceptableWindows[sqi][i] < acceptableWindows[sqi][j]
-			}
-
-			wi := sh.workers[wii]
-			wj := sh.workers[wji]
-
-			rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
-			defer cancel()
-
-			r, err := task.sel.Cmp(rpcCtx, task.taskType, wi, wj)
-			if err != nil {
-				log.Error("selecting best worker: %s", err)
-			}
-			return r
-		})
+		//rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
+		//	acceptableWindows[sqi][i], acceptableWindows[sqi][j] = acceptableWindows[sqi][j], acceptableWindows[sqi][i]
+		//})
+		//sort.SliceStable(acceptableWindows[sqi], func(i, j int) bool {
+		//	wii := sh.openWindows[acceptableWindows[sqi][i]].worker
+		//	wji := sh.openWindows[acceptableWindows[sqi][j]].worker
+		//
+		//	if wii == wji {
+		//		// for the same worker prefer older windows
+		//		return acceptableWindows[sqi][i] < acceptableWindows[sqi][j]
+		//	}
+		//
+		//	wi := sh.workers[wii]
+		//	wj := sh.workers[wji]
+		//
+		//	rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
+		//	defer cancel()
+		//
+		//	r, err := task.sel.Cmp(rpcCtx, task.taskType, wi, wj)
+		//	if err != nil {
+		//		log.Error("selecting best worker: %s", err)
+		//	}
+		//	return r
+		//})
 	}
 
 	// Step 2
@@ -473,18 +502,6 @@ func (sh *scheduler) trySched() {
 		for _, wnd := range acceptableWindows[task.indexHeap] {
 			wid := sh.openWindows[wnd].worker
 			wr := sh.workers[wid].info.Resources
-
-			//log.Debugf("SCHED try assign winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
-
-			// TODO: allow bigger windows
-			if !windows[wnd].allocated.canHandleRequest(needRes, wid, wr) {
-				continue
-			}
-
-			if !sh.canHandleRequestForTask(task.taskType, sh.workers[wid].info.Hostname, task.sector, wid) {
-				log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v\n", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
-				continue
-			}
 
 			log.Debugf("SCHED ASSIGNED winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
 
