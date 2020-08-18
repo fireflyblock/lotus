@@ -20,7 +20,7 @@ func init() {
 }
 
 func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
-	log.Info("c2 grpc start")
+	log.Infof("c2 grpc start, sector id %d", Number)
 	address := config.C.GRPC.IP + config.C.GRPC.Port
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MsgSize)))
 	if err != nil {
@@ -37,7 +37,7 @@ func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 		SectorNumber: Number,
 		Commit1Out:   phase1Out,
 	})
-	log.Info("c2 grpc end")
+	log.Infof("c2 grpc end, sector id %d", Number)
 	return r, err
 }
 
