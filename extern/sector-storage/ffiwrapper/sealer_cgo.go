@@ -570,6 +570,7 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 			log.Errorf("grpc err: %s", err.Error())
 			return []byte{}, err
 		}
+		log.Info("end SealCommit2 grpc c2!")
 		return result.Message, nil
 	default:
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)

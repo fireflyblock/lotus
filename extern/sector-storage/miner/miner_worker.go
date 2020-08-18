@@ -37,6 +37,7 @@ func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 		SectorNumber: Number,
 		Commit1Out:   phase1Out,
 	})
+	log.Info("c2 grpc end")
 	return r, err
 }
 
