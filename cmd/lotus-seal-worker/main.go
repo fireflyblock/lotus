@@ -223,6 +223,7 @@ var runCmd = &cli.Command{
 		}
 		if cctx.Bool("unseal") {
 			taskTypes = append(taskTypes, sealtasks.TTUnseal)
+			taskTypes = append(taskTypes, sealtasks.TTReadUnsealed)
 		}
 		if cctx.Bool("precommit2") {
 			taskTypes = append(taskTypes, sealtasks.TTPreCommit2)

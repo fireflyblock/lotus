@@ -251,6 +251,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	}
 
 	var readOk bool
+	log.Debugf("================ readpiece sector:%+v, best:%+v, selector:%+v\n",  sector, best, selector)
 
 	if len(best) > 0 {
 		// There is unsealed sector, see if we can read from it
@@ -258,6 +259,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+			log.Debugf("================ readpiece TTReadUnsealed1  sector:%+v\n",  sector)
 			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 			return err
 		})
@@ -284,6 +286,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	}
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
+		log.Debugf("================ readpiece TTUnseal  sector:%+v\n",  sector)
 		return w.UnsealPiece(ctx, sector, offset, size, ticket, unsealed)
 	})
 	if err != nil {
@@ -293,6 +296,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+		log.Debugf("================ readpiece TTReadUnsealed2  sector:%+v\n",  sector)
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 		return err
 	})
@@ -348,9 +352,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		taskRd.taskStatus = ADDPIECE_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing AddPiece in sectorID[%+v]", wInfo.Hostname, sector)
+		log.Debugf("================ worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector,apType)
 		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		//p, err := w.AddPiece(ctx, sector, existingPieces, sz, filePath, fileName)
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r, apType)
 		if err != nil {
 			return err

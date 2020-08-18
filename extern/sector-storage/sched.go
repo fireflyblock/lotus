@@ -337,9 +337,9 @@ func (sh *scheduler) trySched() {
 
 	SelectWindowLoop:
 		for wnd, windowRequest := range sh.openWindows {
-			if task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal   {
-				log.Debugf("================ trySched unseal1 sector:%+v\n",  task.sector)
-			}
+			//if task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal {
+			//	log.Debugf("================ trySched unseal1 sector:%+v\n",  task.sector)
+			//}
 			worker := sh.workers[windowRequest.worker]
 
 			hostName, err := os.Hostname()
@@ -350,7 +350,7 @@ func (sh *scheduler) trySched() {
 			//1.deal Finalize/Fetch
 			if worker.info.Hostname == hostName {
 				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
-				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch {
+				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch ||task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal{
 					log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
 					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 					break
@@ -403,10 +403,10 @@ func (sh *scheduler) trySched() {
 				}else {
 					continue
 				}
-			case sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
-				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-				log.Debugf("================ trySched unseal sector:%+v\n",  task.sector)
-				break SelectWindowLoop
+			//case sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
+			//	acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
+			//	log.Debugf("================ trySched unseal sector:%+v\n",  task.sector)
+			//	break SelectWindowLoop
 			default:
 				log.Warnf("================ 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配window :%+v", task.taskType, acceptableWindows)
 				break SelectWindowLoop
@@ -524,8 +524,8 @@ func (sh *scheduler) trySched() {
 			taskRd.taskStatus = ADDPIECE_WAITING
 			taskRd.workerFortask = sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname
 			sh.taskRecorder.Store(task.sector, taskRd)
-			log.Debugf("================ start bind ,window [%d] , worker [%s] , workerID [%+v] , sectorID [%+v] ,taskRecorder: [%+v] \n",
-				selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector, sh.taskRecorder)
+			log.Debugf("================ start bind ,window [%d] , worker [%s] , workerID [%+v] , sectorID [%+v] \n",
+				selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector)
 		}
 		sh.schedQueue.Remove(sqi)
 		sqi--

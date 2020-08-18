@@ -271,7 +271,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 	if err != nil {
 		return err
 	}
-
+	log.Debugf("================ trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n",  sector, index, size, randomness, cid)
 	if err := sb.UnsealPiece(ctx, sector, index, size, randomness, cid); err != nil {
 		return xerrors.Errorf("unsealing sector: %w", err)
 	}
@@ -288,6 +288,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 }
 
 func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+	log.Debugf("================ LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n",  sector, writer, index, size)
 	sb, err := l.sb()
 	if err != nil {
 		return false, err

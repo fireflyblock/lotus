@@ -90,7 +90,9 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 		r.fetchLk.Unlock()
 	}()
 
+	log.Debugf("================ Remote1 AcquireSector, unsealedPath:%+v, done:%+v, err:%+v\n",  s, spt, existing, allocate, pathType, op)
 	paths, stores, err := r.local.AcquireSector(ctx, s, spt, existing, allocate, pathType, op)
+	log.Debugf("================ Remote2 AcquireSector, unsealedPath:%+v, done:%+v, err:%+v\n",  paths, stores, err)
 	if err != nil {
 		return SectorPaths{}, SectorPaths{}, xerrors.Errorf("local acquire error: %w", err)
 	}
@@ -105,8 +107,9 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 			toFetch |= fileType
 		}
 	}
-
+	log.Debugf("================ Remote3 AcquireSector, unsealedPath:%+v, done:%+v, err:%+v\n", s, spt, FTNone, toFetch, pathType, op)
 	apaths, ids, err := r.local.AcquireSector(ctx, s, spt, FTNone, toFetch, pathType, op)
+	log.Debugf("================ Remote4 AcquireSector, unsealedPath:%+v, done:%+v, err:%+v\n", apaths, ids, err)
 	if err != nil {
 		return SectorPaths{}, SectorPaths{}, xerrors.Errorf("allocate local sector for fetching: %w", err)
 	}
