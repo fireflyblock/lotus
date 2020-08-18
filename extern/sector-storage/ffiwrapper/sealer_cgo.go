@@ -564,13 +564,13 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	case "", "DOCKER":
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 	case "MINER":
-		log.Info("start SealCommit2 grpc c2!")
+		log.Info("start SealCommit2 grpc c2! sector Number ", sector.Number)
 		result, err := miner.C2RPC(phase1Out, uint64(sector.Number), uint64(sector.Miner))
 		if err != nil {
 			log.Errorf("grpc err: %s", err.Error())
 			return []byte{}, err
 		}
-		log.Info("end SealCommit2 grpc c2!")
+		log.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
 		return result.Message, nil
 	default:
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
