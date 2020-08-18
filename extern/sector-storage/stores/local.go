@@ -323,6 +323,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 	if existing|allocate != existing^allocate {
 		return SectorPaths{}, SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
+	//log.Debugf("================ Local AcquireSector, sid:%+v,spt:%+v,existing:%+v,allocate:%+v,pathType:%+v\n", sid,spt,existing,allocate,pathType)
 
 	st.localLk.RLock()
 	defer st.localLk.RUnlock()
@@ -331,10 +332,12 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 	var storageIDs SectorPaths
 
 	for _, fileType := range PathTypes {
+		log.Debugf("================ PathTypes1 , sid:%+v,fileType:%+v,existing:%+v,&:%+v\n", sid,fileType,existing,fileType&existing)
 		if fileType&existing == 0 {
 			continue
 		}
-
+// TODO
+		//log.Debugf("================ PathTypes2 , sid:%+v,fileType:%+v\n", sid,fileType)
 		si, err := st.index.StorageFindSector(ctx, sid, fileType, spt, false)
 		if err != nil {
 			log.Warnf("finding existing sector %d(t:%d) failed: %+v", sid, fileType, err)

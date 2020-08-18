@@ -264,7 +264,8 @@ func (i *Index) StorageFindSector(ctx context.Context, s abi.SectorID, ft Sector
 	}
 
 	out := make([]SectorStorageInfo, 0, len(storageIDs))
-
+// TODO storageIDs
+	//log.Debugf("================ StorageFindSector , sid:%+v,ft:%+v,spt:%+v,allowFetch:%+v,storageIDs:+%v\n", s,ft,spt,allowFetch,storageIDs)
 	for id, n := range storageIDs {
 		st, ok := i.stores[id]
 		if !ok {
@@ -294,6 +295,7 @@ func (i *Index) StorageFindSector(ctx context.Context, s abi.SectorID, ft Sector
 			Primary: isprimary[id],
 		})
 	}
+	//log.Debugf("================ Index1 AcquireSector, out:%+v\n", out)
 
 	if allowFetch {
 		spaceReq, err := ft.SealSpaceUse(spt)
@@ -348,7 +350,7 @@ func (i *Index) StorageFindSector(ctx context.Context, s abi.SectorID, ft Sector
 			})
 		}
 	}
-
+	//log.Debugf("================ Index2 AcquireSector, out:%+v\n", out)
 	return out, nil
 }
 

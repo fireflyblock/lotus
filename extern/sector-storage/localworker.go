@@ -116,6 +116,7 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 	}
 	//addPieceLock.Lock()
 	//pi, err := sb.AddPiece(ctx, sector, epcs, sz, filePath, fileName)
+	//log.Debugf("================ ap1 sectorID[%+v], apTYpe:%s", sector,apType)
 	pi, err := sb.AddPiece(ctx, sector, epcs, sz, r, apType)
 	//addPieceLock.Unlock()
 	return pi, err

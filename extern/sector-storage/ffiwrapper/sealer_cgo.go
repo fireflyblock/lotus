@@ -399,6 +399,7 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 }
 
 func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+	log.Debugf("================ Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n",  sector, writer, offset, size)
 	path, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
 	if err != nil {
 		return false, xerrors.Errorf("acquire unsealed sector path: %w", err)
