@@ -7,8 +7,16 @@ import (
 	pb "github.com/filecoin-project/sector-storage/grpc/proto"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/grpc"
+	"os"
 	"time"
 )
+
+func init() {
+	if os.Getenv("LOTUS_WORKER_TYPE") == "MINER" {
+		config.Init()
+		ConnectTest()
+	}
+}
 
 const MsgSize = 4 * 1024 * 1024 * 7
 
@@ -37,7 +45,6 @@ func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 }
 
 func ConnectTest() {
-	config.Init()
 	address := config.C.GRPC.IP + config.C.GRPC.Port
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
