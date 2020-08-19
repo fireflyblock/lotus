@@ -177,7 +177,9 @@ var runCmd = &cli.Command{
 			var closer func()
 			var err error
 			for {
-				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx)
+				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx,
+				jsonrpc.WithNoReconnect(),
+				jsonrpc.WithTimeout(30*time.Second))
 				if err == nil {
 					break
 				}
@@ -453,9 +455,13 @@ func watchMinerConn(ctx context.Context, cctx *cli.Context, nodeApi api.StorageM
 			"run",
 			fmt.Sprintf("--listen=%s", cctx.String("listen")),
 			fmt.Sprintf("--no-local-storage=%t", cctx.Bool("no-local-storage")),
+			fmt.Sprintf("--addpiece=%t", cctx.Bool("addpiece")),
 			fmt.Sprintf("--precommit1=%t", cctx.Bool("precommit1")),
+			fmt.Sprintf("--unseal=%t", cctx.Bool("unseal")),
 			fmt.Sprintf("--precommit2=%t", cctx.Bool("precommit2")),
 			fmt.Sprintf("--commit=%t", cctx.Bool("commit")),
+			fmt.Sprintf("--parallel-fetch-limit=%d", cctx.Int("parallel-fetch-limit")),
+			fmt.Sprintf("--timeout=%s", cctx.String("timeout")),
 		}, os.Environ()); err != nil {
 			fmt.Println(err)
 		}

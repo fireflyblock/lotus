@@ -459,15 +459,15 @@ func (sh *scheduler) trySched() {
 		//筛选worker，首先打乱顺序,然后选择选择资源最优，任务指定的先加入进来的worker优先，也就是index小的表示older
 		// Pick best worker (shuffle in case some workers are equally as good)
 		//rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
-		//	acceptableWindows[sqi][i], acceptableWindows[sqi][j] = acceptableWindows[sqi][j], acceptableWindows[sqi][i]
+		//	acceptableWindows[sqi][i], acceptableWindows[sqi][j] = acceptableWindows[sqi][j], acceptableWindows[sqi][i] // nolint:scopelint
 		//})
 		//sort.SliceStable(acceptableWindows[sqi], func(i, j int) bool {
-		//	wii := sh.openWindows[acceptableWindows[sqi][i]].worker
-		//	wji := sh.openWindows[acceptableWindows[sqi][j]].worker
+		//	wii := sh.openWindows[acceptableWindows[sqi][i]].worker // nolint:scopelint
+		//	wji := sh.openWindows[acceptableWindows[sqi][j]].worker // nolint:scopelint
 		//
 		//	if wii == wji {
 		//		// for the same worker prefer older windows
-		//		return acceptableWindows[sqi][i] < acceptableWindows[sqi][j]
+		//		return acceptableWindows[sqi][i] < acceptableWindows[sqi][j] // nolint:scopelint
 		//	}
 		//
 		//	wi := sh.workers[wii]
@@ -643,7 +643,6 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 			//接收trysched中done传入的req
 			select {
 			case w := <-scheduledWindows:
-				//log.Debugf("============== 接收 trySched 中传入的 done <-window w.allocated:%+v,w.todo:%+v", w.allocated, w.todo)
 				activeWindows = append(activeWindows, w)
 			case <-taskDone:
 				log.Debugw("task done", "workerid", wid)

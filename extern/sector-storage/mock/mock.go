@@ -83,26 +83,12 @@ func (mgr *SectorMgr) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(ffiwrapper.Reader{}, int64(size))
 }
 
-func (mgr *SectorMgr) AddPiece(ctx context.Context, sectorId abi.SectorID, existingPieces []abi.UnpaddedPieceSize, size abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
-	log.Warn("Add piece: ", sectorId, size, mgr.proofType)
+func (mgr *SectorMgr) AddPiece(ctx context.Context, sectorID abi.SectorID, existingPieces []abi.UnpaddedPieceSize, size abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+	log.Warn("Add piece: ", sectorID, size, mgr.proofType)
 
-	//插入转换函数 ++++++++++++++++++++++++++++++++++++++++
 	var r io.Reader
 	if fileName == "_pledgeSector" {
 		r = mgr.pledgeReader(size)
-	} else {
-		fs, err := filestore.NewLocalFileStore(filestore.OsPath(filePath))
-		f, _ := fs.Open(filestore.Path(fileName))
-
-		paddedReader, paddedSize := padreader.New(f, uint64(f.Size()))
-
-		size = abi.UnpaddedPieceSize(paddedSize)
-		r = paddedReader
-		//pieceSize abi.UnpaddedPieceSize, pieceData io.Reader
-		if err != nil {
-			log.Errorf("closing staged file: %+v", err)
-		}
-		//file, err = environment.OpenFile(deal.PiecePath)
 	}
 
 	var b bytes.Buffer
@@ -118,12 +104,12 @@ func (mgr *SectorMgr) AddPiece(ctx context.Context, sectorId abi.SectorID, exist
 	mgr.lk.Lock()
 	mgr.pieces[c] = b.Bytes()
 
-	ss, ok := mgr.sectors[sectorId]
+	ss, ok := mgr.sectors[sectorID]
 	if !ok {
 		ss = &sectorState{
 			state: statePacking,
 		}
-		mgr.sectors[sectorId] = ss
+		mgr.sectors[sectorID] = ss
 	}
 	mgr.lk.Unlock()
 
@@ -286,7 +272,7 @@ func opFinishWait(ctx context.Context) {
 func AddOpFinish(ctx context.Context) (context.Context, func()) {
 	done := make(chan struct{})
 
-	return context.WithValue(ctx, "opfinish", done), func() {
+	return context.WithValue(ctx, "opfinish", done), func() { // nolint
 		close(done)
 	}
 }
@@ -364,7 +350,7 @@ func (mgr *SectorMgr) StageFakeData(mid abi.ActorID) (abi.SectorID, []abi.PieceI
 	}
 
 	buf := make([]byte, usize)
-	rand.Read(buf)
+	_, _ = rand.Read(buf) // nolint:gosec
 
 	id := abi.SectorID{
 		Miner:  mid,
