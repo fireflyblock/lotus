@@ -502,7 +502,17 @@ func (sh *scheduler) trySched() {
 		for _, wnd := range acceptableWindows[task.indexHeap] {
 			wid := sh.openWindows[wnd].worker
 			wr := sh.workers[wid].info.Resources
+			worker := sh.workers[wid]
 
+			switch task.taskType {
+			case sealtasks.TTAddPiece:
+				if taskRd.workerFortask != worker.info.Hostname {
+					if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, wid) {
+						log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, wid, worker.info.Hostname, task.sector, task.taskType, sqi)
+						continue
+					}
+				}
+			}
 			log.Debugf("SCHED ASSIGNED winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
 
 			windows[wnd].allocated.add(wr, needRes)
