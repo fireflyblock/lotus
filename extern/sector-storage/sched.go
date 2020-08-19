@@ -346,22 +346,16 @@ func (sh *scheduler) trySched() {
 				panic(err)
 			}
 
-			//1.deal Finalize/Fetch
-			if worker.info.Hostname == hostName {
+			switch task.taskType {
+			case sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
 				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
-				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch || task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal {
+				if worker.info.Hostname == hostName {
 					log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
 					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-					break
+					break SelectWindowLoop
 				} else {
 					continue
 				}
-			}
-			if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch {
-				continue
-			}
-
-			switch task.taskType {
 			case sealtasks.TTAddPiece:
 				if taskRd.workerFortask == worker.info.Hostname {
 					//log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)

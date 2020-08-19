@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/extern/sector-storage/fsutil"
+	"github.com/filecoin-project/sector-storage/fsutil"
 
 	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/filecoin-project/specs-actors/actors/abi/big"
@@ -265,7 +265,7 @@ func (i *Index) StorageFindSector(ctx context.Context, s abi.SectorID, ft Sector
 	}
 
 	out := make([]SectorStorageInfo, 0, len(storageIDs))
-// TODO storageIDs
+	// TODO storageIDs
 	//log.Debugf("================ StorageFindSector , sid:%+v,ft:%+v,spt:%+v,allowFetch:%+v,storageIDs:+%v\n", s,ft,spt,allowFetch,storageIDs)
 	for id, n := range storageIDs {
 		st, ok := i.stores[id]

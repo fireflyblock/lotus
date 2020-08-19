@@ -11,7 +11,7 @@ import (
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
 
-	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
+	"github.com/filecoin-project/sector-storage/stores"
 
 	"go.opencensus.io/trace"
 )

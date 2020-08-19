@@ -30,8 +30,6 @@ require (
 	google.golang.org/protobuf v1.25.0
 )
 
-replace github.com/filecoin-project/storage-fsm => ../storage-fsm
-
 replace github.com/filecoin-project/filecoin-ffi => ../filecoin-ffi
 
 replace github.com/filecoin-project/specs-storage => ../../../specs-storage

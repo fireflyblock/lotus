@@ -14,9 +14,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/filecoin-project/lotus/extern/sector-storage/fsutil"
-	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
-	"github.com/filecoin-project/lotus/extern/sector-storage/tarutil"
+	"github.com/filecoin-project/sector-storage/fsutil"
+	"github.com/filecoin-project/sector-storage/storiface"
+	"github.com/filecoin-project/sector-storage/tarutil"
 
 	"github.com/filecoin-project/specs-actors/actors/abi"
 
