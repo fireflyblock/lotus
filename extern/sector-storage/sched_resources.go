@@ -76,18 +76,18 @@ func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
 func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res storiface.WorkerResources) bool {
 
 	// TODO: dedupe needRes.BaseMinMemory per task type (don't add if that task is already running)
-	minNeedMem := res.MemReserved + a.memUsedMin + needRes.MinMemory + needRes.BaseMinMemory
-	if minNeedMem > res.MemPhysical {
-		log.Debugf("sched: not scheduling on worker %d; not enough physical memory - need: %dM, have %dM", wid, minNeedMem/mib, res.MemPhysical/mib)
-		return false
-	}
-
-	maxNeedMem := res.MemReserved + a.memUsedMax + needRes.MaxMemory + needRes.BaseMinMemory
-
-	if maxNeedMem > res.MemSwap+res.MemPhysical {
-		log.Debugf("sched: not scheduling on worker %d; not enough virtual memory - need: %dM, have %dM", wid, maxNeedMem/mib, (res.MemSwap+res.MemPhysical)/mib)
-		return false
-	}
+	//minNeedMem := res.MemReserved + a.memUsedMin + needRes.MinMemory + needRes.BaseMinMemory
+	//if minNeedMem > res.MemPhysical {
+	//	log.Debugf("sched: not scheduling on worker %d; not enough physical memory - need: %dM, have %dM", wid, minNeedMem/mib, res.MemPhysical/mib)
+	//	return false
+	//}
+	//
+	//maxNeedMem := res.MemReserved + a.memUsedMax + needRes.MaxMemory + needRes.BaseMinMemory
+	//
+	//if maxNeedMem > res.MemSwap+res.MemPhysical {
+	//	log.Debugf("sched: not scheduling on worker %d; not enough virtual memory - need: %dM, have %dM", wid, maxNeedMem/mib, (res.MemSwap+res.MemPhysical)/mib)
+	//	return false
+	//}
 
 	//if needRes.MultiThread() {
 	//	if a.cpuUse > 0 {
@@ -158,14 +158,14 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 	}
 
 	if judge {
-		log.Debugf("\n========================= check Task status "+
-			"check workerHostName :%s can do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
-			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
+		//log.Debugf("\n========================= check Task status "+
+		//	"check workerHostName :%s can do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
+		//	workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return true
 	} else {
-		log.Debugf("\n========================= check Task status "+
-			"check workerHostName :%s can't do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
-			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
+		//log.Debugf("\n========================= check Task status "+
+		//	"check workerHostName :%s can't do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
+		//	workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return false
 	}
 }

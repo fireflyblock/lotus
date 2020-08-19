@@ -119,11 +119,11 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-	//addPieceLock.Lock()
-	//pi, err := sb.AddPiece(ctx, sector, epcs, sz, filePath, fileName)
-	//log.Debugf("================ ap1 sectorID[%+v], apTYpe:%s", sector,apType)
+	startAt := time.Now()
 	pi, err := sb.AddPiece(ctx, sector, epcs, sz, r, apType)
-	//addPieceLock.Unlock()
+	log.Infof("================ worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+
 	return pi, err
 }
 
@@ -277,7 +277,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 	if err != nil {
 		return err
 	}
-	log.Debugf("================ trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n",  sector, index, size, randomness, cid)
+	log.Debugf("================ trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n", sector, index, size, randomness, cid)
 	if err := sb.UnsealPiece(ctx, sector, index, size, randomness, cid); err != nil {
 		return xerrors.Errorf("unsealing sector: %w", err)
 	}
@@ -294,7 +294,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 }
 
 func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	log.Debugf("================ LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n",  sector, writer, index, size)
+	log.Debugf("================ LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, index, size)
 	sb, err := l.sb()
 	if err != nil {
 		return false, err

@@ -334,7 +334,6 @@ func (sh *scheduler) trySched() {
 
 		task.indexHeap = sqi
 
-
 	SelectWindowLoop:
 		for wnd, windowRequest := range sh.openWindows {
 			//if task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal {
@@ -350,7 +349,7 @@ func (sh *scheduler) trySched() {
 			//1.deal Finalize/Fetch
 			if worker.info.Hostname == hostName {
 				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
-				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch ||task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal{
+				if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch || task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal {
 					log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
 					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 					break
@@ -358,14 +357,14 @@ func (sh *scheduler) trySched() {
 					continue
 				}
 			}
-			if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch  {
+			if task.taskType == sealtasks.TTFinalize || task.taskType == sealtasks.TTFetch {
 				continue
 			}
 
 			switch task.taskType {
 			case sealtasks.TTAddPiece:
 				if taskRd.workerFortask == worker.info.Hostname {
-					log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+					//log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 					goto Judge
 				} else {
 					rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
@@ -384,15 +383,15 @@ func (sh *scheduler) trySched() {
 						continue
 					}
 					acceptableAPWindows[sqi] = append(acceptableAPWindows[sqi], wnd)
-					log.Debugf("================ check addpiece, window [%d] in worker [%s] is preparing [AddPiece] in sectorID [%+v] ", wnd, worker.info.Hostname, task.sector)
+					//log.Debugf("================ check addpiece, window [%d] in worker [%s] is preparing [AddPiece] in sectorID [%+v] ", wnd, worker.info.Hostname, task.sector)
 					continue
 				}
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-				log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+				//log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 				if taskRd.workerFortask == worker.info.Hostname {
-					log.Infof("================ bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
+					//log.Infof("================ bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 					goto Judge
-				}else {
+				} else {
 					continue
 				}
 			case sealtasks.TTCommit2:
@@ -400,7 +399,7 @@ func (sh *scheduler) trySched() {
 				if sh.workScopeRecorder.search(PRIORITYCOMMIT2, worker.info.Hostname) {
 					log.Debugf("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
 					goto Judge
-				}else {
+				} else {
 					continue
 				}
 			//case sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
@@ -451,11 +450,12 @@ func (sh *scheduler) trySched() {
 					log.Debugf("================ CLOSE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
 					continue
 				}
+			} else {
+				log.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
 			}
-			log.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
 		}
 
-	//EXCUTEADDPIECE:
+		//EXCUTEADDPIECE:
 		//筛选worker，首先打乱顺序,然后选择选择资源最优，任务指定的先加入进来的worker优先，也就是index小的表示older
 		// Pick best worker (shuffle in case some workers are equally as good)
 		//rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
@@ -645,7 +645,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 				return
 			}
 
-		assignLoop:
+			//assignLoop:
 			//分配window去做req
 			//监听是否有新任务分配，如果有则变更windowsRequested的数量，进入新的循环，创建新的window，保持一直有windowsRequested数量个window
 			// process windows in order
@@ -654,21 +654,21 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 				//最终分配req到worker
 				for len(activeWindows[0].todo) > 0 {
 					todo := activeWindows[0].todo[0]
-					needRes := ResourceTable[todo.taskType][sh.spt]
-
-					sh.workersLk.RLock()
-					worker.lk.Lock()
-					ok := worker.preparing.canHandleRequest(needRes, wid, worker.info.Resources)
-					worker.lk.Unlock()
-
-					if !ok {
-						sh.workersLk.RUnlock()
-						break assignLoop
-					}
+					//needRes := ResourceTable[todo.taskType][sh.spt]
+					//
+					//sh.workersLk.RLock()
+					//worker.lk.Lock()
+					//ok := worker.preparing.canHandleRequest(needRes, wid, worker.info.Resources)
+					//worker.lk.Unlock()
+					//
+					//if !ok {
+					//	sh.workersLk.RUnlock()
+					//	break assignLoop
+					//}
 
 					log.Debugf("assign worker sector %d", todo.sector.Number)
 					err := sh.assignWorker(taskDone, wid, worker, todo)
-					sh.workersLk.RUnlock()
+					//sh.workersLk.RUnlock()
 
 					if err != nil {
 						log.Error("assignWorker error: %+v", err)
