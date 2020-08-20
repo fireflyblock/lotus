@@ -178,8 +178,8 @@ var runCmd = &cli.Command{
 			var err error
 			for {
 				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx,
-				jsonrpc.WithNoReconnect(),
-				jsonrpc.WithTimeout(30*time.Second))
+					jsonrpc.WithNoReconnect(),
+					jsonrpc.WithTimeout(30*time.Second))
 				if err == nil {
 					break
 				}
@@ -408,7 +408,11 @@ var runCmd = &cli.Command{
 					cancel()
 					return
 				}
-				log.Info("============================ worker连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
+				if workerType == "" {
+					log.Info("============================ worker 连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
+				} else {
+					log.Info("============================ worker_min 连接 miner=========:", "ws://"+cctx.String("address")+"/rpc/v0")
+				}
 			}()
 
 			return srv.Serve(nl)

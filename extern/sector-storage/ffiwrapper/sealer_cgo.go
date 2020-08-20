@@ -384,7 +384,7 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 }
 
 func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	log.Debugf("================ Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n",  sector, writer, offset, size)
+	log.Debugf("================ Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, offset, size)
 	path, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
 	if err != nil {
 		return false, xerrors.Errorf("acquire unsealed sector path: %w", err)
@@ -547,9 +547,10 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	workerType := os.Getenv("LOTUS_WORKER_TYPE")
 	switch workerType {
 	case "", "DOCKER":
+		log.Info("start SealCommit2 grpc c2_DOCKER! sector Number ", sector.Number)
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 	case "MINER":
-		log.Info("start SealCommit2 grpc c2! sector Number ", sector.Number)
+		log.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.Number)
 		result, err := miner.C2RPC(phase1Out, uint64(sector.Number), uint64(sector.Miner))
 		if err != nil {
 			log.Errorf("grpc err: %s", err.Error())
