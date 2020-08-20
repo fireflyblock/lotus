@@ -1,6 +1,7 @@
 package sectorstorage
 
 import (
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"math"
 	"sync"
 
@@ -124,9 +125,9 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 	if sh.workers[wid].taskConf == nil {
 		sh.workers[wid].taskConf = &TaskConfig{}
 	}
-	//log.Infof("========== try check taskConfig, workerHostName: [%+v] ,tasks: [%+v] , taskConf: [%+v] ", workerHostName, v.(*taskCounter), sh.workers[wid].taskConf)
-	//log.Infof("========== sectorFilter 1: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
-	//log.Infof("========== sectorFilter 2: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2))
+	//logrus.SchedLogger.Infof("========== try check taskConfig, workerHostName: [%+v] ,tasks: [%+v] , taskConf: [%+v] ", workerHostName, v.(*taskCounter), sh.workers[wid].taskConf)
+	//logrus.SchedLogger.Infof("========== sectorFilter 1: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
+	//logrus.SchedLogger.Infof("========== sectorFilter 2: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2))
 	switch taskType {
 	case sealtasks.TTAddPiece:
 		if v.(*taskCounter).addpiece < sh.workers[wid].taskConf.AddPieceSize &&
@@ -153,17 +154,17 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 			judge = true
 		}
 	default:
-		log.Warnf("========== addTask--->found task %s ,we are not care!!!!", taskType)
+		logrus.SchedLogger.Warnf("========== addTask--->found task %s ,we are not care!!!!", taskType)
 		return true
 	}
 
 	if judge {
-		//log.Debugf("\n========================= check Task status "+
+		//logrus.SchedLoggerrus.SchedLogger.Infof("\n========================= check Task status "+
 		//	"check workerHostName :%s can do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 		//	workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return true
 	} else {
-		//log.Debugf("\n========================= check Task status "+
+		//logrus.SchedLoggerrus.SchedLogger.Infof("\n========================= check Task status "+
 		//	"check workerHostName :%s can't do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 		//	workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return false
@@ -179,7 +180,7 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 	v.(*taskCounter).tasksLK.Lock()
 	defer v.(*taskCounter).tasksLK.Unlock()
 
-	//log.Infof("========== check taskConfig, workerHostName: [%+v] , sectorID: [%+v] , tasks: [%+v] ,taskConf: [%+v] ", workerHostName, sectorID, v.(*taskCounter), sh.workers[wid].taskConf)
+	//logrus.SchedLogger.Infof("========== check taskConfig, workerHostName: [%+v] , sectorID: [%+v] , tasks: [%+v] ,taskConf: [%+v] ", workerHostName, sectorID, v.(*taskCounter), sh.workers[wid].taskConf)
 	if sh.tryCanHandleRequestForTask(taskType, workerHostName, sectorID, wid) {
 		switch taskType {
 		case sealtasks.TTAddPiece:
@@ -193,16 +194,16 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 		case sealtasks.TTCommit2:
 			v.(*taskCounter).commit2++
 		default:
-			log.Warnf("========== addTask--->found task %s ,we are not care!!!!", taskType)
+			logrus.SchedLogger.Warnf("========== addTask--->found task %s ,we are not care!!!!", taskType)
 			return true
 		}
 		sh.tasks.Store(workerHostName, v.(*taskCounter))
-		log.Debugf("\n========================= select worker\n"+
+		logrus.SchedLogger.Infof("\n========================= select worker\n"+
 			"select workerHostName :%s to do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return true
 	} else {
-		log.Errorf("\n========================= check Task status \n"+
+		logrus.SchedLogger.Errorf("\n========================= check Task status \n"+
 			"select workerHostName :%s can't do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return false
@@ -243,23 +244,23 @@ func (sh *scheduler) sectorFilter(workerHostName string, wid WorkerID, taskType 
 		return true
 	})
 	// TODO 此日志可以考虑删除
-	//log.Infof("========== sectorFilter: [%+v] ", taskType)
-	//log.Infof("========== workerHostName: [%+v] ,countForpre1Waiting: [%+v] , countForpre1Computing: [%+v] ", workerHostName, countForpre1Waiting, countForpre1Computing)
-	//log.Infof("========== workerHostName: [%+v] ,countForpre2Waiting: [%+v] , countForpre2Computing: [%+v] ", workerHostName, countForpre2Waiting, countForpre2Computing)
+	//logrus.SchedLogger.Infof("========== sectorFilter: [%+v] ", taskType)
+	//logrus.SchedLogger.Infof("========== workerHostName: [%+v] ,countForpre1Waiting: [%+v] , countForpre1Computing: [%+v] ", workerHostName, countForpre1Waiting, countForpre1Computing)
+	//logrus.SchedLogger.Infof("========== workerHostName: [%+v] ,countForpre2Waiting: [%+v] , countForpre2Computing: [%+v] ", workerHostName, countForpre2Waiting, countForpre2Computing)
 	switch taskType {
 	case sealtasks.TTPreCommit1:
 		if float64(countForpre1Waiting+countForpre1Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
-			//log.Infof("========== sectorFilter_P1:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre1Waiting, countForpre1Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
+			//logrus.SchedLogger.Infof("========== sectorFilter_P1:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre1Waiting, countForpre1Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
 			return true
 		}
 	case sealtasks.TTPreCommit2:
 		//p2等待和p2计算中的总数量小于p1设置的总数，目的让刷单可以流动起来，其次对p1数量加个百分之75的比率，向下取整，用来留出p2失败的容错量
 		if float64(countForpre2Waiting+countForpre2Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
-			//log.Infof("========== sectorFilter_P2:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre2Waiting, countForpre2Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
+			//logrus.SchedLogger.Infof("========== sectorFilter_P2:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre2Waiting, countForpre2Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
 			return true
 		}
 	default:
-		log.Warnf("========== sectorFilter:false ,Unexpect type(%s)", taskType)
+		logrus.SchedLogger.Warnf("========== sectorFilter:false ,Unexpect type(%s)", taskType)
 		return false
 	}
 	return false
@@ -272,7 +273,7 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 		return
 	}
 
-	log.Infof("================ sh.tasks: %+v\n", v)
+	logrus.SchedLogger.Infof("================ sh.tasks: %+v\n", v)
 	if v == nil {
 		return
 	}
@@ -282,42 +283,42 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 			v.(*taskCounter).addpiece--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))
 		} else {
-			log.Info("================ addpiece任务已经为0，无法继续释放 =================")
+			logrus.SchedLogger.Info("================ addpiece任务已经为0，无法继续释放 =================")
 		}
 	case sealtasks.TTPreCommit1:
 		if v.(*taskCounter).precommit1 > 0 {
 			v.(*taskCounter).precommit1--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))
 		} else {
-			log.Info("================ precommit1任务已经为0，无法继续释放 =================")
+			logrus.SchedLogger.Info("================ precommit1任务已经为0，无法继续释放 =================")
 		}
 	case sealtasks.TTPreCommit2:
 		if v.(*taskCounter).precommit2 > 0 {
 			v.(*taskCounter).precommit2--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))
 		} else {
-			log.Info("================ precommit2任务已经为0，无法继续释放 =================")
+			logrus.SchedLogger.Info("================ precommit2任务已经为0，无法继续释放 =================")
 		}
 	case sealtasks.TTCommit1:
 		if v.(*taskCounter).commit1 > 0 {
 			v.(*taskCounter).commit1--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))
 		} else {
-			log.Info("================ commit1任务已经为0，无法继续释放 =================")
+			logrus.SchedLogger.Info("================ commit1任务已经为0，无法继续释放 =================")
 		}
 	case sealtasks.TTCommit2:
 		if v.(*taskCounter).commit2 > 0 {
 			v.(*taskCounter).commit2--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))
 		} else {
-			log.Info("================ commit2任务已经为0，无法继续释放 =================")
+			logrus.SchedLogger.Info("================ commit2任务已经为0，无法继续释放 =================")
 		}
 	default:
 		return
 	}
 
 	v, _ = sh.tasks.Load(workerHostName)
-	log.Infof("\n========================= freeTask \n"+
+	logrus.SchedLogger.Infof("\n========================= freeTask \n"+
 		"workerHostName :%s free %s task of sector(%d), worker task status:{addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 		workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 
@@ -360,9 +361,9 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	var c2Num uint64 = 3
 
 	p1MemCount := (memSize-GB56)/GB64 - p2Num + 2 //内存容量下p1的最大数量
-	log.Debugf("================ p1MemCount, p1MemCount [%d] , memSize: [%d] ", p1MemCount, memSize)
+	logrus.SchedLogger.Infof("================ p1MemCount, p1MemCount [%d] , memSize: [%d] ", p1MemCount, memSize)
 	p1DiskCount := diskSize / GB416 //磁盘容量下p1的最大数量
-	log.Debugf("================ p1DiskCount, p1DiskCount [%s] ,diskSize: [%+v] ", p1DiskCount, diskSize)
+	logrus.SchedLogger.Infof("================ p1DiskCount, p1DiskCount [%s] ,diskSize: [%+v] ", p1DiskCount, diskSize)
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
 	tc.AddPieceSize = uint8(p1Num)

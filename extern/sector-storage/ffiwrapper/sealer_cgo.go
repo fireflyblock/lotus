@@ -16,6 +16,7 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	//rlepluslazy "github.com/filecoin-project/go-bitfield/rle"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	"github.com/filecoin-project/specs-actors/actors/abi"
@@ -91,7 +92,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		if stagedFile != nil {
 			if err := stagedFile.Close(); err != nil {
-				log.Errorf("closing staged file: %+v", err)
+				logrus.SchedLogger.Errorf("closing staged file: %+v", err)
 			}
 		}
 	}()
@@ -384,7 +385,7 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 }
 
 func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	log.Debugf("================ Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, offset, size)
+	logrus.SchedLogger.Debugf("================ Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, offset, size)
 	path, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
 	if err != nil {
 		return false, xerrors.Errorf("acquire unsealed sector path: %w", err)
@@ -449,7 +450,7 @@ func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	if err := os.Mkdir(paths.Cache, 0755); err != nil { // nolint
 		if os.IsExist(err) {
-			log.Warnf("existing cache in %s; removing", paths.Cache)
+			logrus.SchedLogger.Warnf("existing cache in %s; removing", paths.Cache)
 
 			if err := os.RemoveAll(paths.Cache); err != nil {
 				return nil, xerrors.Errorf("remove existing sector cache from %s (sector %d): %w", paths.Cache, sector, err)
@@ -490,17 +491,17 @@ func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 }
 
 func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (storage.SectorCids, error) {
-	log.Infof("====== SealPreCommit2--> trans params \n sector:%+v\n phase1Out:%+v\n strphase1Out:%+v", sector, phase1Out, string(phase1Out))
+	logrus.SchedLogger.Infof("====== SealPreCommit2--> trans params \n sector:%+v\n phase1Out:%+v\n strphase1Out:%+v", sector, phase1Out, string(phase1Out))
 
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector paths: %w", err)
 	}
 	defer done()
-	log.Infof("====== SealPreCommit2--> AcquireSector return \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
+	logrus.SchedLogger.Infof("====== SealPreCommit2--> AcquireSector return \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
 
 	sealedCID, unsealedCID, err := ffi.SealPreCommitPhase2(phase1Out, paths.Cache, paths.Sealed)
-	log.Infof("====== SealPreCommit2--> SealPreCommitPhase2 return \n sealedCID:%+v\n unsealedCID:%+v\n err:%+v", sealedCID, unsealedCID, err)
+	logrus.SchedLogger.Infof("====== SealPreCommit2--> SealPreCommitPhase2 return \n sealedCID:%+v\n unsealedCID:%+v\n err:%+v", sealedCID, unsealedCID, err)
 
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("presealing sector %d (%s): %w", sector.Number, paths.Unsealed, err)
@@ -513,10 +514,10 @@ func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 }
 
 func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
-	log.Infof("====== SealCommit1--> trans params \n sector:%+v\n ticket:%+v\n seed:%+v\n pieces:%+v\n cids:%+v", sector, ticket, seed, pieces, cids)
+	logrus.SchedLogger.Infof("====== SealCommit1--> trans params \n sector:%+v\n ticket:%+v\n seed:%+v\n pieces:%+v\n cids:%+v", sector, ticket, seed, pieces, cids)
 
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
-	log.Infof("====== SealCommit1--> AcquireSector \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
+	logrus.SchedLogger.Infof("====== SealCommit1--> AcquireSector \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
 
 	if err != nil {
 		return nil, xerrors.Errorf("acquire sector paths: %w", err)
@@ -535,8 +536,8 @@ func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		pieces,
 	)
 	if err != nil {
-		log.Warn("StandaloneSealCommit error: ", err)
-		log.Warnf("num:%d tkt:%v seed:%v, pi:%v sealedCID:%v, unsealedCID:%v", sector.Number, ticket, seed, pieces, cids.Sealed, cids.Unsealed)
+		logrus.SchedLogger.Warn("StandaloneSealCommit error: ", err)
+		logrus.SchedLogger.Warnf("num:%d tkt:%v seed:%v, pi:%v sealedCID:%v, unsealedCID:%v", sector.Number, ticket, seed, pieces, cids.Sealed, cids.Unsealed)
 
 		return nil, xerrors.Errorf("StandaloneSealCommit: %w", err)
 	}
@@ -547,16 +548,16 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	workerType := os.Getenv("LOTUS_WORKER_TYPE")
 	switch workerType {
 	case "", "DOCKER":
-		log.Info("start SealCommit2 grpc c2_DOCKER! sector Number ", sector.Number)
+		logrus.SchedLogger.Info("start SealCommit2 grpc c2_DOCKER! sector Number ", sector.Number)
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 	case "MINER":
-		log.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.Number)
+		logrus.SchedLogger.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.Number)
 		result, err := miner.C2RPC(phase1Out, uint64(sector.Number), uint64(sector.Miner))
 		if err != nil {
-			log.Errorf("grpc err: %s", err.Error())
+			logrus.SchedLogger.Errorf("grpc err: %s", err.Error())
 			return []byte{}, err
 		}
-		log.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
+		logrus.SchedLogger.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
 		return result.Message, nil
 	default:
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
@@ -564,7 +565,7 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 }
 
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
-	log.Info("======== do FinalizeSector skip check keepUnsealed ")
+	logrus.SchedLogger.Info("======== do FinalizeSector skip check keepUnsealed ")
 	//if len(keepUnsealed) > 0 {
 	//	maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
@@ -722,22 +723,22 @@ func GenerateUnsealedCID(proofType abi.RegisteredSealProof, pieces []abi.PieceIn
 }
 
 //func transferData(path, name string) {
-//	//log.Info("====== transferData Called")
-//	//log.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
+//	//logrus.SchedLogger.Info("====== transferData Called")
+//	//logrus.SchedLogger.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
 //
 //	addr := os.Getenv("MINER_LISTEN_ADDR")
 //	url := "http://" + addr + "/TransferData"
-//	log.Infof("====== transferData get request url --> \n url:%+v ", url)
+//	logrus.SchedLogger.Infof("====== transferData get request url --> \n url:%+v ", url)
 //
 //	repReader := bytes.NewReader([]byte(path))
 //	r, err := http.NewRequest("GET", url, repReader)
 //	if err != nil {
-//		log.Info("====== transferData newrequest err:", err)
+//		logrus.SchedLogger.Info("====== transferData newrequest err:", err)
 //		return
 //	}
 //	resp, err := http.DefaultClient.Do(r)
 //	if err != nil {
-//		log.Info("====== transferData transfer err:", err)
+//		logrus.SchedLogger.Info("====== transferData transfer err:", err)
 //		return
 //	}
 //	response, _ := ioutil.ReadAll(resp.Body)
@@ -746,20 +747,20 @@ func GenerateUnsealedCID(proofType abi.RegisteredSealProof, pieces []abi.PieceIn
 //	tmp := os.Getenv("TMPDIR")
 //	err = ioutil.WriteFile(tmp+"/"+name, response, 0755)
 //	if err != nil {
-//		log.Info("====== transferData transfer resp err:", err)
+//		logrus.SchedLogger.Info("====== transferData transfer resp err:", err)
 //	} else {
-//		log.Info("====== transferData transfer resp success")
+//		logrus.SchedLogger.Info("====== transferData transfer resp success")
 //	}
 //}
 
 //func handlerReader(name string) (io.Reader, abi.UnpaddedPieceSize, error) {
-//	//log.Info("====== handlerReader Called")
-//	//log.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
+//	//logrus.SchedLogger.Info("====== handlerReader Called")
+//	//logrus.SchedLogger.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
 //	tmp := os.Getenv("TMPDIR")
 //	store, err := filestore.NewLocalFileStore(filestore.OsPath(tmp))
 //	file, err := store.Open(filestore.Path(name))
 //	if err != nil {
-//		log.Info("====== handlerReader err:", err)
+//		logrus.SchedLogger.Info("====== handlerReader err:", err)
 //		return nil, 0, err
 //	}
 //	reader, size := padreader.New(file, uint64(file.Size()))

@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"fmt"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"os"
 	"sync"
 	"time"
@@ -176,11 +177,11 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 }
 
 func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType sealtasks.TaskType, sel WorkerSelector, prepare WorkerAction, work WorkerAction) error {
-	log.Debugf("========== new req sched, sectorID:%+v, taskType:%+v\n", sector, taskType)
+	logrus.SchedLogger.Infof("========== new req sched, sectorID:%+v, taskType:%+v\n", sector, taskType)
 
 	if taskType == sealtasks.TTAddPiecePl {
 		if !sh.isExistFreeWorker {
-			log.Warnf("============== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v\n", sh.schedQueue.Len(), sector, taskType)
+			logrus.SchedLogger.Warnf("============== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v\n", sh.schedQueue.Len(), sector, taskType)
 			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue)
 		} else {
 			taskType = sealtasks.TTAddPiece
@@ -222,7 +223,7 @@ func (r *workerRequest) respond(err error) {
 	select {
 	case r.ret <- workerResponse{err: err}:
 	case <-r.ctx.Done():
-		log.Warnf("request got cancelled before we could respond")
+		logrus.SchedLogger.Warnf("request got cancelled before we could respond")
 	}
 }
 
@@ -252,7 +253,19 @@ func (sh *scheduler) runSched() {
 			sh.dropWorker(wid)
 
 		case req := <-sh.schedule:
-			log.Debugf("========== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
+			if req.taskType == sealtasks.TTAddPiece {
+				tr, ok := sh.taskRecorder.Load(req.sector)
+				if !ok {
+					logrus.SchedLogger.Infof("========== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
+				} else {
+					taskRd := tr.(sectorTaskRecord)
+					logrus.SchedLogger.Infof("========== new req again, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
+						"worker:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, taskRd.workerFortask, sh.isExistFreeWorker)
+				}
+			} else {
+				logrus.SchedLogger.Infof("========== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
+			}
+
 			sh.schedQueue.Push(req)
 			go sh.StartStore(req.sector.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
 			sh.trySched()
@@ -315,7 +328,7 @@ func (sh *scheduler) trySched() {
 	acceptableWindows := make([][]int, sh.schedQueue.Len())
 	acceptableAPWindows := make([][]int, sh.schedQueue.Len())
 
-	log.Debugf("SCHED %d queued; %d open windows", sh.schedQueue.Len(), len(windows))
+	logrus.SchedLogger.Infof("SCHED %d queued; %d open windows", sh.schedQueue.Len(), len(windows))
 
 	sh.workersLk.RLock()
 	defer sh.workersLk.RUnlock()
@@ -336,9 +349,6 @@ func (sh *scheduler) trySched() {
 
 	SelectWindowLoop:
 		for wnd, windowRequest := range sh.openWindows {
-			//if task.taskType == sealtasks.TTReadUnsealed || task.taskType == sealtasks.TTUnseal {
-			//	log.Debugf("================ trySched unseal1 sector:%+v\n",  task.sector)
-			//}
 			worker := sh.workers[windowRequest.worker]
 
 			hostName, err := os.Hostname()
@@ -348,9 +358,8 @@ func (sh *scheduler) trySched() {
 
 			switch task.taskType {
 			case sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
-				//log.Debugf("=============== is localWorker windows, sqi:%d, type:%+v, sector %d to window %d,hostname:%+v,", sqi, task.taskType, task.sector.Number, wnd, worker.info.Hostname)
 				if worker.info.Hostname == hostName {
-					log.Debugf("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
+					logrus.SchedLogger.Infof("=============== taskType is :%+v, sqi:%d, sector %d to window %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, wnd, worker.info.Hostname)
 					acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
 					break SelectWindowLoop
 				} else {
@@ -358,14 +367,13 @@ func (sh *scheduler) trySched() {
 				}
 			case sealtasks.TTAddPiece:
 				if taskRd.workerFortask == worker.info.Hostname {
-					//log.Infof("================ addpiece bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 					goto Judge
 				} else {
 					rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
 					ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
 					cancel()
 					if err != nil {
-						log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+						logrus.SchedLogger.Errorf("trySched(1) req.sel.Ok error: %+v", err)
 						continue
 					}
 
@@ -373,35 +381,28 @@ func (sh *scheduler) trySched() {
 						continue
 					}
 					if !sh.tryCanHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
-						log.Warnf("================ [tryCanHandleRequestForTask]  Worker %s processing sectorid(%+v) is not available，taskType:%s", worker.info.Hostname, task.sector, task.taskType)
+						logrus.SchedLogger.Warnf("================ [tryCanHandleRequestForTask]  Worker %s processing sectorid(%+v) is not available，taskType:%s", worker.info.Hostname, task.sector, task.taskType)
 						continue
 					}
 					acceptableAPWindows[sqi] = append(acceptableAPWindows[sqi], wnd)
-					//log.Debugf("================ check addpiece, window [%d] in worker [%s] is preparing [AddPiece] in sectorID [%+v] ", wnd, worker.info.Hostname, task.sector)
 					continue
 				}
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-				//log.Debugf("================ p1 p2 c1 window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 				if taskRd.workerFortask == worker.info.Hostname {
-					//log.Infof("================ bind window [%d] , worker [%s] , workerID [%+v] , preparing [%+v] in sectorID [%+v] ", wnd, worker.info.Hostname, windowRequest.worker, task.taskType, task.sector)
 					goto Judge
 				} else {
 					continue
 				}
 			case sealtasks.TTCommit2:
-				log.Debugf("================ check workScopeRecorder [%+v] ,worker: [%s] ,window [%d] ", sh.workScopeRecorder, worker.info.Hostname, wnd)
+				logrus.SchedLogger.Infof("================ check workScopeRecorder [%+v] ,worker: [%s] ,window [%d] ", sh.workScopeRecorder, worker.info.Hostname, wnd)
 				if sh.workScopeRecorder.search(PRIORITYCOMMIT2, worker.info.Hostname) {
-					log.Debugf("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
+					logrus.SchedLogger.Infof("================ 查询到合适的做c2的worker [%s] ,window [%s] ", worker.info.Hostname, wnd)
 					goto Judge
 				} else {
 					continue
 				}
-			//case sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
-			//	acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
-			//	log.Debugf("================ trySched unseal sector:%+v\n",  task.sector)
-			//	break SelectWindowLoop
 			default:
-				log.Warnf("================ 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配window :%+v", task.taskType, acceptableWindows)
+				logrus.SchedLogger.Warnf("================ 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配window :%+v", task.taskType, acceptableWindows)
 				break SelectWindowLoop
 			}
 
@@ -416,7 +417,7 @@ func (sh *scheduler) trySched() {
 				ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
 				cancel()
 				if err != nil {
-					log.Errorf("trySched(1) req.sel.Ok error: %+v", err)
+					logrus.SchedLogger.Errorf("trySched(1) req.sel.Ok error: %+v", err)
 					continue
 				}
 
@@ -425,7 +426,7 @@ func (sh *scheduler) trySched() {
 				}
 
 				if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, windowRequest.worker) {
-					log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, windowRequest.worker, worker.info.Hostname, task.sector, task.taskType, sqi)
+					logrus.SchedLogger.Infof("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, windowRequest.worker, worker.info.Hostname, task.sector, task.taskType, sqi)
 					continue
 				}
 				acceptableWindows[sqi] = append(acceptableWindows[sqi], wnd)
@@ -441,11 +442,11 @@ func (sh *scheduler) trySched() {
 					//goto EXCUTEADDPIECE
 				} else {
 					sh.isExistFreeWorker = false
-					log.Debugf("================ CLOSE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
+					logrus.SchedLogger.Infof("================ CLOSE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
 					continue
 				}
 			} else {
-				log.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
+				logrus.SchedLogger.Warnf("============== sector:%+v，type:%+v，无window可分配", task.sector, task.taskType)
 			}
 		}
 
@@ -472,7 +473,7 @@ func (sh *scheduler) trySched() {
 		//
 		//	r, err := task.sel.Cmp(rpcCtx, task.taskType, wi, wj)
 		//	if err != nil {
-		//		log.Error("selecting best worker: %s", err)
+		//		logrus.SchedLogger.Error("selecting best worker: %s", err)
 		//	}
 		//	return r
 		//})
@@ -502,12 +503,12 @@ func (sh *scheduler) trySched() {
 			case sealtasks.TTAddPiece:
 				if taskRd.workerFortask != worker.info.Hostname {
 					if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, wid) {
-						log.Debugf("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, wid, worker.info.Hostname, task.sector, task.taskType, sqi)
+						logrus.SchedLogger.Infof("================ [canHandleRequestForTask] winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wnd, wid, worker.info.Hostname, task.sector, task.taskType, sqi)
 						continue
 					}
 				}
 			}
-			log.Debugf("SCHED ASSIGNED winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
+			logrus.SchedLogger.Infof("SCHED ASSIGNED winID:%+v, workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v, scheduled:%+v", wnd, wid, sh.workers[wid].info.Hostname, task.sector, task.taskType, sqi, scheduled)
 
 			windows[wnd].allocated.add(wr, needRes)
 
@@ -521,14 +522,14 @@ func (sh *scheduler) trySched() {
 		}
 
 		windows[selectedWindow].todo = append(windows[selectedWindow].todo, task)
-		log.Debugf("============== select window to do task ->  window [%d] , worker [%s] , workerID [%+v] ,sectorID [%+v] ,type [%+v] \n",
+		logrus.SchedLogger.Infof("============== select window to do task ->  window [%d] , worker [%s] , workerID [%+v] ,sectorID [%+v] ,type [%+v] \n",
 			selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector, task.taskType)
 
 		if task.taskType == sealtasks.TTAddPiece {
 			taskRd.taskStatus = ADDPIECE_WAITING
 			taskRd.workerFortask = sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname
 			sh.taskRecorder.Store(task.sector, taskRd)
-			log.Debugf("================ start bind ,window [%d] , worker [%s] , workerID [%+v] , sectorID [%+v] \n",
+			logrus.SchedLogger.Infof("================ start bind ,window [%d] , worker [%s] , workerID [%+v] , sectorID [%+v] \n",
 				selectedWindow, sh.workers[sh.openWindows[selectedWindow].worker].info.Hostname, sh.openWindows[selectedWindow].worker, task.sector)
 		}
 		sh.schedQueue.Remove(sqi)
@@ -554,9 +555,9 @@ func (sh *scheduler) trySched() {
 		window := window // copy
 		select {
 		case sh.openWindows[wnd].done <- &window:
-			log.Debugf("============== done <- allocated:%+v,todo:%+v,wnd:%+v,", &window.allocated, &window.todo, wnd)
+			logrus.SchedLogger.Infof("============== done <- allocated:%+v,todo:%+v,wnd:%+v,", &window.allocated, &window.todo, wnd)
 		default:
-			log.Error("expected sh.openWindows[wnd].done to be buffered")
+			logrus.SchedLogger.Error("expected sh.openWindows[wnd].done to be buffered")
 		}
 	}
 
@@ -610,7 +611,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 		}
 
 		defer func() {
-			log.Warnw("Worker closing", "workerid", wid)
+			logrus.SchedLogger.Warn("Worker closing, workerid:", wid)
 
 			// TODO: close / return all queued tasks
 		}()
@@ -624,7 +625,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 					worker: wid,
 					done:   scheduledWindows,
 				}:
-					//log.Debugf("============== new scheduledWindows for worker:%+v,workerID:%+v", scheduledWindows, wid)
+					//logrus.SchedLogger.Infof("============== new scheduledWindows for worker:%+v,workerID:%+v", scheduledWindows, wid)
 				case <-sh.closing:
 					return
 				case <-workerClosing:
@@ -639,7 +640,7 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 			case w := <-scheduledWindows:
 				activeWindows = append(activeWindows, w)
 			case <-taskDone:
-				log.Debugw("task done", "workerid", wid)
+				logrus.SchedLogger.Debug("task done, workerid:", wid)
 			case <-sh.closing:
 				return
 			case <-workerClosing:
@@ -669,12 +670,12 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 					//	break assignLoop
 					//}
 
-					log.Debugf("assign worker sector %d", todo.sector.Number)
+					logrus.SchedLogger.Infof("assign worker sector %d", todo.sector.Number)
 					err := sh.assignWorker(taskDone, wid, worker, todo)
 					//sh.workersLk.RUnlock()
 
 					if err != nil {
-						log.Error("assignWorker error: %+v", err)
+						logrus.SchedLogger.Error("assignWorker error: %+v", err)
 						go todo.respond(xerrors.Errorf("assignWorker error: %w", err))
 					}
 
@@ -694,10 +695,6 @@ func (sh *scheduler) runWorker(wid WorkerID) {
 func (sh *scheduler) updateTransforCount(updatetype int) {
 	// 记录等待传输的数量
 	tc, _ := sh.transferChannel.LoadOrStore("wCount", 0)
-	//if !ok {
-	//	log.Errorf("======updateTransforCount load wCount error\n")
-	//	return
-	//}
 	wCount, _ := tc.(int)
 
 	if updatetype == 1 {
@@ -707,7 +704,7 @@ func (sh *scheduler) updateTransforCount(updatetype int) {
 	}
 
 	sh.transferChannel.Store("wCount", wCount)
-	log.Infof("========total wait transforing count is :%d\n", wCount)
+	logrus.SchedLogger.Infof("========total wait transforing count is :%d\n", wCount)
 }
 
 // 拉取数据
@@ -717,7 +714,7 @@ func (sh *scheduler) tryFetchData(wid WorkerID, req *workerRequest) {
 		return
 	}
 
-	log.Infof("=========before sector(%+v) to do SealCommit2 tryFetchData", req.sector)
+	logrus.SchedLogger.Infof("=========before sector(%+v) to do SealCommit2 tryFetchData", req.sector)
 
 	// transferChannel存储key：wid，value：channel
 	// 存储channel用于计算任务完成后检测传输是否完成，如果未完成则等待传输完成。
@@ -735,13 +732,11 @@ func (sh *scheduler) tryFetchData(wid WorkerID, req *workerRequest) {
 	// 执行拉取
 	transforStartAt := time.Now()
 	_ = w.w.FetchRealData(req.ctx, req.sector)
-	log.Infof("=========sector(%+v) transfor cost time : %s", req.sector, time.Now().Sub(transforStartAt))
+	logrus.SchedLogger.Infof("=========sector(%+v) transfor cost time : %s", req.sector, time.Now().Sub(transforStartAt))
 	//time.Sleep(time.Minute * 1)
 
 	// 写入数据完成信号
 	tch <- req.sector
-	//log.Info("===============传送完成--测试测试。。。。。。。。。。。。。")
-
 }
 
 func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *workerHandle, req *workerRequest) error {
@@ -768,15 +763,15 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			select {
 			case taskDone <- struct{}{}:
 			case <-sh.closing:
-				log.Warnf("scheduler closed while sending response (prepare error: %+v)", err)
+				logrus.SchedLogger.Warnf("scheduler closed while sending response (prepare error: %+v)", err)
 			}
 
 			select {
 			case req.ret <- workerResponse{err: err}:
 			case <-req.ctx.Done():
-				log.Warnf("request got cancelled before we could respond (prepare error: %+v)", err)
+				logrus.SchedLogger.Warnf("request got cancelled before we could respond (prepare error: %+v)", err)
 			case <-sh.closing:
-				log.Warnf("scheduler closed while sending response (prepare error: %+v)", err)
+				logrus.SchedLogger.Warnf("scheduler closed while sending response (prepare error: %+v)", err)
 			}
 			return
 		}
@@ -798,7 +793,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 			// 检测C2任务是否完成，完成则返回，否则等待
 			if req.taskType == sealtasks.TTCommit2 {
-				log.Warnf("=======sector(%+v) finished SealCommit2 task, check transfer is finish...", req.sector)
+				logrus.SchedLogger.Warnf("=======sector(%+v) finished SealCommit2 task, check transfer is finish...", req.sector)
 				tch, ok := sh.transferChannel.Load(req.sector)
 				if ok {
 					tch1 := tch.(chan abi.SectorID)
@@ -807,23 +802,23 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 						sh.transferChannel.Delete(req.sector)
 						sh.updateTransforCount(0)
 						if sid != req.sector {
-							log.Errorf("===========maybe some error when transfer process\n")
+							logrus.SchedLogger.Errorf("===========maybe some error when transfer process\n")
 						}
-						log.Infof("========receive sector[%+v] transfer finished signal", req.sector)
+						logrus.SchedLogger.Infof("========receive sector[%+v] transfer finished signal", req.sector)
 					}
 
 				} else {
 					// TODO 告警，sector C2任务完成确没有传输数据的channel，需要检查sealed和cache数据
-					log.Errorf("========sector(%+v) finished SealPrecommit2,but not found transfer channel. check data!!!!", req.sector)
+					logrus.SchedLogger.Errorf("========sector(%+v) finished SealPrecommit2,but not found transfer channel. check data!!!!", req.sector)
 				}
 			}
 
 			select {
 			case req.ret <- workerResponse{err: err}:
 			case <-req.ctx.Done():
-				log.Warnf("request got cancelled before we could respond")
+				logrus.SchedLogger.Warnf("request got cancelled before we could respond")
 			case <-sh.closing:
-				log.Warnf("scheduler closed while sending response")
+				logrus.SchedLogger.Warnf("scheduler closed while sending response")
 			}
 
 			return nil
@@ -833,7 +828,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 		// This error should always be nil, since nothing is setting it, but just to be safe:
 		if err != nil {
-			log.Errorf("error executing worker (withResources): %+v", err)
+			logrus.SchedLogger.Errorf("error executing worker (withResources): %+v", err)
 		}
 	}()
 
@@ -879,7 +874,7 @@ func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
 	select {
 	case <-w.closedMgr:
 	case <-time.After(time.Second):
-		log.Errorf("timeout closing worker manager goroutine %d", wid)
+		logrus.SchedLogger.Errorf("timeout closing worker manager goroutine %d", wid)
 	}
 
 	if !w.cleanupStarted {
@@ -893,11 +888,11 @@ func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
 		}
 		sh.openWindows = newWindows
 
-		log.Debugf("dropWorker %d", wid)
+		logrus.SchedLogger.Infof("dropWorker %d", wid)
 
 		go func() {
 			if err := w.w.Close(); err != nil {
-				log.Warnf("closing worker %d: %+v", err)
+				logrus.SchedLogger.Warnf("closing worker %d: %+v", err)
 			}
 		}()
 	}
@@ -906,7 +901,7 @@ func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
 func (sh *scheduler) schedClose() {
 	sh.workersLk.Lock()
 	defer sh.workersLk.Unlock()
-	log.Debugf("closing scheduler")
+	logrus.SchedLogger.Infof("closing scheduler")
 
 	for i, w := range sh.workers {
 		sh.workerCleanup(i, w)

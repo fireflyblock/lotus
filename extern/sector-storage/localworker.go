@@ -14,6 +14,7 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 
@@ -81,7 +82,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 		return stores.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
 	}
 
-	log.Debugf("acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
+	logrus.SchedLogger.Debugf("acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
 		releaseStorage()
@@ -94,7 +95,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 			sid := stores.PathByType(storageIDs, fileType)
 
 			if err := l.w.sindex.StorageDeclareSector(ctx, stores.ID(sid), sector, fileType, l.op == stores.AcquireMove); err != nil {
-				log.Errorf("declare sector error: %+v", err)
+				logrus.SchedLogger.Errorf("declare sector error: %+v", err)
 			}
 		}
 	}, nil
@@ -121,7 +122,7 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 	}
 	startAt := time.Now()
 	pi, err := sb.AddPiece(ctx, sector, epcs, sz, r, apType)
-	log.Infof("================ worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
+	logrus.SchedLogger.Infof("================ worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
 	return pi, err
@@ -155,7 +156,7 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 
 	startAt := time.Now()
 	out, err = sb.SealPreCommit1(ctx, sector, ticket, pieces)
-	log.Infof("================ worker  finished %+v  [SealPreCommit1] start at:%s end at:%s cost time:%s",
+	logrus.SchedLogger.Infof("================ worker  finished %+v  [SealPreCommit1] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
 	return out, err
@@ -171,7 +172,7 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 
 	startAt := time.Now()
 	cids, err = sb.SealPreCommit2(ctx, sector, phase1Out)
-	log.Infof("================ worker  finished %+v [SealPreCommit2] start at:%s end at:%s cost time:%s",
+	logrus.SchedLogger.Infof("================ worker  finished %+v [SealPreCommit2] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 	return cids, err
 	//return sb.SealPreCommit2(ctx, sector, phase1Out)
@@ -185,10 +186,10 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 
 	startAt := time.Now()
 	out, err := sb.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
-	log.Infof("================ worker  finished %+v [SealCommit1] start at:%s end at:%s cost time:%s",
+	logrus.SchedLogger.Infof("================ worker  finished %+v [SealCommit1] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
-	log.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+	logrus.SchedLogger.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
 	l.localStore.RemoveLayersAndTreeCAndD(ctx, sector, l.scfg.SealProofType, stores.FTCache)
 
 	return out, err
@@ -198,15 +199,15 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 
 // this method can only called by worker0
 func (l *LocalWorker) FetchRealData(ctx context.Context, sector abi.SectorID) error {
-	//log.Infof("=========before to do SealCommit2 for sector [%v], delete remote workers' cache layer and tree_d and tree_c files",
+	//logrus.SchedLogger.Infof("=========before to do SealCommit2 for sector [%v], delete remote workers' cache layer and tree_d and tree_c files",
 	//	sector)
 	//l.storage.RemoveLayersAndTreeCAndD(ctx,sector,l.scfg.SealProofType,stores.FTCache)
 
 	// fetch cache dir and sealed dir
-	log.Infof("=========before to do SealCommit2 for sector [%v], fetch remote workers' cache layer and tree_d and tree_c files", sector)
+	logrus.SchedLogger.Infof("=========before to do SealCommit2 for sector [%v], fetch remote workers' cache layer and tree_d and tree_c files", sector)
 	l.Fetch(ctx, sector, stores.FTCache|stores.FTSealed, stores.PathStorage, stores.AcquireMove)
 
-	log.Infof("=========before to do SealCommit2 for sector [%v], fetch finished", sector)
+	logrus.SchedLogger.Infof("=========before to do SealCommit2 for sector [%v], fetch finished", sector)
 	return nil
 }
 
@@ -218,7 +219,7 @@ func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phas
 
 	startAt := time.Now()
 	proof, err = sb.SealCommit2(ctx, sector, phase1Out)
-	log.Infof("================ worker  finished %+v [Commit2] start at:%s end at:%s cost time:%s",
+	logrus.SchedLogger.Infof("================ worker  finished %+v [Commit2] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
 	return proof, err
@@ -277,7 +278,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 	if err != nil {
 		return err
 	}
-	log.Debugf("================ trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n", sector, index, size, randomness, cid)
+	logrus.SchedLogger.Debugf("================ trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n", sector, index, size, randomness, cid)
 	if err := sb.UnsealPiece(ctx, sector, index, size, randomness, cid); err != nil {
 		return xerrors.Errorf("unsealing sector: %w", err)
 	}
@@ -294,7 +295,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 }
 
 func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	log.Debugf("================ LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, index, size)
+	logrus.SchedLogger.Debugf("================ LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, index, size)
 	sb, err := l.sb()
 	if err != nil {
 		return false, err
@@ -319,7 +320,7 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 
 	gpus, err := ffi.GetGPUDevices()
 	if err != nil {
-		log.Errorf("getting gpu devices failed: %+v", err)
+		logrus.SchedLogger.Errorf("getting gpu devices failed: %+v", err)
 	}
 
 	h, err := sysinfo.Host()

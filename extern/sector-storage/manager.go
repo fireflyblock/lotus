@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/mitchellh/go-homedir"
 
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
@@ -94,6 +95,7 @@ type SealerConfig struct {
 type StorageAuth http.Header
 
 func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg *ffiwrapper.Config, sc SealerConfig, urls URLs, sa StorageAuth) (*Manager, error) {
+	logrus.Init()
 	lstor, err := stores.NewLocal(ctx, ls, si, urls)
 	if err != nil {
 		return nil, err
@@ -192,10 +194,11 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 
 	//计算worker配置信息
 	tc := CalculateResources(info.Resources, fsS.Available)
-	log.Debugf("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
+	//logrus.SchedLogger.Infof("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
+	logrus.SchedLogger.Infof("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	if scope == PRIORITYCOMMIT2 {
 		tc.Commit2 = 10000
-		log.Debugf("================ c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
+		logrus.SchedLogger.Infof("================ c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
 	}
 
 	m.sched.newWorkers <- &workerHandle{
@@ -210,7 +213,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		WorkScope: scope,
 	}
 	m.sched.workScopeRecorder.append(scope, info.Hostname)
-	log.Debugf("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
+	logrus.SchedLogger.Infof("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
 	return nil
 }
 
@@ -255,7 +258,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	}
 
 	var readOk bool
-	log.Debugf("================ readpiece sector:%+v, best:%+v, selector:%+v\n", sector, best, selector)
+	logrus.SchedLogger.Infof("================ readpiece sector:%+v, best:%+v, selector:%+v\n", sector, best, selector)
 
 	if len(best) > 0 {
 		// There is unsealed sector, see if we can read from it
@@ -263,7 +266,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-			log.Debugf("================ readpiece TTReadUnsealed1  sector:%+v\n", sector)
+			logrus.SchedLogger.Infof("================ readpiece TTReadUnsealed1  sector:%+v\n", sector)
 			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 			return err
 		})
@@ -290,7 +293,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	}
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
-		log.Debugf("================ readpiece TTUnseal  sector:%+v\n", sector)
+		logrus.SchedLogger.Infof("================ readpiece TTUnseal  sector:%+v\n", sector)
 		return w.UnsealPiece(ctx, sector, offset, size, ticket, unsealed)
 	})
 	if err != nil {
@@ -300,7 +303,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-		log.Debugf("================ readpiece TTReadUnsealed2  sector:%+v\n", sector)
+		logrus.SchedLogger.Infof("================ readpiece TTReadUnsealed2  sector:%+v\n", sector)
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 		return err
 	})
@@ -316,7 +319,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 }
 
 func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
-	log.Warnf("stub NewSector")
+	logrus.SchedLogger.Warnf("stub NewSector")
 	return nil
 }
 
@@ -356,7 +359,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		taskRd.taskStatus = ADDPIECE_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector, apType)
+		logrus.SchedLogger.Infof("================ worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector, apType)
 		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r, apType)
 		if err != nil {
@@ -367,7 +370,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = PRE1_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -398,7 +401,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 		taskRd.taskStatus = PRE1_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
 		if err != nil {
@@ -410,7 +413,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = PRE2_WAITING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -432,7 +435,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		wInfo, _ := w.Info(ctx)
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			log.Debugf("================ SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("================ SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
 		}()
 		_, ok := m.sched.taskRecorder.Load(sector)
 		if !ok {
@@ -443,7 +446,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 
 		taskRd.taskStatus = PRE2_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
@@ -455,7 +458,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = COMMIT1_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -486,7 +489,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 		taskRd.taskStatus = COMMIT1_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
 		if err != nil {
@@ -498,7 +501,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = COMMIT2_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -511,7 +514,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		wInfo, _ := w.Info(ctx)
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			log.Debugf("================ SealCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("================ SealCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
 		}()
 
 		_, ok := m.sched.taskRecorder.Load(sector)
@@ -523,7 +526,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 
 		taskRd.taskStatus = COMMIT2_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit2(ctx, sector, phase1Out)
 		if err != nil {
@@ -535,7 +538,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = TRANSFOR_FINISHED
 		m.sched.taskRecorder.Store(sector, taskRd)
-		log.Debugf("================ worker %s is TRANSFOR_FINISHED in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("================ worker %s is TRANSFOR_FINISHED in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -569,7 +572,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		schedNop,
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
-			log.Debugf("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
+			logrus.SchedLogger.Infof("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)
 			return w.FinalizeSector(ctx, sector, []storage.Range{})
 		})
@@ -606,7 +609,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 }
 
 func (m *Manager) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
-	log.Warnw("ReleaseUnsealed todo")
+	logrus.SchedLogger.Warn("ReleaseUnsealed todo")
 	return nil
 }
 
