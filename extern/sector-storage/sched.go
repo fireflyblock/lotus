@@ -369,6 +369,10 @@ func (sh *scheduler) trySched() {
 				if taskRd.workerFortask == worker.info.Hostname {
 					goto Judge
 				} else {
+					if worker.info.Hostname==hostName{
+						continue
+					}
+
 					rpcCtx, cancel := context.WithTimeout(task.ctx, SelectorTimeout)
 					ok, err := task.sel.Ok(rpcCtx, task.taskType, sh.spt, worker)
 					cancel()

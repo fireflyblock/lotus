@@ -430,7 +430,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, true)
+	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, false)
 
 	//err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
@@ -640,6 +640,12 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			wInfo, _ := w.Info(ctx)
 			logrus.SchedLogger.Infof("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			m.sched.taskRecorder.Delete(sector)
+			// 找不到合适的路径让commit1执行失败并且不要删除数据
+			destPath, _ := m.FindBestStoragePath(ctx, sector)
+			if destPath==""{
+				// if not mount nfs disk then miner fetch form worker
+				return w.FinalizeSector(ctx,sector,[]storage.Range{})
+			}
 			return nil
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)
 			//return w.FinalizeSector(ctx, sector, []storage.Range{})
