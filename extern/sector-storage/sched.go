@@ -753,7 +753,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 	go func() {
 		// 拉取数据
-		go sh.tryFetchData(wid, req)
+		//go sh.tryFetchData(wid, req)
 
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()
@@ -797,26 +797,26 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 			// 检测C2任务是否完成，完成则返回，否则等待
-			if req.taskType == sealtasks.TTCommit2 {
-				log.Warnf("=======sector(%+v) finished SealCommit2 task, check transfer is finish...", req.sector)
-				tch, ok := sh.transferChannel.Load(req.sector)
-				if ok {
-					tch1 := tch.(chan abi.SectorID)
-					select {
-					case sid := <-tch1:
-						sh.transferChannel.Delete(req.sector)
-						sh.updateTransforCount(0)
-						if sid != req.sector {
-							log.Errorf("===========maybe some error when transfer process\n")
-						}
-						log.Infof("========receive sector[%+v] transfer finished signal", req.sector)
-					}
+			//if req.taskType == sealtasks.TTCommit2 {
+			//	log.Warnf("=======sector(%+v) finished SealCommit2 task, check transfer is finish...", req.sector)
+			//	tch, ok := sh.transferChannel.Load(req.sector)
+			//	if ok {
+			//		tch1 := tch.(chan abi.SectorID)
+			//		select {
+			//		case sid := <-tch1:
+			//			sh.transferChannel.Delete(req.sector)
+			//			sh.updateTransforCount(0)
+			//			if sid != req.sector {
+			//				log.Errorf("===========maybe some error when transfer process\n")
+			//			}
+			//			log.Infof("========receive sector[%+v] transfer finished signal", req.sector)
+			//		}
 
-				} else {
-					// TODO 告警，sector C2任务完成确没有传输数据的channel，需要检查sealed和cache数据
-					log.Errorf("========sector(%+v) finished SealPrecommit2,but not found transfer channel. check data!!!!", req.sector)
-				}
-			}
+			//	} else {
+			//		// TODO 告警，sector C2任务完成确没有传输数据的channel，需要检查sealed和cache数据
+			//		log.Errorf("========sector(%+v) finished SealPrecommit2,but not found transfer channel. check data!!!!", req.sector)
+			//	}
+			//}
 
 			select {
 			case req.ret <- workerResponse{err: err}:

@@ -34,6 +34,7 @@ type WorkerAPI interface {
 
 	FetchRealData(ctx context.Context, id abi.SectorID) error
 	Fetch(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error
+	PushDataToStorage(ctx context.Context,sid abi.SectorID,dest string) error
 
 	Closing(context.Context) (<-chan struct{}, error)
 }

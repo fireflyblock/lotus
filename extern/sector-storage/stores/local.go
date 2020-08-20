@@ -512,7 +512,53 @@ func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID,
 	log.Infof("======== who call me ??????????????????????????")
 	return nil
 }
+func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, proofType abi.RegisteredSealProof, dest string) error {
+	// 获取worker存储
+	pathCfg, err := st.localStorage.GetStorage()
+	if err != nil || len(pathCfg.StoragePaths) == 0 {
+		log.Errorf("try to send sector (%+v) to storage Server,pathCfg(%+v),Get Worker Storage Path error : %w", sector, pathCfg, err)
+		return xerrors.Errorf("try to send sector (%+v) to storage Server,pathCfg(%+v),Get Worker Storage Path error : %w", sector, pathCfg, err)
+	}
 
+	// 筛选存储机器
+
+	// 尝试 开始发送 通过解析p.local来获取NFS ip
+	ip, destPath := PareseDestFromePath(dest)
+	if ip == "" {
+		log.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest ip", sector, dest)
+	} else if destPath == "" {
+		log.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, dest)
+	} else {
+		// 删除数据
+		log.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+		st.RemoveLayersAndTreeCAndD(ctx, sector, proofType, FTCache)
+
+		start := time.Now()
+		// send FTSealed
+		srcPath := filepath.Join(pathCfg.StoragePaths[0].Path, FTSealed.String()) + "/"
+		src := SectorName(sector)
+		sealedPath := filepath.Join(destPath, FTSealed.String()) + "/"
+		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, sealedPath)
+		err := SendFile(srcPath, src, sealedPath, ip)
+		if err != nil {
+			return err
+		}
+
+		// send FTCache
+		srcPath = filepath.Join(pathCfg.StoragePaths[0].Path, FTCache.String()) + "/"
+		cachePath := filepath.Join(destPath, FTCache.String()) + "/"
+		//src:=SectorName(sector)
+		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, cachePath)
+		err = SendZipFile(srcPath, src, cachePath, ip)
+		log.Infof("======transfor sector(%+v) to Storage(%+v) cost time %s", sector, time.Now().Sub(start))
+
+		return err
+	}
+	return nil
+
+	// 声明miner存储记录
+	// 清除worker存储记录
+}
 func (st *Local) Remove(ctx context.Context, sid abi.SectorID, typ SectorFileType, force bool) error {
 	if bits.OnesCount(uint(typ)) != 1 {
 		return xerrors.New("delete expects one file type")
