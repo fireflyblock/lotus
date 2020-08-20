@@ -70,6 +70,7 @@ func (sb *Sealer) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 
 //func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data, apType string) (abi.PieceInfo, error) {
+	log.Infof("=====>>> existingPieceSizes:%+v,apType:%+v",existingPieceSizes,apType)
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size

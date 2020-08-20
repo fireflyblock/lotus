@@ -52,6 +52,9 @@ type Worker interface {
 	// returns channel signalling worker shutdown
 	Closing(context.Context) (<-chan struct{}, error)
 
+	// worker push sealed data to Storage
+	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
+
 	Close() error
 }
 
@@ -194,7 +197,6 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 
 	//计算worker配置信息
 	tc := CalculateResources(info.Resources, fsS.Available)
-	//logrus.SchedLogger.Infof("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	logrus.SchedLogger.Infof("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	if scope == PRIORITYCOMMIT2 {
 		tc.Commit2 = 10000
@@ -496,6 +498,26 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			return err
 		}
 		out = p
+
+		// 找不到合适的路径让commit1执行失败并且不要删除数据
+		destPath, sID := m.FindBestStoragePath(ctx, sector)
+		if destPath == "" {
+			return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
+		}
+
+		err = w.PushDataToStorage(ctx, sector, destPath)
+		if err != nil {
+			logrus.SchedLogger.Errorf("========= after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+			return xerrors.Errorf("========= after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+		}
+
+		// 申明新的存储路径
+		err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
+		if err != nil {
+			logrus.SchedLogger.Errorf("========= after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+			return xerrors.Errorf("========= after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+		}
+
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
 
 		//任务结束，更改taskRecorder状态
@@ -507,6 +529,50 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	return out, err
 }
 
+func (m *Manager) FindBestStoragePath(ctx context.Context, sector abi.SectorID) (string, stores.ID) {
+	// 筛选存储机器
+	sis, err := m.index.StorageBestAlloc(ctx, stores.FTSealed, abi.RegisteredSealProof_StackedDrg32GiBV1, stores.PathStorage)
+	//m.index.StorageList
+	if err != nil {
+		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding best storage error : %w", sector, err)
+		return "", ""
+	}
+
+	storagePaths, err := m.StorageLocal(ctx)
+	if err != nil {
+		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding storagePaths error : %w", sector, err)
+		return "", ""
+	}
+
+	var bestSi stores.StorageInfo
+	for _, si := range sis {
+		p, ok := storagePaths[si.ID]
+		if !ok {
+			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage ID(%+v)", sector, si.ID)
+			continue
+		}
+
+		if p == "" { // TODO: can that even be the case?
+			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage path is null", sector)
+			continue
+		}
+
+		// 尝试 开始发送 通过解析p.local来获取NFS ip
+		ip, destPath := stores.PareseDestFromePath(p)
+		if ip == "" {
+			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest ip", sector, p)
+		} else if destPath == "" {
+			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, p)
+		} else {
+			logrus.SchedLogger.Infof("======= find best destPath(%+v) ip(%+v)", destPath, ip)
+			return p, si.ID
+		}
+	}
+	if bestSi.ID == "" {
+		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+	}
+	return "", ""
+}
 func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
 	selector := newTaskSelector()
 
@@ -573,8 +639,10 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
 			logrus.SchedLogger.Infof("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
+			m.sched.taskRecorder.Delete(sector)
+			return nil
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)
-			return w.FinalizeSector(ctx, sector, []storage.Range{})
+			//return w.FinalizeSector(ctx, sector, []storage.Range{})
 		})
 	if err != nil {
 		return err

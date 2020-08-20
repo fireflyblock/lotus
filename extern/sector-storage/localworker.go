@@ -189,12 +189,21 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 	logrus.SchedLogger.Infof("================ worker  finished %+v [SealCommit1] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
-	logrus.SchedLogger.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
-	l.localStore.RemoveLayersAndTreeCAndD(ctx, sector, l.scfg.SealProofType, stores.FTCache)
+	//logrus.SchedLogger.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+	//l.localStore.RemoveLayersAndTreeCAndD(ctx, sector, l.scfg.SealProofType, stores.FTCache)
 
 	return out, err
 
 	//return sb.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
+}
+// 从manager传入index用以获取存储路径
+/*
+	传输文件到存储服务机器
+	目的：worker直接写入文件到存储机器，并且创建sector索引
+	注意点：通过这个方法传输文件，则不使用FetchRealData来拉取数据
+*/
+func (l *LocalWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
+	return l.localStore.TransforDataToStorageServer(ctx, sid, l.scfg.SealProofType, dest)
 }
 
 // this method can only called by worker0

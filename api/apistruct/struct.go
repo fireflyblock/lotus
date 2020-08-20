@@ -323,6 +323,7 @@ type WorkerStruct struct {
 
 		FetchRealData func(ctx context.Context, id abi.SectorID) error                                                      `perm:"admin"`
 		Fetch         func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
+		PushDataToStorage func(ctx context.Context,sid abi.SectorID,dest string)  error `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -1229,6 +1230,9 @@ func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.S
 
 func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
 	return w.Internal.FetchRealData(ctx, id)
+}
+func (w *WorkerStruct)PushDataToStorage(ctx context.Context,sid abi.SectorID,dest string) error{
+	return w.Internal.PushDataToStorage(ctx,sid,dest)
 }
 
 func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
