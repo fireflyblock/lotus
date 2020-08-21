@@ -499,10 +499,17 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		}
 		out = p
 
-		// 找不到合适的路径让commit1执行失败并且不要删除数据
+		// 找不到合适的路径,则使用miner的存储
 		destPath, sID := m.FindBestStoragePath(ctx, sector)
 		if destPath == "" {
-			return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
+			logrus.SchedLogger.Errorf("sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector,destPath)
+			go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+			//任务结束，更改taskRecorder状态
+			taskRd.taskStatus = COMMIT2_WAITTING
+			m.sched.taskRecorder.Store(sector, taskRd)
+			logrus.SchedLogger.Infof("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+			return nil
+			//return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
 		}
 
 		err = w.PushDataToStorage(ctx, sector, destPath)
