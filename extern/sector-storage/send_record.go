@@ -87,12 +87,12 @@ func (sh *scheduler) StartLoad() error {
 		return nil
 	}
 
-	log.Debugf("========== init taskRecorder :%+v", sh.taskRecorder)
+	log.Debugf("===== init taskRecorder :%+v", sh.taskRecorder)
 	for _, it := range itList {
 		tr := sectorTaskRecord{}
 		tr.workerFortask = it.Worker
 		sh.taskRecorder.Store(it.Sector, tr)
-		log.Debugf("========== sectorTaskRecord :%+v", tr)
+		log.Debugf("===== sectorTaskRecord :%+v", tr)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func Store(data []byte) error {
 	var url string
 	c, err := initRequestConfig("conf.json")
 	if err != nil {
-		fmt.Println("========== read conf.json err:", err)
+		fmt.Println("===== read conf.json err:", err)
 	}
 	if c.Url == "" {
 		url = defaultRequestURL
@@ -112,11 +112,11 @@ func Store(data []byte) error {
 	reader := bytes.NewReader(data)
 	resp, err := http.Post(url, "application/json", reader)
 	if err != nil {
-		fmt.Println("========== send post err:", err)
+		fmt.Println("===== send post err:", err)
 		log.Error("send post err:", err)
 		return err
 	}
-	fmt.Printf("========== resp.Status:%+v, resp.Body:%+v\n", resp.Status, resp.Body)
+	fmt.Printf("===== resp.Status:%+v, resp.Body:%+v\n", resp.Status, resp.Body)
 	defer resp.Body.Close()
 	return nil
 }
@@ -126,7 +126,7 @@ func Load() ([]IncompleteTask, error) {
 	var iT = make([]IncompleteTask, 0)
 	c, err := initRequestConfig("conf.json")
 	if err != nil {
-		fmt.Println("========== read conf.json err:", err)
+		fmt.Println("===== read conf.json err:", err)
 		return iT, err
 	}
 	if c.Url == "" {
@@ -137,20 +137,20 @@ func Load() ([]IncompleteTask, error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("========== http get err:", err)
+		fmt.Println("===== http get err:", err)
 		return iT, err
 	}
 	defer resp.Body.Close()
 
 	resByte, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("========== read all err:", err)
+		fmt.Println("===== read all err:", err)
 		return iT, err
 	}
 
 	err = json.Unmarshal(resByte, &iT)
 	if err != nil {
-		fmt.Println("========== json Unmarshal err:", err)
+		fmt.Println("===== json Unmarshal err:", err)
 		return iT, err
 	}
 

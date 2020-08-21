@@ -127,7 +127,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 
 	//err = m.sched.StartLoad()
 	//if err != nil {
-	//	return  nil,xerrors.Errorf("========== start load task record err: %w", err)
+	//	return  nil,xerrors.Errorf("===== start load task record err: %w", err)
 	//}
 	go m.sched.runSched()
 
@@ -197,10 +197,10 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 
 	//计算worker配置信息
 	tc := CalculateResources(info.Resources, fsS.Available)
-	logrus.SchedLogger.Infof("================CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
+	logrus.SchedLogger.Infof("===== CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	if scope == PRIORITYCOMMIT2 {
 		tc.Commit2 = 10000
-		logrus.SchedLogger.Infof("================ c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
+		logrus.SchedLogger.Infof("===== c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
 	}
 
 	m.sched.newWorkers <- &workerHandle{
@@ -215,7 +215,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		WorkScope: scope,
 	}
 	m.sched.workScopeRecorder.append(scope, info.Hostname)
-	logrus.SchedLogger.Infof("================ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
+	logrus.SchedLogger.Infof("===== ADD worker[%s],Resources:[%+v],WorkScope:[%+v],workScopeRecorder:[%+v]", info.Hostname, info.Resources, scope, m.sched.workScopeRecorder)
 	return nil
 }
 
@@ -246,40 +246,44 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	// passing 0 spt because we only need it when allowFetch is true
-	best, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
-	if err != nil {
-		return xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
-	}
-
+	best := make([]stores.SectorStorageInfo, 0)
 	var selector WorkerSelector
-	if len(best) == 0 { // new
-		selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
-	} else { // append to existing
-		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
-	}
-
+	selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
 	var readOk bool
-	logrus.SchedLogger.Infof("================ readpiece sector:%+v, best:%+v, selector:%+v\n", sector, best, selector)
-
-	if len(best) > 0 {
-		// There is unsealed sector, see if we can read from it
-
-		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
-
-		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-			logrus.SchedLogger.Infof("================ readpiece TTReadUnsealed1  sector:%+v\n", sector)
-			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
-			return err
-		})
-		if err != nil {
-			return xerrors.Errorf("reading piece from sealed sector: %w", err)
-		}
-
-		if readOk {
-			return nil
-		}
-	}
+	// passing 0 spt because we only need it when allowFetch is true
+	//best, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
+	//if err != nil {
+	//	return xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
+	//}
+	//
+	//var selector WorkerSelector
+	//if len(best) == 0 { // new
+	//	selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
+	//} else { // append to existing
+	//	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+	//}
+	//
+	//var readOk bool
+	//logrus.SchedLogger.Infof("===== readpiece sector:%+v, best:%+v, selector:%+v\n", sector, best, selector)
+	//
+	//if len(best) > 0 {
+	//	// There is unsealed sector, see if we can read from it
+	//
+	//	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+	//
+	//	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	//		logrus.SchedLogger.Infof("===== readpiece TTReadUnsealed1  sector:%+v\n", sector)
+	//		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
+	//		return err
+	//	})
+	//	if err != nil {
+	//		return xerrors.Errorf("reading piece from sealed sector: %w", err)
+	//	}
+	//
+	//	if readOk {
+	//		return nil
+	//	}
+	//}
 
 	unsealFetch := func(ctx context.Context, worker Worker) error {
 		if err := worker.Fetch(ctx, sector, stores.FTSealed|stores.FTCache, stores.PathSealing, stores.AcquireCopy); err != nil {
@@ -294,8 +298,8 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return nil
 	}
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
-		logrus.SchedLogger.Infof("================ readpiece TTUnseal  sector:%+v\n", sector)
+	err := m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
+		logrus.SchedLogger.Infof("===== readpiece TTUnseal  sector:%+v\n", sector)
 		return w.UnsealPiece(ctx, sector, offset, size, ticket, unsealed)
 	})
 	if err != nil {
@@ -305,7 +309,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-		logrus.SchedLogger.Infof("================ readpiece TTReadUnsealed2  sector:%+v\n", sector)
+		logrus.SchedLogger.Infof("===== readpiece TTReadUnsealed2  sector:%+v\n", sector)
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 		return err
 	})
@@ -361,7 +365,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		taskRd.taskStatus = ADDPIECE_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector, apType)
+		logrus.SchedLogger.Infof("===== worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector, apType)
 		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r, apType)
 		if err != nil {
@@ -372,7 +376,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = PRE1_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -403,7 +407,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 		taskRd.taskStatus = PRE1_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
 		if err != nil {
@@ -415,7 +419,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = PRE2_WAITING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -437,7 +441,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		wInfo, _ := w.Info(ctx)
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("================ SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("===== SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
 		}()
 		_, ok := m.sched.taskRecorder.Load(sector)
 		if !ok {
@@ -448,7 +452,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 
 		taskRd.taskStatus = PRE2_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
@@ -460,7 +464,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = COMMIT1_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -491,7 +495,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 		taskRd.taskStatus = COMMIT1_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
 		if err != nil {
@@ -502,27 +506,27 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		// 找不到合适的路径,则使用miner的存储
 		destPath, sID := m.FindBestStoragePath(ctx, sector)
 		if destPath == "" {
-			logrus.SchedLogger.Errorf("sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector,destPath)
+			logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
 			go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
 			//任务结束，更改taskRecorder状态
 			taskRd.taskStatus = COMMIT2_WAITTING
 			m.sched.taskRecorder.Store(sector, taskRd)
-			logrus.SchedLogger.Infof("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+			logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 			return nil
 			//return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
 		}
 
 		err = w.PushDataToStorage(ctx, sector, destPath)
 		if err != nil {
-			logrus.SchedLogger.Errorf("========= after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
-			return xerrors.Errorf("========= after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+			logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+			return xerrors.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
 		}
 
 		// 申明新的存储路径
 		err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
 		if err != nil {
-			logrus.SchedLogger.Errorf("========= after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
-			return xerrors.Errorf("========= after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+			logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+			return xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
 		}
 
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
@@ -530,7 +534,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = COMMIT2_WAITTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 	return out, err
@@ -571,7 +575,7 @@ func (m *Manager) FindBestStoragePath(ctx context.Context, sector abi.SectorID) 
 		} else if destPath == "" {
 			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, p)
 		} else {
-			logrus.SchedLogger.Infof("======= find best destPath(%+v) ip(%+v)", destPath, ip)
+			logrus.SchedLogger.Infof("===== find best destPath(%+v) ip(%+v)", destPath, ip)
 			return p, si.ID
 		}
 	}
@@ -587,7 +591,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		wInfo, _ := w.Info(ctx)
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("================ SealCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("===== SealCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
 		}()
 
 		_, ok := m.sched.taskRecorder.Load(sector)
@@ -599,7 +603,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 
 		taskRd.taskStatus = COMMIT2_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit2(ctx, sector, phase1Out)
 		if err != nil {
@@ -611,7 +615,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = TRANSFOR_FINISHED
 		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("================ worker %s is TRANSFOR_FINISHED in sectorID[%+v]", wInfo.Hostname, sector)
+		logrus.SchedLogger.Infof("===== worker %s is TRANSFOR_FINISHED in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
 
@@ -645,13 +649,13 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		schedNop,
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
-			logrus.SchedLogger.Infof("================ worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
+			logrus.SchedLogger.Infof("===== worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			m.sched.taskRecorder.Delete(sector)
 			// 找不到合适的路径让commit1执行失败并且不要删除数据
 			destPath, _ := m.FindBestStoragePath(ctx, sector)
-			if destPath==""{
+			if destPath == "" {
 				// if not mount nfs disk then miner fetch form worker
-				return w.FinalizeSector(ctx,sector,[]storage.Range{})
+				return w.FinalizeSector(ctx, sector, []storage.Range{})
 			}
 			return nil
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)

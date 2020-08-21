@@ -463,7 +463,7 @@ func (st *Local) getLayersAndTreeCAndTreeDFiles(url string, proofType abi.Regist
 
 func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID, proofType abi.RegisteredSealProof, typ SectorFileType) error {
 
-	log.Infof("==========try to remove sector [%+v] from worker", sid)
+	log.Infof("===== try to remove sector [%+v] from worker", sid)
 
 	si, err := st.index.StorageFindSector(ctx, sid, typ, 0, false)
 	if err != nil {
@@ -492,7 +492,7 @@ func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID,
 		spath := filepath.Join(p.local, typ.String(), SectorName(sid))
 
 		files := st.getLayersAndTreeCAndTreeDFiles(spath, proofType)
-		log.Infof("==========try to remove sector [%+v] from worker--------->delete files:[%+v]", sid, files)
+		log.Infof("===== try to remove sector [%+v] from worker--------->delete files:[%+v]", sid, files)
 		for _, file := range files {
 			log.Infof("remove %s", file)
 
@@ -509,7 +509,7 @@ func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID,
 		}
 
 	}
-	log.Infof("======== who call me ??????????????????????????")
+	log.Infof("===== who call me ??????????????????????????")
 	return nil
 }
 func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, proofType abi.RegisteredSealProof, dest string) error {
@@ -530,7 +530,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 		log.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, dest)
 	} else {
 		// 删除数据
-		log.Infof("===========after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+		log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
 		st.RemoveLayersAndTreeCAndD(ctx, sector, proofType, FTCache)
 
 		start := time.Now()
@@ -550,7 +550,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, cachePath)
 		err = SendZipFile(srcPath, src, cachePath, ip)
-		log.Infof("======transfor sector(%+v) to Storage(%+v) cost time %s", sector, time.Now().Sub(start))
+		log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, time.Now().Sub(start))
 
 		return err
 	}
