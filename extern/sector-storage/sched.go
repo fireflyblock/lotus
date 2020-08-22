@@ -720,15 +720,6 @@ func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
 
 	if !w.cleanupStarted {
 		w.cleanupStarted = true
-
-		newWindows := make([]*schedWindowRequest, 0, len(sh.openWindows))
-		for _, window := range sh.openWindows {
-			if window.worker != wid {
-				newWindows = append(newWindows, window)
-			}
-		}
-		sh.openWindows = newWindows
-
 		logrus.SchedLogger.Infof("dropWorker %d", wid)
 
 		go func() {
