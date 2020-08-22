@@ -388,8 +388,10 @@ func (sh *scheduler) trySched() {
 				if !isFreeWorker {
 					sh.isExistFreeWorker = false
 					logrus.SchedLogger.Infof("===== CLOSE PLEDGE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
-					continue
 				}
+
+				// 次数说明addpiece任务无论成功与否都应该continue,
+				continue
 			}
 		case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 			if taskRd.workerFortask != "" {
