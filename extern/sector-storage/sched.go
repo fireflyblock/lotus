@@ -361,9 +361,17 @@ func (sh *scheduler) trySched() {
 			} else {
 				var isFreeWorker bool
 				for wid, worker := range sh.workers {
+
+					// 过滤miner不做addpiece
 					if worker.info.Hostname == hostName {
 						continue
 					}
+
+					// 过滤C2woker不做addpice
+					if worker.WorkScope == PRIORITYCOMMIT2 {
+						continue
+					}
+
 					if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, wid) {
 						logrus.SchedLogger.Infof("===== [canHandleRequestForTask] "+
 							"workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", wid, worker.info.Hostname, task.sector, task.taskType, sqi)
