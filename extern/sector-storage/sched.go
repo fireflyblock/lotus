@@ -250,6 +250,7 @@ func (sh *scheduler) runSched() {
 			sh.dropWorker(wid)
 
 		case req := <-sh.schedule:
+
 			if req.taskType == sealtasks.TTAddPiece {
 				tr, ok := sh.taskRecorder.Load(req.sector)
 				if !ok {
@@ -406,10 +407,10 @@ func (sh *scheduler) trySched() {
 				continue
 			}
 		case sealtasks.TTCommit2:
-			logrus.SchedLogger.Infof("===== check workScopeRecorder [%+v] ,worker: [%s]", sh.workScopeRecorder, taskRd.workerFortask)
-			if sh.workScopeRecorder.PriorityCommit2[0] != "" {
-				logrus.SchedLogger.Infof("===== 查询到合适的做c2的worker [%s] ", taskRd.workerFortask)
-				acceptableWorker = taskRd.workerFortask
+			logrus.SchedLogger.Infof("===== check workScopeRecorder [%+v] ,worker: [%s]", sh.workScopeRecorder, sh.workScopeRecorder.pick(PRIORITYCOMMIT2))
+			if sh.workScopeRecorder.pick(PRIORITYCOMMIT2) != "" {
+				logrus.SchedLogger.Infof("===== find a suitable c2 worker [%s] ", sh.workScopeRecorder.pick(PRIORITYCOMMIT2))
+				acceptableWorker = sh.workScopeRecorder.pick(PRIORITYCOMMIT2)
 				wid, ok := sh.workerAndID[acceptableWorker]
 				if ok {
 					acceptableWorkerID = wid
@@ -419,10 +420,11 @@ func (sh *scheduler) trySched() {
 					continue
 				}
 			} else {
+				logrus.SchedLogger.Infof("===== c2 worker not exist, workScopeRecorder:%+v", sh.workScopeRecorder)
 				continue
 			}
 		default:
-			logrus.SchedLogger.Warnf("===== 不在remoteWorker任务范围内,或者未知任务类型:%+v，无法分配worker", task.taskType)
+			logrus.SchedLogger.Warnf("===== %+v not in the range of know types", task.taskType)
 			continue
 		}
 

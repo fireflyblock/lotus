@@ -80,3 +80,18 @@ func (wt *ScopeOfWork) search(st ScopeType, hostname string) bool {
 		//	wt.PriorityReadPiece = append(wt.PriorityReadPiece, hostname)
 	}
 }
+
+func (wt *ScopeOfWork) pick(st ScopeType) string {
+	switch st {
+	case PRIORITYCOMMIT2:
+		if len(wt.PriorityCommit2) > 0 {
+			return wt.PriorityCommit2[0]
+		} else {
+			return ""
+		}
+	default:
+		return ""
+		//case 1:
+		//	wt.PriorityReadPiece = append(wt.PriorityReadPiece, hostname)
+	}
+}
