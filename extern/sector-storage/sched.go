@@ -178,7 +178,7 @@ func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType
 	if taskType == sealtasks.TTAddPiecePl {
 		if !sh.isExistFreeWorker {
 			logrus.SchedLogger.Warnf("===== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v\n", sh.schedQueue.Len(), sector, taskType)
-			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue)
+			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue.Len())
 		} else {
 			taskType = sealtasks.TTAddPiece
 		}
@@ -456,8 +456,6 @@ func (sh *scheduler) trySched() {
 		}
 	}
 }
-
-
 
 func (sh *scheduler) updateTransforCount(updatetype int) {
 	// 记录等待传输的数量
