@@ -219,6 +219,10 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector SectorInf
 		return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("precommit message was nil")})
 	}
 
+	go func() {
+		log.Infof("====== send turnOnCh")
+		m.turnOnCh <- struct{}{}
+	}()
 	// would be ideal to just use the events.Called handler, but it wouldn't be able to handle individual message timeouts
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.StateWaitMsg(ctx.Context(), *sector.PreCommitMessage)

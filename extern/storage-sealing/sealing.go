@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -80,6 +81,8 @@ type Sealing struct {
 	stats SectorStats
 
 	getConfig GetSealingConfigFunc
+
+	turnOnCh chan struct{}
 }
 
 type FeeConfig struct {
@@ -121,6 +124,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		stats: SectorStats{
 			bySector: map[abi.SectorID]statSectorState{},
 		},
+		turnOnCh: make(chan struct{}),
 	}
 
 	s.sectors = statemachine.New(namespace.Wrap(ds, datastore.NewKey(SectorStorePrefix)), s, SectorInfo{})
@@ -139,6 +143,59 @@ func (m *Sealing) Run(ctx context.Context) error {
 
 func (m *Sealing) Stop(ctx context.Context) error {
 	return m.sectors.Stop(ctx)
+}
+
+func (m *Sealing) PledgeWatch(ctx context.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("====== PledgeWatch err", err)
+			s := debug.Stack()
+			log.Error(string(s))
+		}
+	}()
+	for {
+		select {
+		case <-m.turnOnCh:
+			log.Infof("====== turnOnCh comming")
+			go func() {
+				ctx := context.TODO() // we can't use the context from command which invokes
+				// this, as we run everything here async, and it's cancelled when the
+				// command exits
+
+				size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
+
+				sid, err := m.sc.Next()
+				if err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+				err = m.sealer.NewSector(ctx, m.minerSector(sid))
+				if err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+
+				pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
+				if err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+
+				ps := make([]Piece, len(pieces))
+				for idx := range ps {
+					ps[idx] = Piece{
+						Piece:    pieces[idx],
+						DealInfo: nil,
+					}
+				}
+
+				if err := m.newSectorCC(sid, ps); err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+			}()
+		}
+	}
 }
 
 //func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {

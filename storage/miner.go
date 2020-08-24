@@ -127,7 +127,7 @@ func (m *Miner) Run(ctx context.Context) error {
 	m.sealing = sealing.New(adaptedAPI, fc, NewEventsAdapter(evts), m.maddr, m.ds, m.sealer, m.sc, m.verif, &pcp, sealing.GetSealingConfigFunc(m.getSealConfig))
 
 	go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
-
+	go m.sealing.PledgeWatch(ctx)
 	return nil
 }
 
