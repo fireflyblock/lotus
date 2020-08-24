@@ -198,6 +198,12 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 			return true
 		}
 		sh.tasks.Store(workerHostName, v.(*taskCounter))
+
+		v, ok := sh.tasks.Load(workerHostName)
+		if !ok {
+			logrus.SchedLogger.Warnf("workerHostName :%s is droped", workerHostName)
+			return false
+		}
 		logrus.SchedLogger.Infof("\n===== select worker\n"+
 			"select workerHostName :%s to do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
@@ -317,10 +323,20 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 		return
 	}
 
-	v, _ = sh.tasks.Load(workerHostName)
+	v, ok = sh.tasks.Load(workerHostName)
+	if !ok {
+		logrus.SchedLogger.Warnf("workerHostName :%s is droped", workerHostName)
+		return
+	}
 	logrus.SchedLogger.Infof("\n===== freeTask \n"+
-		"workerHostName :%s free %s task of sector(%d), worker task status:{addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
-		workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
+		"workerHostName :%s free %s task of sector(%d),"+
+		" worker task status:{addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
+		workerHostName, taskType, sectorID,
+		v.(*taskCounter).addpiece,
+		v.(*taskCounter).precommit1,
+		v.(*taskCounter).precommit2,
+		v.(*taskCounter).commit1,
+		v.(*taskCounter).commit2)
 
 }
 
