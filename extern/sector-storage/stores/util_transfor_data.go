@@ -1,8 +1,11 @@
 package stores
 
 import (
-	"archive/zip"
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"golang.org/x/xerrors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -41,11 +44,29 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 // ip 目标服务器 ip 地址
 func SendZipFile(srcPath, src, dstPath, ip string) error {
 	// 目标文件，压缩后的文件
-	var dst = src + ".zip"
+	var dst = src + ".tar.gz"
+	var buf bytes.Buffer
+	err := Tar(srcPath+src, &buf)
+	if err != nil {
+		log.Errorf("create tar failed: %s", err)
+		return err
+	}
 
-	_ = os.Rename(srcPath+src, "./"+src)
-	if err := Zip(dst, src); err != nil {
-		log.Errorf("create zip err:", err)
+	// write the .tar.gzip
+	fileToWrite, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0755)
+	if err != nil {
+		log.Errorf("open file failed: %s", err)
+		return err
+	}
+
+	if _, err := io.Copy(fileToWrite, &buf); err != nil {
+		log.Errorf("copy file failed: %s", err)
+		return err
+	}
+
+	err = fileToWrite.Close()
+	if err != nil {
+		log.Errorf("close file failed: %s", err)
 		return err
 	}
 
@@ -79,17 +100,26 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 	}
 
 	url := "http://" + ip + port + "/uploadZip" + "?path=" + dstPath + "&" + "src=" + src
-	_, err := http.Post(url, m.FormDataContentType(), r)
+	res, err := http.Post(url, m.FormDataContentType(), r)
 	if err != nil {
 		log.Errorf("http post request err %s", err.Error())
 		return err
 	}
 
-	_ = os.Remove(dst)
-	err = os.RemoveAll(src)
+	if res.StatusCode != 200 {
+		return xerrors.Errorf("ConnectTest failed")
+	}
+
+	err = os.Remove(dst)
 	if err != nil {
+		log.Errorf("remove dst failed, %s", err.Error())
 		return err
-		//panic(err)
+	}
+
+	err = os.RemoveAll(srcPath + src)
+	if err != nil {
+		log.Errorf("remove src failed, %s", err.Error())
+		return err
 	}
 	return nil
 }
@@ -129,11 +159,15 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 	}
 
 	url := "http://" + ip + port + "/upload" + "?path=" + dstPath + "&" + "src=" + src
-	_, err := http.Post(url, m.FormDataContentType(), r)
+	resp, err := http.Post(url, m.FormDataContentType(), r)
 	if err != nil {
 		log.Errorf("http post request err %s", err.Error())
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return xerrors.Errorf("ConnectTest failed")
+	}
+
 	err = os.Remove(srcPath + src)
 	if err != nil {
 		return err
@@ -142,73 +176,82 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 	return nil
 }
 
-func Zip(dst, src string) (err error) {
-	// 创建准备写入的文件
-	fw, err := os.Create(dst)
-	if fw == nil {
-		return nil
+func ConnectTest(path, ip string) error {
+	port := os.Getenv("STORAGE_SERVICE_PORT")
+	if port == "" {
+		port = ":8080"
 	}
-	defer fw.Close()
+
+	url := "http://" + ip + port + "/connect" + "?path=" + path
+	response, err := http.Get(url)
 	if err != nil {
-		return err
+		log.Errorf("ConnectTest failed, %s", err.Error())
+		return xerrors.Errorf("ConnectTest failed, ", err.Error())
 	}
 
-	// 通过 fw 来创建 zip.Write
-	zw := zip.NewWriter(fw)
-	defer func() {
-		// 检测一下是否成功关闭
-		if err := zw.Close(); err != nil {
-			log.Errorf("", err)
-		}
-	}()
+	if response.StatusCode != 200 {
+		return xerrors.Errorf("ConnectTest failed")
+	}
 
-	// 下面来将文件写入 zw ，因为有可能会有很多个目录及文件，所以递归处理
-	return filepath.Walk(src, func(path string, fi os.FileInfo, errBack error) (err error) {
-		if errBack != nil {
-			return errBack
-		}
+	return nil
+}
 
-		// 通过文件信息，创建 zip 的文件信息
-		fh, err := zip.FileInfoHeader(fi)
+func Tar(src string, writers ...io.Writer) error {
+
+	// ensure the src actually exists before trying to tar it
+	if _, err := os.Stat(src); err != nil {
+		return fmt.Errorf("Unable to tar files - %v ", err.Error())
+	}
+
+	mw := io.MultiWriter(writers...)
+
+	gzw := gzip.NewWriter(mw)
+	defer gzw.Close()
+
+	tw := tar.NewWriter(gzw)
+	defer tw.Close()
+
+	// walk path
+	return filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+
+		// return on any error
 		if err != nil {
-			return
+			return err
 		}
 
-		// 替换文件信息中的文件名
-		fh.Name = strings.TrimPrefix(path, string(filepath.Separator))
-
-		// 这步开始没有加，会发现解压的时候说它不是个目录
-		if fi.IsDir() {
-			fh.Name += "/"
-		}
-
-		// 写入文件信息，并返回一个 Write 结构
-		w, err := zw.CreateHeader(fh)
-		if err != nil {
-			return
-		}
-
-		// 检测，如果不是标准文件就只写入头信息，不写入文件数据到 w
-		// 如目录，也没有数据需要写
-		if !fh.Mode().IsRegular() {
+		// return on non-regular files (thanks to [kumo](https://medium.com/@komuw/just-like-you-did-fbdd7df829d3) for this suggested update)
+		if !fi.Mode().IsRegular() {
 			return nil
 		}
 
-		// 打开要压缩的文件
-		fr, err := os.Open(path)
-		if fr == nil {
-			panic("fr == nil")
-		}
-		defer fr.Close()
+		// create a new dir/file header
+		header, err := tar.FileInfoHeader(fi, fi.Name())
 		if err != nil {
-			return
+			return err
 		}
 
-		// 将打开的文件 Copy 到 w
-		_, err = io.Copy(w, fr)
-		if err != nil {
-			return
+		// update the name to correctly reflect the desired destination when untaring
+		header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
+
+		// write the header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
 		}
+
+		// open files for taring
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+
+		// copy file data into tar writer
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+
+		// manually close here after each file operation; defering would cause each file close
+		// to wait until all operations have completed.
+		f.Close()
 
 		return nil
 	})
