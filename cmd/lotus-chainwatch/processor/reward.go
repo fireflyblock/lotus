@@ -159,7 +159,7 @@ func (p *Processor) persistRewardActors(ctx context.Context, rewards []rewardAct
 		log.Debugw("Persisted Reward Actors", "duration", time.Since(start).String())
 	}()
 
-	grp, ctx := errgroup.WithContext(ctx)
+	grp, ctx := errgroup.WithContext(ctx) //nolint
 
 	grp.Go(func() error {
 		if err := p.storeChainPower(rewards); err != nil {
@@ -280,6 +280,9 @@ func (p *Processor) storeRewardSmoothingEstimates(rewards []rewardActorInfo) err
 	}
 
 	for _, rewardState := range rewards {
+		if rewardState.epochSmoothingEstimate == nil {
+			continue
+		}
 		if _, err := stmt.Exec(
 			rewardState.common.stateroot.String(),
 			rewardState.epochSmoothingEstimate.PositionEstimate.String(),
