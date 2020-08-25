@@ -586,7 +586,7 @@ RetryFindStorage:
 			}
 
 			// 检测连通行
-			ok, err := stores.ConnectTest(destPath+"firefly-miner", ip)
+			ok, err := stores.ConnectTest(destPath+"/firefly-miner", ip)
 			if !ok || err != nil {
 				continue
 			}
