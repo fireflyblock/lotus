@@ -603,13 +603,13 @@ RetryFindStorage:
 			}
 			m.transIP2Count.Store(ip, v.(int)+1)
 			v, _ = m.transIP2Count.Load(ip)
-			log.Infof("ip(%s) transfor task count is %d", v.(int)+1)
+			log.Infof("ip(%s) transfor task count is %d", ip, v.(int)+1)
 
 			// 开始传输数据
-			err = w.PushDataToStorage(ctx, sector, destPath)
+			err = w.PushDataToStorage(ctx, sector, p)
 			v, _ = m.transIP2Count.Load(ip)
 			m.transIP2Count.Store(ip, v.(int)-1)
-			log.Infof("ip(%s) transfor task count is %d", v.(int)-1)
+			log.Infof("ip(%s) transfor task count is %d", ip, v.(int)-1)
 
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
