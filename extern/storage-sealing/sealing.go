@@ -157,43 +157,10 @@ func (m *Sealing) PledgeWatch(ctx context.Context) {
 		select {
 		case <-m.turnOnCh:
 			log.Infof("====== turnOnCh comming")
-			go func() {
-				ctx := context.TODO() // we can't use the context from command which invokes
-				// this, as we run everything here async, and it's cancelled when the
-				// command exits
-
-				size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
-
-				sid, err := m.sc.Next()
-				if err != nil {
-					log.Errorf("%+v", err)
-					return
-				}
-				err = m.sealer.NewSector(ctx, m.minerSector(sid))
-				if err != nil {
-					log.Errorf("%+v", err)
-					return
-				}
-
-				pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
-				if err != nil {
-					log.Errorf("%+v", err)
-					return
-				}
-
-				ps := make([]Piece, len(pieces))
-				for idx := range ps {
-					ps[idx] = Piece{
-						Piece:    pieces[idx],
-						DealInfo: nil,
-					}
-				}
-
-				if err := m.newSectorCC(sid, ps); err != nil {
-					log.Errorf("%+v", err)
-					return
-				}
-			}()
+			err := m.PledgeSector()
+			if err != nil {
+				log.Errorf("====== turnOnCh PledgeSector err:", err)
+			}
 		}
 	}
 }
