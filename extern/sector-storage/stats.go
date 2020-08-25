@@ -71,7 +71,7 @@ func (m *Manager) WorkerConfSet(hostname string, config []byte) WorkerID {
 				}
 				handle.taskConf.Commit1 = taskConf.Commit1
 			}
-			if taskConf.Commit2 != 10086 {
+			if taskConf.Commit2 != 20070920 {
 				if taskConf.Commit2 > handle.taskConf.Commit2 {
 					m.sched.isExistFreeWorker = true
 				}

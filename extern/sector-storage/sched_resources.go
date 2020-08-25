@@ -126,14 +126,12 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 		sh.workers[wid].taskConf = &TaskConfig{}
 	}
 	//logrus.SchedLogger.Infof("===== try check taskConfig, workerHostName: [%+v] ,tasks: [%+v] , taskConf: [%+v] ", workerHostName, v.(*taskCounter), sh.workers[wid].taskConf)
-	//logrus.SchedLogger.Infof("===== sectorFilter 1: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
+	logrus.SchedLogger.Infof("===== sectorFilter : [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
 	//logrus.SchedLogger.Infof("===== sectorFilter 2: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2))
 	switch taskType {
 	case sealtasks.TTAddPiece:
 		if v.(*taskCounter).addpiece < sh.workers[wid].taskConf.AddPieceSize &&
-			v.(*taskCounter).precommit1 < sh.workers[wid].taskConf.Pre1CommitSize &&
-			sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1) &&
-			sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2) {
+			sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1) {
 			judge = true
 		}
 	case sealtasks.TTPreCommit1:
@@ -224,9 +222,9 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 func (sh *scheduler) sectorFilter(workerHostName string, wid WorkerID, taskType sealtasks.TaskType) bool {
 	var countForpre1Waiting uint
 	var countForpre1Computing uint
-	var countForpre2Waiting uint
-	var countForpre2Computing uint
-	var rate float64 = float64(100) / float64(100)
+	//var countForpre2Waiting uint
+	//var countForpre2Computing uint
+	//var rate float64 = float64(100) / float64(100)
 	//拿出pre1已做完的任务数量
 	sh.taskRecorder.Range(func(key, value interface{}) bool {
 		if value.(sectorTaskRecord).workerFortask == workerHostName {
@@ -238,14 +236,14 @@ func (sh *scheduler) sectorFilter(workerHostName string, wid WorkerID, taskType 
 				countForpre1Computing++
 				//return false
 			}
-			if value.(sectorTaskRecord).taskStatus == PRE2_WAITING {
-				countForpre2Waiting++
-				//return false
-			}
-			if value.(sectorTaskRecord).taskStatus == PRE2_COMPUTING {
-				countForpre2Computing++
-				//return false
-			}
+			//if value.(sectorTaskRecord).taskStatus == PRE2_WAITING {
+			//	countForpre2Waiting++
+			//	//return false
+			//}
+			//if value.(sectorTaskRecord).taskStatus == PRE2_COMPUTING {
+			//	countForpre2Computing++
+			//	//return false
+			//}
 		}
 		return true
 	})
@@ -255,16 +253,18 @@ func (sh *scheduler) sectorFilter(workerHostName string, wid WorkerID, taskType 
 	//logrus.SchedLogger.Infof("===== workerHostName: [%+v] ,countForpre2Waiting: [%+v] , countForpre2Computing: [%+v] ", workerHostName, countForpre2Waiting, countForpre2Computing)
 	switch taskType {
 	case sealtasks.TTPreCommit1:
-		if float64(countForpre1Waiting+countForpre1Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
-			//logrus.SchedLogger.Infof("===== sectorFilter_P1:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre1Waiting, countForpre1Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
+		//if float64(countForpre1Waiting+countForpre1Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
+		//	return true
+		//}
+		if countForpre1Waiting <= uint(sh.workers[wid].taskConf.Pre1CommitSize) {
 			return true
 		}
-	case sealtasks.TTPreCommit2:
-		//p2等待和p2计算中的总数量小于p1设置的总数，目的让刷单可以流动起来，其次对p1数量加个百分之75的比率，向下取整，用来留出p2失败的容错量
-		if float64(countForpre2Waiting+countForpre2Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
-			//logrus.SchedLogger.Infof("===== sectorFilter_P2:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre2Waiting, countForpre2Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
-			return true
-		}
+	//case sealtasks.TTPreCommit2:
+	//	//p2等待和p2计算中的总数量小于p1设置的总数，目的让刷单可以流动起来，其次对p1数量加个百分之75的比率，向下取整，用来留出p2失败的容错量
+	//	if float64(countForpre2Waiting+countForpre2Computing) <= math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate) {
+	//		//logrus.SchedLogger.Infof("===== sectorFilter_P2:true,%s can do AddPiece task(%.1f+%.1f<%.1f)", workerHostName, countForpre2Waiting, countForpre2Computing, math.Floor(float64(sh.workers[wid].taskConf.Pre1CommitSize)*rate))
+	//		return true
+	//	}
 	default:
 		logrus.SchedLogger.Warnf("===== sectorFilter:false ,Unexpect type(%s)", taskType)
 		return false
@@ -371,6 +371,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	tc := &TaskConfig{}
 	var diskSize uint64 = CalculatePercentage(uint64(disk), DiskRate)
 	var memSize uint64 = wr.MemPhysical - GB2
+	var apNum uint64 = 1
 	var p1Num uint64
 	var p2Num uint64 = 4
 	var c1Num uint64 = 1
@@ -382,7 +383,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	logrus.SchedLogger.Infof("===== p1DiskCount, p1DiskCount [%s] ,diskSize: [%+v] ", p1DiskCount, diskSize)
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
-	tc.AddPieceSize = uint8(p1Num)
+	tc.AddPieceSize = uint8(apNum)
 	tc.Pre1CommitSize = uint8(p1Num)
 	tc.Pre2CommitSize = uint8(p2Num)
 	tc.Commit1 = uint8(c1Num)

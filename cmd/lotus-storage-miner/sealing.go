@@ -243,7 +243,7 @@ var setTasksNumberCmd = &cli.Command{
 		&cli.UintFlag{
 			Name:  "c2size",
 			Usage: "the number of commit2 tasks the worker can accept",
-			Value: DefaultSize,
+			Value: 20070920,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -278,9 +278,6 @@ var setTasksNumberCmd = &cli.Command{
 		tc.Commit1 = uint8(c1Size)
 
 		c2Size := cctx.Uint("c2size")
-		if c2Size > 255 {
-			return xerrors.Errorf("constant %d overflows uint8", c2Size)
-		}
 		tc.Commit2 = uint64(c2Size)
 
 		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
