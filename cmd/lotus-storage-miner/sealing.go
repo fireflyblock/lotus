@@ -16,7 +16,6 @@ import (
 
 	"github.com/filecoin-project/sector-storage/storiface"
 
-	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
@@ -86,29 +85,29 @@ var sealingWorkersCmd = &cli.Command{
 
 			fmt.Printf("\tCPU:  [%s] %d core(s) in use\n", color.GreenString(cpuBar), stat.CpuUse)
 
-			ramBarsRes := int(stat.Info.Resources.MemReserved * barCols / stat.Info.Resources.MemPhysical)
-			ramBarsUsed := int(stat.MemUsedMin * barCols / stat.Info.Resources.MemPhysical)
-			ramBar := color.YellowString(strings.Repeat("|", ramBarsRes)) +
-				color.GreenString(strings.Repeat("|", ramBarsUsed)) +
-				strings.Repeat(" ", int(barCols)-ramBarsUsed-ramBarsRes)
+			//ramBarsRes := int(stat.Info.Resources.MemReserved * barCols / stat.Info.Resources.MemPhysical)
+			//ramBarsUsed := int(stat.MemUsedMin * barCols / stat.Info.Resources.MemPhysical)
+			//ramBar := color.YellowString(strings.Repeat("|", ramBarsRes)) +
+			//	color.GreenString(strings.Repeat("|", ramBarsUsed)) +
+			//	strings.Repeat(" ", int(barCols)-ramBarsUsed-ramBarsRes)
 
-			vmem := stat.Info.Resources.MemPhysical + stat.Info.Resources.MemSwap
+			//vmem := stat.Info.Resources.MemPhysical + stat.Info.Resources.MemSwap
 
-			vmemBarsRes := int(stat.Info.Resources.MemReserved * barCols / vmem)
-			vmemBarsUsed := int(stat.MemUsedMax * barCols / vmem)
-			vmemBar := color.YellowString(strings.Repeat("|", vmemBarsRes)) +
-				color.GreenString(strings.Repeat("|", vmemBarsUsed)) +
-				strings.Repeat(" ", int(barCols)-vmemBarsUsed-vmemBarsRes)
+			//vmemBarsRes := int(stat.Info.Resources.MemReserved * barCols / vmem)
+			//vmemBarsUsed := int(stat.MemUsedMax * barCols / vmem)
+			//vmemBar := color.YellowString(strings.Repeat("|", vmemBarsRes)) +
+			//	color.GreenString(strings.Repeat("|", vmemBarsUsed)) +
+			//	strings.Repeat(" ", int(barCols)-vmemBarsUsed-vmemBarsRes)
 
-			fmt.Printf("\tRAM:  [%s] %d%% %s/%s\n", ramBar,
-				(stat.Info.Resources.MemReserved+stat.MemUsedMin)*100/stat.Info.Resources.MemPhysical,
-				types.SizeStr(types.NewInt(stat.Info.Resources.MemReserved+stat.MemUsedMin)),
-				types.SizeStr(types.NewInt(stat.Info.Resources.MemPhysical)))
+			//fmt.Printf("\tRAM:  [%s] %d%% %s/%s\n", ramBar,
+			//	(stat.Info.Resources.MemReserved+stat.MemUsedMin)*100/stat.Info.Resources.MemPhysical,
+			//	types.SizeStr(types.NewInt(stat.Info.Resources.MemReserved+stat.MemUsedMin)),
+			//	types.SizeStr(types.NewInt(stat.Info.Resources.MemPhysical)))
 
-			fmt.Printf("\tVMEM: [%s] %d%% %s/%s\n", vmemBar,
-				(stat.Info.Resources.MemReserved+stat.MemUsedMax)*100/vmem,
-				types.SizeStr(types.NewInt(stat.Info.Resources.MemReserved+stat.MemUsedMax)),
-				types.SizeStr(types.NewInt(vmem)))
+			//fmt.Printf("\tVMEM: [%s] %d%% %s/%s\n", vmemBar,
+			//	(stat.Info.Resources.MemReserved+stat.MemUsedMax)*100/vmem,
+			//	types.SizeStr(types.NewInt(stat.Info.Resources.MemReserved+stat.MemUsedMax)),
+			//	types.SizeStr(types.NewInt(vmem)))
 
 			for _, gpu := range stat.Info.Resources.GPUs {
 				fmt.Printf("\tGPU: %s\n", color.New(gpuCol).Sprintf("%s, %sused", gpu, gpuUse))
