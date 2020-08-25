@@ -68,14 +68,14 @@ func Registered() {
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				ip = ipnet.IP.String()
-				if ip[:9] == "172.16.20" {
+				if ip[:9] == "172.16.20" || ip[:9] == "192.168.20" {
 					break
 				}
 			}
 		}
 	}
 
-	if ip[:9] != "172.16.20" {
+	if ip[:9] != "172.16.20" && ip[:9] != "192.168.20" {
 		panic("网段有问题")
 	}
 
