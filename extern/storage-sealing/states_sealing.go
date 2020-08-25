@@ -112,6 +112,10 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 }
 
 func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector SectorInfo) error {
+	go func() {
+		log.Infof("====== send turnOnCh")
+		m.turnOnCh <- struct{}{}
+	}()
 	cids, err := m.sealer.SealPreCommit2(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), sector.PreCommit1Out)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit2Failed{xerrors.Errorf("seal pre commit(2) failed: %w", err)})
@@ -219,10 +223,6 @@ func (m *Sealing) handlePreCommitWait(ctx statemachine.Context, sector SectorInf
 		return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("precommit message was nil")})
 	}
 
-	go func() {
-		log.Infof("====== send turnOnCh")
-		m.turnOnCh <- struct{}{}
-	}()
 	// would be ideal to just use the events.Called handler, but it wouldn't be able to handle individual message timeouts
 	log.Info("Sector precommitted: ", sector.SectorNumber)
 	mw, err := m.api.StateWaitMsg(ctx.Context(), *sector.PreCommitMessage)
