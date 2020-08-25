@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/sector-storage/fsutil"
@@ -82,6 +83,9 @@ type Manager struct {
 	sched *scheduler
 
 	storage.Prover
+
+	// 存储ip -> 传输数量映射
+	transIP2Count sync.Map
 }
 
 type SealerConfig struct {
@@ -507,8 +511,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		}
 		out = p
 
-		// 找不到合适的路径,则使用miner的存储
-		destPath, sID := m.FindBestStoragePath(ctx, sector)
+		// 找不到合适的路径并且传输数据，否则使用miner的存储
+		destPath, sID := m.FindBestStoragePathToPushData(ctx, sector, w)
 		if destPath == "" {
 			logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
 			go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
@@ -518,12 +522,6 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 			return nil
 			//return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
-		}
-
-		err = w.PushDataToStorage(ctx, sector, destPath)
-		if err != nil {
-			logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
-			return xerrors.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
 		}
 
 		// 申明新的存储路径
@@ -544,7 +542,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	return out, err
 }
 
-func (m *Manager) FindBestStoragePath(ctx context.Context, sector abi.SectorID) (string, stores.ID) {
+func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.SectorID, w Worker) (string, stores.ID) {
 	// 筛选存储机器
 	sis, err := m.index.StorageBestAlloc(ctx, stores.FTSealed, abi.RegisteredSealProof_StackedDrg32GiBV1, stores.PathStorage)
 	//m.index.StorageList
@@ -559,7 +557,9 @@ func (m *Manager) FindBestStoragePath(ctx context.Context, sector abi.SectorID) 
 		return "", ""
 	}
 
-	var bestSi stores.StorageInfo
+	var hasNFS bool
+RetryFindStorage:
+	//var bestSi stores.StorageInfo
 	for _, si := range sis {
 		p, ok := storagePaths[si.ID]
 		if !ok {
@@ -580,12 +580,55 @@ func (m *Manager) FindBestStoragePath(ctx context.Context, sector abi.SectorID) 
 			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, p)
 		} else {
 			logrus.SchedLogger.Infof("===== find best destPath(%+v) ip(%+v)", destPath, ip)
-			return p, si.ID
+			hasNFS = true
+			if w == nil {
+				return p, si.ID
+			}
+
+			// 检测连通行
+			ok, err := stores.ConnectTest(destPath+"firefly-miner", ip)
+			if !ok || err != nil {
+				continue
+			}
+
+			// 绑定传输，设置传输数量最多同时为3
+			_, ok = m.transIP2Count.Load(ip)
+			if !ok {
+				m.transIP2Count.Store(ip, 0)
+			}
+			v, _ := m.transIP2Count.Load(ip)
+			if v.(int) >= 4 {
+				logrus.SchedLogger.Infof("===== 当前有超过2个传输任务向IP(%+v)传输数据", ip)
+				continue
+			}
+			m.transIP2Count.Store(ip, v.(int)+1)
+			v, _ = m.transIP2Count.Load(ip)
+			log.Infof("ip(%s) transfor task count is %d", v.(int)+1)
+
+			// 开始传输数据
+			err = w.PushDataToStorage(ctx, sector, destPath)
+			v, _ = m.transIP2Count.Load(ip)
+			m.transIP2Count.Store(ip, v.(int)-1)
+			log.Infof("ip(%s) transfor task count is %d", v.(int)-1)
+
+			if err != nil {
+				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+			} else {
+				// 传输成功，返回
+				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, destPath)
+				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, destPath)
+				return p, si.ID
+			}
 		}
 	}
-	if bestSi.ID == "" {
-		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+	//if bestSi.ID == "" {
+	if hasNFS {
+		log.Warnf("all storage transfor task count is more then 3, please check it")
+		time.Sleep(time.Minute)
+		goto RetryFindStorage
 	}
+	logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+	//}
 	return "", ""
 }
 func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
@@ -651,7 +694,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			logrus.SchedLogger.Infof("===== worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			m.sched.taskRecorder.Delete(sector)
 			// 找不到合适的路径让commit1执行失败并且不要删除数据
-			destPath, _ := m.FindBestStoragePath(ctx, sector)
+			destPath, _ := m.FindBestStoragePathToPushData(ctx, sector, nil)
 			if destPath == "" {
 				// if not mount nfs disk then miner fetch form worker
 				return w.FinalizeSector(ctx, sector, []storage.Range{})

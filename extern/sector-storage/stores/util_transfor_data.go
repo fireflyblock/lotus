@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"golang.org/x/xerrors"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -36,6 +37,29 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 		destPath = ""
 	}
 	return ip, destPath
+}
+
+func ConnectTest(path, ip string) (bool, error) {
+
+	port := os.Getenv("STORAGE_SERVICE_PORT")
+	if port == "" {
+		port = ":8080"
+	}
+
+	url := "http://" + ip + port + "/connect" + "?path=" + path
+	response, err := http.Get(url)
+	if err != nil {
+		fmt.Println("ConnectTest failed, ", err.Error())
+		return false, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == 200 {
+		return true, nil
+	} else {
+		body, err := ioutil.ReadAll(response.Body)
+		return false, xerrors.Errorf("ConnectTest ip(%s) error, body : %s ,err: %+v", ip, string(body), err)
+	}
 }
 
 // srcPath 源文件路径
@@ -176,25 +200,25 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 	return nil
 }
 
-func ConnectTest(path, ip string) error {
-	port := os.Getenv("STORAGE_SERVICE_PORT")
-	if port == "" {
-		port = ":8080"
-	}
-
-	url := "http://" + ip + port + "/connect" + "?path=" + path
-	response, err := http.Get(url)
-	if err != nil {
-		log.Errorf("ConnectTest failed, %s", err.Error())
-		return xerrors.Errorf("ConnectTest failed, ", err.Error())
-	}
-
-	if response.StatusCode != 200 {
-		return xerrors.Errorf("ConnectTest failed")
-	}
-
-	return nil
-}
+//func ConnectTest(path, ip string) error {
+//	port := os.Getenv("STORAGE_SERVICE_PORT")
+//	if port == "" {
+//		port = ":8080"
+//	}
+//
+//	url := "http://" + ip + port + "/connect" + "?path=" + path
+//	response, err := http.Get(url)
+//	if err != nil {
+//		log.Errorf("ConnectTest failed, %s", err.Error())
+//		return xerrors.Errorf("ConnectTest failed, ", err.Error())
+//	}
+//
+//	if response.StatusCode != 200 {
+//		return xerrors.Errorf("ConnectTest failed")
+//	}
+//
+//	return nil
+//}
 
 func Tar(src string, writers ...io.Writer) error {
 
