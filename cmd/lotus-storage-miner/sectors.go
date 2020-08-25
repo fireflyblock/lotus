@@ -34,6 +34,8 @@ var sectorsCmd = &cli.Command{
 		sectorsStartSealCmd,
 		sectorsSealDelayCmd,
 		sectorsCapacityCollateralCmd,
+		sectorsPledgeSwitchCmd,
+		sectorsSwitchStatusCmd,
 	},
 }
 
@@ -49,6 +51,62 @@ var sectorsPledgeCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		return nodeApi.PledgeSector(ctx)
+	},
+}
+
+var sectorsPledgeSwitchCmd = &cli.Command{
+	Name:  "switch",
+	Usage: "control the switch of the pledge",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "turning",
+			Usage: "the hostname of the worker to be queried",
+			Value: "on",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		turning := cctx.String("turning")
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		switch turning {
+		case "on":
+			return nodeApi.PledgeSwitch(ctx, "on")
+		case "off":
+			return nodeApi.PledgeSwitch(ctx, "off")
+		default:
+			return xerrors.Errorf("unrecognized switch signal")
+		}
+	},
+}
+
+var sectorsSwitchStatusCmd = &cli.Command{
+	Name:  "switch-status",
+	Usage: "get status of pledge switch",
+	Action: func(cctx *cli.Context) error {
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+		status, err := nodeApi.GetSwitchStatus(ctx)
+		if err != nil {
+			return err
+		}
+		switch status {
+		case true:
+			fmt.Println("Pledge-Switch : ON")
+			return nil
+		case false:
+			fmt.Println("Pledge-Switch : OFF")
+			return nil
+		}
+		return nil
 	},
 }
 

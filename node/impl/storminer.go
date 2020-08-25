@@ -102,6 +102,15 @@ func (sm *StorageMinerAPI) GetWorkerConf(ctx context.Context, hostname string) (
 	return sm.StorageMgr.WorkerConfGet(hostname)
 }
 
+func (sm *StorageMinerAPI) PledgeSwitch(ctx context.Context, signal string) error {
+	return sm.StorageMgr.PledgeSwitch(signal)
+}
+
+//GetSwitchStatus(ctx context.Context) (bool, error)
+func (sm *StorageMinerAPI) GetSwitchStatus(ctx context.Context) (bool, error) {
+	return sm.StorageMgr.GetSwitchStatus()
+}
+
 func (sm *StorageMinerAPI) ActorAddress(context.Context) (address.Address, error) {
 	return sm.Miner.Address(), nil
 }

@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"encoding/json"
 	"github.com/filecoin-project/sector-storage/storiface"
+	"golang.org/x/xerrors"
 )
 
 func (m *Manager) WorkerStats() map[uint64]storiface.WorkerStats {
@@ -132,4 +133,29 @@ func (m *Manager) WorkerConfGet(hostname string) ([]TaskConfig, error) {
 	}
 
 	return taskList, nil
+}
+
+func (m *Manager) PledgeSwitch(signal string) error {
+	log.Infof("================ switch pledge")
+	switch signal {
+	case "on":
+		m.sched.isExistFreeWorker = true
+	case "off":
+		m.sched.isExistFreeWorker = false
+	default:
+		return xerrors.Errorf("unrecognized switch signal")
+	}
+	return nil
+}
+
+func (m *Manager) GetSwitchStatus() (bool, error) {
+	log.Infof("================ get switch status")
+
+	switch m.sched.isExistFreeWorker {
+	case true:
+		return true, nil
+	case false:
+		return false, nil
+	}
+	return false, xerrors.Errorf("get switch status err")
 }

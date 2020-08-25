@@ -258,11 +258,13 @@ type StorageMinerStruct struct {
 		SectorRemove                  func(context.Context, abi.SectorNumber) error                                                 `perm:"admin"`
 		SectorMarkForUpgrade          func(ctx context.Context, id abi.SectorNumber) error                                          `perm:"admin"`
 
-		WorkerConnect func(context.Context, string) error                                            `perm:"admin"` // TODO: worker perm
-		WorkerStats   func(context.Context) (map[uint64]storiface.WorkerStats, error)                `perm:"admin"`
-		WorkerJobs    func(context.Context) (map[uint64][]storiface.WorkerJob, error)                `perm:"admin"`
-		SetWorkerConf func(context.Context, string, []byte) error                                    `perm:"admin"`
-		GetWorkerConf func(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) `perm:"admin"`
+		WorkerConnect   func(context.Context, string) error                                            `perm:"admin"` // TODO: worker perm
+		WorkerStats     func(context.Context) (map[uint64]storiface.WorkerStats, error)                `perm:"admin"`
+		WorkerJobs      func(context.Context) (map[uint64][]storiface.WorkerJob, error)                `perm:"admin"`
+		SetWorkerConf   func(context.Context, string, []byte) error                                    `perm:"admin"`
+		GetWorkerConf   func(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) `perm:"admin"`
+		PledgeSwitch    func(ctx context.Context, signal string) error                                 `perm:"admin"`
+		GetSwitchStatus func(ctx context.Context) (bool, error)                                        `perm:"admin"`
 
 		SealingSchedDiag func(context.Context) (interface{}, error) `perm:"admin"`
 
@@ -325,9 +327,9 @@ type WorkerStruct struct {
 		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)           `perm:"admin"`
 
-		FetchRealData func(ctx context.Context, id abi.SectorID) error                                                      `perm:"admin"`
-		Fetch         func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
-		PushDataToStorage func(ctx context.Context,sid abi.SectorID,dest string)  error `perm:"admin"`
+		FetchRealData     func(ctx context.Context, id abi.SectorID) error                                                      `perm:"admin"`
+		Fetch             func(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error `perm:"admin"`
+		PushDataToStorage func(ctx context.Context, sid abi.SectorID, dest string) error                                        `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -1018,6 +1020,14 @@ func (c *StorageMinerStruct) GetWorkerConf(ctx context.Context, hostname string)
 	return c.Internal.GetWorkerConf(ctx, hostname)
 }
 
+func (c *StorageMinerStruct) PledgeSwitch(ctx context.Context, signal string) error {
+	return c.Internal.PledgeSwitch(ctx, signal)
+}
+
+func (c *StorageMinerStruct) GetSwitchStatus(ctx context.Context) (bool, error) {
+	return c.Internal.GetSwitchStatus(ctx)
+}
+
 func (c *StorageMinerStruct) StorageAttach(ctx context.Context, si stores.StorageInfo, st fsutil.FsStat) error {
 	return c.Internal.StorageAttach(ctx, si, st)
 }
@@ -1247,8 +1257,8 @@ func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.S
 func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
 	return w.Internal.FetchRealData(ctx, id)
 }
-func (w *WorkerStruct)PushDataToStorage(ctx context.Context,sid abi.SectorID,dest string) error{
-	return w.Internal.PushDataToStorage(ctx,sid,dest)
+func (w *WorkerStruct) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
+	return w.Internal.PushDataToStorage(ctx, sid, dest)
 }
 
 func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {

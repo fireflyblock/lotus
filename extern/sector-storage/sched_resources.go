@@ -374,7 +374,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	var apNum uint64 = 1
 	var p1Num uint64
 	var p2Num uint64 = 4
-	var c1Num uint64 = 1
+	var c1Num uint64 = 2
 	var c2Num uint64 = 3
 
 	p1MemCount := (memSize-GB56)/GB64 - p2Num + 2 //内存容量下p1的最大数量
@@ -384,7 +384,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
 	tc.AddPieceSize = uint8(apNum)
-	tc.Pre1CommitSize = uint8(p1Num)
+	tc.Pre1CommitSize = uint8(p1Num - 1)
 	tc.Pre2CommitSize = uint8(p2Num)
 	tc.Commit1 = uint8(c1Num)
 	tc.Commit2 = c2Num
