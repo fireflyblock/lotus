@@ -588,7 +588,7 @@ RetryFindStorage:
 			}
 
 			// 检测连通行
-			ok, err := stores.ConnectTest(destPath+"firefly-miner", ip)
+			ok, err := stores.ConnectTest(destPath+"/firefly-miner", ip)
 			if !ok || err != nil {
 				continue
 			}
@@ -600,11 +600,11 @@ RetryFindStorage:
 			}
 			v, _ := m.transIP2Count.Load(ip)
 			if v.(int) >= 4 {
-				logrus.SchedLogger.Infof("===== 当前有超过2个传输任务向IP(%+v)传输数据", ip)
+				log.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据", v.(int), ip)
 				continue
 			}
 			m.transIP2Count.Store(ip, v.(int)+1)
-			v, _ = m.transIP2Count.Load(ip)
+			//v, _ = m.transIP2Count.Load(ip)
 			log.Infof("ip(%s) transfor task count is %d", ip, v.(int)+1)
 
 			// 开始传输数据
