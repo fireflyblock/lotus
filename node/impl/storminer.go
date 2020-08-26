@@ -106,8 +106,7 @@ func (sm *StorageMinerAPI) PledgeSwitch(ctx context.Context, signal string) erro
 	return sm.StorageMgr.PledgeSwitch(signal)
 }
 
-//GetSwitchStatus(ctx context.Context) (bool, error)
-func (sm *StorageMinerAPI) GetSwitchStatus(ctx context.Context) (bool, error) {
+func (sm *StorageMinerAPI) GetSwitchStatus(ctx context.Context) ([]bool, error) {
 	return sm.StorageMgr.GetSwitchStatus()
 }
 

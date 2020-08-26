@@ -136,26 +136,20 @@ func (m *Manager) WorkerConfGet(hostname string) ([]TaskConfig, error) {
 }
 
 func (m *Manager) PledgeSwitch(signal string) error {
-	log.Infof("================ switch pledge")
 	switch signal {
 	case "on":
-		m.sched.isExistFreeWorker = true
+		m.sched.masterSwitch = true
 	case "off":
-		m.sched.isExistFreeWorker = false
+		m.sched.masterSwitch = false
 	default:
 		return xerrors.Errorf("unrecognized switch signal")
 	}
 	return nil
 }
 
-func (m *Manager) GetSwitchStatus() (bool, error) {
-	log.Infof("================ get switch status")
-
-	switch m.sched.isExistFreeWorker {
-	case true:
-		return true, nil
-	case false:
-		return false, nil
-	}
-	return false, xerrors.Errorf("get switch status err")
+func (m *Manager) GetSwitchStatus() ([]bool, error) {
+	statusList := make([]bool, 2)
+	statusList[0] = m.sched.masterSwitch
+	statusList[1] = m.sched.isExistFreeWorker
+	return statusList, nil
 }

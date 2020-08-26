@@ -369,7 +369,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("===== AddPiece finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("===== AddPiece finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v], masterSwitch:[%+v]",
+				wInfo.Hostname, sector, m.sched.isExistFreeWorker, m.sched.masterSwitch)
 		}()
 		taskRd.taskStatus = ADDPIECE_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
@@ -449,7 +450,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		wInfo, _ := w.Info(ctx)
 		defer func() {
 			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("===== SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v]", wInfo.Hostname, sector, m.sched.isExistFreeWorker)
+			logrus.SchedLogger.Infof("===== SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v], masterSwitch:[%+v]",
+				wInfo.Hostname, sector, m.sched.isExistFreeWorker, m.sched.masterSwitch)
 		}()
 		_, ok := m.sched.taskRecorder.Load(sector)
 		if !ok {

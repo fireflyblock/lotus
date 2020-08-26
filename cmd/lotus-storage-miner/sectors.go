@@ -94,18 +94,26 @@ var sectorsSwitchStatusCmd = &cli.Command{
 		}
 		defer closer()
 		ctx := lcli.ReqContext(cctx)
+		var res string
 		status, err := nodeApi.GetSwitchStatus(ctx)
 		if err != nil {
 			return err
 		}
-		switch status {
+		switch status[0] {
 		case true:
-			fmt.Println("Pledge-Switch : ON")
-			return nil
+			res += fmt.Sprintf("master-Switch : ON\n")
 		case false:
-			fmt.Println("Pledge-Switch : OFF")
-			return nil
+			res += fmt.Sprintf("master-Switch : OFF\n")
 		}
+
+		switch status[1] {
+		case true:
+			res += fmt.Sprintf("vice-Switch : ON\n")
+		case false:
+			res += fmt.Sprintf("vice-Switch : OFF\n")
+		}
+
+		fmt.Println(res)
 		return nil
 	},
 }

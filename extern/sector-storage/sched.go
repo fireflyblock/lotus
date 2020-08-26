@@ -62,6 +62,7 @@ type scheduler struct {
 	workerAndID       map[string]WorkerID
 	workScopeRecorder *ScopeOfWork
 	isExistFreeWorker bool
+	masterSwitch      bool
 
 	watchClosing  chan WorkerID
 	workerClosing chan WorkerID
@@ -157,6 +158,7 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 		workerAndID:       map[string]WorkerID{},
 		workScopeRecorder: &ScopeOfWork{},
 		isExistFreeWorker: true,
+		masterSwitch:      true,
 
 		watchClosing:  make(chan WorkerID),
 		workerClosing: make(chan WorkerID),
@@ -176,11 +178,12 @@ func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType
 	logrus.SchedLogger.Infof("===== new req sched, sectorID:%+v, taskType:%+v\n", sector, taskType)
 
 	if taskType == sealtasks.TTAddPiecePl {
-		if !sh.isExistFreeWorker {
-			logrus.SchedLogger.Warnf("===== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v\n", sh.schedQueue.Len(), sector, taskType)
-			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue.Len())
-		} else {
+		if sh.isExistFreeWorker && sh.masterSwitch {
 			taskType = sealtasks.TTAddPiece
+		} else {
+			logrus.SchedLogger.Warnf("===== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v, masterSwitch:%+v\n",
+				sh.schedQueue.Len(), sector, taskType, sh.isExistFreeWorker, sh.masterSwitch)
+			return xerrors.Errorf("no free workers , schedQueue:%+v\n", sh.schedQueue.Len())
 		}
 	}
 
@@ -254,14 +257,19 @@ func (sh *scheduler) runSched() {
 			if req.taskType == sealtasks.TTAddPiece {
 				tr, ok := sh.taskRecorder.Load(req.sector)
 				if !ok {
-					logrus.SchedLogger.Infof("===== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
+					logrus.SchedLogger.Infof("===== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
+						"isExistFreeWorker:%+v, masterSwitch:%+v\n",
+						sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker, sh.masterSwitch)
 				} else {
 					taskRd := tr.(sectorTaskRecord)
 					logrus.SchedLogger.Infof("===== new req again, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
-						"worker:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, taskRd.workerFortask, sh.isExistFreeWorker)
+						"worker:%+v, isExistFreeWorker:%+v, masterSwitch:%+v\n",
+						sh.schedQueue.Len(), req.sector, req.taskType, taskRd.workerFortask, sh.isExistFreeWorker, sh.masterSwitch)
 				}
 			} else {
-				logrus.SchedLogger.Infof("===== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v ", sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker)
+				logrus.SchedLogger.Infof("===== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
+					"isExistFreeWorker:%+v, masterSwitch:%+v",
+					sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker, sh.masterSwitch)
 			}
 
 			sh.schedQueue.Push(req)
