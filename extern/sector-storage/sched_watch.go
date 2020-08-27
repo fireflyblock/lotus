@@ -93,7 +93,7 @@ func (sh *scheduler) runWorkerWatcher() {
 			sh.workScopeRecorder.delete(sh.workers[wid].WorkScope, sh.workers[wid].info.Hostname)
 			sh.workersLk.Unlock()
 
-			log.Warnf("worker %d dropped", wid)
+			log.Warnf("worker %d:%+v dropped", wid, hostname)
 			// send in a goroutine to avoid a deadlock between workerClosing / watchClosing
 			go func() {
 				select {

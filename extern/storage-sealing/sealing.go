@@ -178,20 +178,20 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	m.unsealedInfoMap.lk.Lock()
-
-	sid, pads, err := m.getSectorAndPadding(size)
+	sid, _, err := m.getSectorAndPadding(size)
+	log.Infof("===== start paking sector infos:%+v, sid:%+v, DealID:%+v", m.unsealedInfoMap.infos[sid], sid, d.DealID)
 	if err != nil {
 		m.unsealedInfoMap.lk.Unlock()
 		return 0, 0, xerrors.Errorf("getting available sector: %w", err)
 	}
 
-	for _, p := range pads {
-		err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
-		if err != nil {
-			m.unsealedInfoMap.lk.Unlock()
-			return 0, 0, xerrors.Errorf("writing pads: %w", err)
-		}
-	}
+	//for _, p := range pads {
+	//	err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
+	//	if err != nil {
+	//		m.unsealedInfoMap.lk.Unlock()
+	//		return 0, 0, xerrors.Errorf("writing pads: %w", err)
+	//	}
+	//}
 
 	offset := m.unsealedInfoMap.infos[sid].stored
 	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:+%v ", offset)
@@ -269,14 +269,14 @@ func (m *Sealing) StartPacking(sectorID abi.SectorNumber) error {
 
 // Caller should hold m.unsealedInfoMap.lk
 func (m *Sealing) getSectorAndPadding(size abi.UnpaddedPieceSize) (abi.SectorNumber, []abi.PaddedPieceSize, error) {
-	ss := abi.PaddedPieceSize(m.sealer.SectorSize())
-	for k, v := range m.unsealedInfoMap.infos {
-		pads, padLength := ffiwrapper.GetRequiredPadding(v.stored, size.Padded())
-		if v.stored+size.Padded()+padLength <= ss {
-			return k, pads, nil
-		}
-	}
-
+	//ss := abi.PaddedPieceSize(m.sealer.SectorSize())
+	//for k, v := range m.unsealedInfoMap.infos {
+	//	pads, padLength := ffiwrapper.GetRequiredPadding(v.stored, size.Padded())
+	//	if v.stored+size.Padded()+padLength <= ss {
+	//		log.Infof("===== start1 paking sector infos:%+v, k:%+v, pads:%+v", m.unsealedInfoMap.infos,k, pads)
+	//		return k, pads, nil
+	//	}
+	//}
 	ns, err := m.newDealSector()
 	if err != nil {
 		return 0, nil, err

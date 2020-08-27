@@ -620,12 +620,12 @@ func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
 	select {
 	case <-w.closedMgr:
 	case <-time.After(time.Second):
-		logrus.SchedLogger.Errorf("timeout closing worker manager goroutine %d", wid)
+		logrus.SchedLogger.Errorf("timeout closing worker manager goroutine %d:%+v", wid, w.info.Hostname)
 	}
 
 	if !w.cleanupStarted {
 		w.cleanupStarted = true
-		logrus.SchedLogger.Infof("dropWorker %d", wid)
+		logrus.SchedLogger.Infof("dropWorker %d:%+v", wid, w.info.Hostname)
 
 		go func() {
 			if err := w.w.Close(); err != nil {
