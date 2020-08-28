@@ -529,24 +529,42 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 
 	start := time.Now()
 	// send FTSealed
-	srcPath := filepath.Join(pathCfg.StoragePaths[0].Path, FTSealed.String()) + "/"
+	srcSealedPath := filepath.Join(pathCfg.StoragePaths[0].Path, FTSealed.String()) + "/"
 	src := SectorName(sector)
 	sealedPath := filepath.Join(destPath, FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, sealedPath)
-	err = SendFile(srcPath, src, sealedPath, ip)
+	err = SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
 		return err
 	}
 
 	// send FTCache
-	srcPath = filepath.Join(pathCfg.StoragePaths[0].Path, FTCache.String()) + "/"
+	srcCachePath := filepath.Join(pathCfg.StoragePaths[0].Path, FTCache.String()) + "/"
 	cachePath := filepath.Join(destPath, FTCache.String()) + "/"
 	//src:=SectorName(sector)
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, cachePath)
-	err = SendZipFile(srcPath, src, cachePath, ip)
+	err = SendZipFile(srcCachePath, src, cachePath, ip)
+	if err != nil {
+		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcPath, src, ip, cachePath, err)
+		return err
+	}
 	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))
 
-	return err
+	// 删除sealed文件
+	err = os.Remove(srcSealedPath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, sealedPath, srcSealedPath)
+		//panic(err)
+	}
+
+	// 删除cache文件
+	err = os.RemoveAll(srcCachePath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, cachePath, srcCachePath)
+		//panic(err)
+	}
+
+	return nil
 }
 func (st *Local) Remove(ctx context.Context, sid abi.SectorID, typ SectorFileType, force bool) error {
 	if bits.OnesCount(uint(typ)) != 1 {

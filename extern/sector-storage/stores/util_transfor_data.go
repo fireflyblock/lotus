@@ -140,11 +140,11 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 		return err
 	}
 
-	err = os.RemoveAll(srcPath + src)
-	if err != nil {
-		log.Errorf("remove src failed, %s", err.Error())
-		return err
-	}
+	//err = os.RemoveAll(srcPath + src)
+	//if err != nil {
+	//	log.Errorf("remove src failed, %s", err.Error())
+	//	return err
+	//}
 	return nil
 }
 
@@ -192,11 +192,11 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 		return xerrors.Errorf("ConnectTest failed")
 	}
 
-	err = os.Remove(srcPath + src)
-	if err != nil {
-		return err
-		//panic(err)
-	}
+	//err = os.Remove(srcPath + src)
+	//if err != nil {
+	//	return err
+	//	//panic(err)
+	//}
 	return nil
 }
 
