@@ -535,7 +535,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	srcSealedPath := filepath.Join(pathCfg.StoragePaths[0].Path, FTSealed.String()) + "/"
 	src := SectorName(sector)
 	sealedPath := filepath.Join(destPath, FTSealed.String()) + "/"
-	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, sealedPath)
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
 	err = SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
 		return err
@@ -545,10 +545,10 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	srcCachePath := filepath.Join(pathCfg.StoragePaths[0].Path, FTCache.String()) + "/"
 	cachePath := filepath.Join(destPath, FTCache.String()) + "/"
 	//src:=SectorName(sector)
-	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcPath, src, ip, cachePath)
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
 	err = SendZipFile(srcCachePath, src, cachePath, ip)
 	if err != nil {
-		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcPath, src, ip, cachePath, err)
+		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
 		return err
 	}
 	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))

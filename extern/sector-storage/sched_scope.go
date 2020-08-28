@@ -12,6 +12,7 @@ const (
 	_ScopeType = iota
 	PRIORITYCOMMIT2
 	PRIORITYREADPIECE
+	PRIORITYSEAL
 )
 
 func GetWorkScope(ctx context.Context, w Worker) (ScopeType, error) {
@@ -23,12 +24,17 @@ func GetWorkScope(ctx context.Context, w Worker) (ScopeType, error) {
 	if _, supported := tasks[sealtasks.TTAddPiece]; !supported {
 		scope = PRIORITYCOMMIT2
 	}
+
+	if _, supported := tasks[sealtasks.TTCommit2]; !supported {
+		scope = PRIORITYSEAL
+	}
+
 	return scope, nil
 }
 
 type ScopeOfWork struct {
 	PriorityCommit2 []string
-	//PriorityReadPiece []string
+	PrioritySeal    []string
 }
 
 func (wt *ScopeOfWork) append(st ScopeType, hostname string) {
@@ -37,14 +43,24 @@ func (wt *ScopeOfWork) append(st ScopeType, hostname string) {
 		wt.PriorityCommit2 = append(wt.PriorityCommit2, hostname)
 		//case 1:
 		//	wt.PriorityReadPiece = append(wt.PriorityReadPiece, hostname)
+	case PRIORITYSEAL:
+		wt.PrioritySeal = append(wt.PrioritySeal, hostname)
 	}
 }
 func (wt *ScopeOfWork) delete(st ScopeType, hostname string) {
 	target := []string{}
 	switch st {
 	case PRIORITYCOMMIT2:
+		if wt.PriorityCommit2 == nil {
+			return
+		}
 		target = wt.PriorityCommit2
 		//case 1:
+	case PRIORITYSEAL:
+		if wt.PrioritySeal == nil {
+			return
+		}
+		target = wt.PrioritySeal
 	}
 
 	if len(target) == 0 {
@@ -61,6 +77,8 @@ func (wt *ScopeOfWork) delete(st ScopeType, hostname string) {
 	switch st {
 	case PRIORITYCOMMIT2:
 		wt.PriorityCommit2 = target[:i]
+	case PRIORITYSEAL:
+		wt.PrioritySeal = target[:i]
 	}
 }
 
@@ -73,7 +91,13 @@ func (wt *ScopeOfWork) search(st ScopeType, hostname string) bool {
 			}
 		}
 		return false
-
+	case PRIORITYSEAL:
+		for _, st := range wt.PrioritySeal {
+			if st == hostname {
+				return true
+			}
+		}
+		return false
 	default:
 		return false
 		//case 1:
@@ -86,6 +110,12 @@ func (wt *ScopeOfWork) pick(st ScopeType) string {
 	case PRIORITYCOMMIT2:
 		if len(wt.PriorityCommit2) > 0 {
 			return wt.PriorityCommit2[0]
+		} else {
+			return ""
+		}
+	case PRIORITYSEAL:
+		if len(wt.PrioritySeal) > 0 {
+			return wt.PrioritySeal[0]
 		} else {
 			return ""
 		}

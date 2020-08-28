@@ -341,7 +341,7 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 	for _, sector := range trackedSectors {
 		// TODO 重启矿工过滤掉非Proving的sector，这样是否有问题 待验证
 		if sector.State != Proving {
-			log.Warnf("=========restart miner --->>> sector(%+v) sate ---->>>> %+v, ignore!!!!!", sector.SectorNumber, sector.State)
+			log.Warnf("===== restart miner --->>> sector(%+v) sate ---->>>> %+v, ignore!!!!!", sector.SectorNumber, sector.State)
 			continue
 		}
 		if err := m.sectors.Send(uint64(sector.SectorNumber), SectorRestart{}); err != nil {
@@ -353,6 +353,7 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 				timer := time.NewTimer(cfg.WaitDealsDelay)
 				go func() {
 					<-timer.C
+					log.Warnf("===== StartPacking1 Sectors sector:%+v, sate:%+v", sector.SectorNumber, sector.State)
 					if err := m.StartPacking(sector.SectorNumber); err != nil {
 						log.Errorf("starting sector %d: %+v", sector.SectorNumber, err)
 					}

@@ -4,6 +4,7 @@ type TaskType string
 
 const (
 	TTAddPiecePl TaskType = "seal/v0/addpiece/pledge"
+	TTAddPieceSe TaskType = "seal/v0/addpiece/seal"
 	TTAddPiece   TaskType = "seal/v0/addpiece"
 	TTPreCommit1 TaskType = "seal/v0/precommit/1"
 	TTPreCommit2 TaskType = "seal/v0/precommit/2"

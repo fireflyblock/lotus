@@ -129,7 +129,7 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 	logrus.SchedLogger.Infof("===== sectorFilter : [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1))
 	//logrus.SchedLogger.Infof("===== sectorFilter 2: [%+v] ", sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit2))
 	switch taskType {
-	case sealtasks.TTAddPiece:
+	case sealtasks.TTAddPiece, sealtasks.TTAddPiecePl:
 		if v.(*taskCounter).addpiece < sh.workers[wid].taskConf.AddPieceSize &&
 			sh.sectorFilter(workerHostName, wid, sealtasks.TTPreCommit1) {
 			judge = true
@@ -153,7 +153,7 @@ func (sh *scheduler) tryCanHandleRequestForTask(taskType sealtasks.TaskType, wor
 		}
 	default:
 		logrus.SchedLogger.Warnf("===== found task %s ,we are not care!!!!", taskType)
-		return true
+		return false
 	}
 
 	if judge {
@@ -181,7 +181,7 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 	//logrus.SchedLogger.Infof("===== check taskConfig, workerHostName: [%+v] , sectorID: [%+v] , tasks: [%+v] ,taskConf: [%+v] ", workerHostName, sectorID, v.(*taskCounter), sh.workers[wid].taskConf)
 	if sh.tryCanHandleRequestForTask(taskType, workerHostName, sectorID, wid) {
 		switch taskType {
-		case sealtasks.TTAddPiece:
+		case sealtasks.TTAddPiece, sealtasks.TTAddPiecePl:
 			v.(*taskCounter).addpiece++
 		case sealtasks.TTPreCommit1:
 			v.(*taskCounter).precommit1++
@@ -193,7 +193,7 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 			v.(*taskCounter).commit2++
 		default:
 			logrus.SchedLogger.Warnf("===== addTask--->found task %s ,we are not care!!!!", taskType)
-			return true
+			return false
 		}
 		sh.tasks.Store(workerHostName, v.(*taskCounter))
 
@@ -284,7 +284,7 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 		return
 	}
 	switch taskType {
-	case sealtasks.TTAddPiece:
+	case sealtasks.TTAddPiece, sealtasks.TTAddPiecePl:
 		if v.(*taskCounter).addpiece > 0 {
 			v.(*taskCounter).addpiece--
 			sh.tasks.Store(workerHostName, v.(*taskCounter))

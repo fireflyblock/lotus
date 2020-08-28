@@ -3,17 +3,16 @@ package sealing
 import (
 	"context"
 	"errors"
-	"io"
-	"math"
-	"runtime/debug"
-	"sync"
-	"time"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
+	"io"
+	"math"
+	"runtime/debug"
+	"sync"
+	"time"
 
 	"github.com/filecoin-project/go-address"
 	padreader "github.com/filecoin-project/go-padreader"
@@ -194,7 +193,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	//}
 
 	offset := m.unsealedInfoMap.infos[sid].stored
-	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:+%v ", offset)
+	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:%+v ", offset)
 
 	//err = m.addPiece(ctx, sid, size, filePath, fileName, &d)
 	err = m.addPiece(ctx, sid, size, r, &d)
@@ -220,7 +219,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 // Caller should hold m.unsealedInfoMap.lk
 func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, r io.Reader, di *DealInfo) error {
 	log.Infof("Adding piece to sector %d", sectorID)
-	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, r, "")
+	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, r, "_seal")
 	if err != nil {
 		return xerrors.Errorf("writing piece: %w", err)
 	}

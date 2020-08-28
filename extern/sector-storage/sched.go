@@ -179,7 +179,7 @@ func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType
 
 	if taskType == sealtasks.TTAddPiecePl {
 		if sh.isExistFreeWorker && sh.masterSwitch {
-			taskType = sealtasks.TTAddPiece
+			//taskType = sealtasks.TTAddPiece
 		} else {
 			logrus.SchedLogger.Warnf("===== no free workers , schedQueue:%+v, sectorID:%+v, taskType:%+v, isExistFreeWorker:%+v, masterSwitch:%+v\n",
 				sh.schedQueue.Len(), sector, taskType, sh.isExistFreeWorker, sh.masterSwitch)
@@ -257,7 +257,7 @@ func (sh *scheduler) runSched() {
 			if req.taskType == sealtasks.TTAddPiece {
 				tr, ok := sh.taskRecorder.Load(req.sector)
 				if !ok {
-					logrus.SchedLogger.Infof("===== new req comming, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
+					logrus.SchedLogger.Infof("===== new req comming seal, schedQueue %d queued, sectorID:%+v, taskType:%+v, "+
 						"isExistFreeWorker:%+v, masterSwitch:%+v\n",
 						sh.schedQueue.Len(), req.sector, req.taskType, sh.isExistFreeWorker, sh.masterSwitch)
 				} else {
@@ -357,22 +357,8 @@ func (sh *scheduler) trySched() {
 			sqi--
 			continue
 
-		case sealtasks.TTAddPiece:
-			if taskRd.workerFortask != "" {
-				acceptableWorker = taskRd.workerFortask
-				wid, ok := sh.workerAndID[acceptableWorker]
-				if ok {
-					acceptableWorkerID = wid
-					logrus.SchedLogger.Infof("===== assign deal addpiece worker:%+v, wid:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, acceptableWorkerID, task.sector, task.taskType)
-					sh.assignWorker(acceptableWorkerID, sh.workers[acceptableWorkerID], task)
-					sh.schedQueue.Remove(sqi)
-					sqi--
-					continue
-				}
-				logrus.SchedLogger.Warnf("===== worker closed , worker:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, task.sector, task.taskType)
-				continue
-			}
-
+		case sealtasks.TTAddPiecePl:
+			//task.taskType = sealtasks.TTAddPiece
 			var isFreeWorker bool
 			for wid, worker := range sh.workers {
 				// 过滤miner不做addpiece
@@ -380,8 +366,8 @@ func (sh *scheduler) trySched() {
 					continue
 				}
 
-				// 过滤C2woker不做addpice
-				if worker.WorkScope == PRIORITYCOMMIT2 {
+				// 过滤 C2/deal woker不做addpice
+				if worker.WorkScope == PRIORITYCOMMIT2 || worker.WorkScope == PRIORITYSEAL {
 					continue
 				}
 
@@ -391,7 +377,7 @@ func (sh *scheduler) trySched() {
 						wid, worker.info.Hostname, task.sector, task.taskType, sqi)
 					continue
 				}
-				logrus.SchedLogger.Infof("===== assign addpiece worker:%+v, wid:%+v, sectorid(%+v)，taskType:%s", worker.info.Hostname, wid, task.sector, task.taskType)
+				logrus.SchedLogger.Infof("===== assign pledge addpiece worker:%+v, wid:%+v, sectorid(%+v)，taskType:%s", worker.info.Hostname, wid, task.sector, task.taskType)
 				sh.assignWorker(wid, worker, task)
 
 				//bind
@@ -412,6 +398,48 @@ func (sh *scheduler) trySched() {
 				logrus.SchedLogger.Infof("===== CLOSE PLEDGE, sectorid(%+v)，taskType:%s", task.sector, task.taskType)
 			}
 			// 次数说明addpiece任务无论成功与否都应该continue,
+			continue
+
+		case sealtasks.TTAddPiece:
+			if taskRd.workerFortask != "" {
+				acceptableWorker = taskRd.workerFortask
+				wid, ok := sh.workerAndID[acceptableWorker]
+				if ok {
+					acceptableWorkerID = wid
+					logrus.SchedLogger.Infof("===== assign again deal ap worker:%+v, wid:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, acceptableWorkerID, task.sector, task.taskType)
+					sh.assignWorker(acceptableWorkerID, sh.workers[acceptableWorkerID], task)
+					sh.schedQueue.Remove(sqi)
+					sqi--
+					continue
+				}
+				logrus.SchedLogger.Warnf("===== worker closed , worker:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, task.sector, task.taskType)
+				continue
+			}
+			if sh.workScopeRecorder.pick(PRIORITYSEAL) != "" {
+				//1.find
+				logrus.SchedLogger.Infof("===== find a suitable deal worker [%s] ", sh.workScopeRecorder.pick(PRIORITYSEAL))
+				acceptableWorker = sh.workScopeRecorder.pick(PRIORITYSEAL)
+				wid, ok := sh.workerAndID[acceptableWorker]
+				if ok {
+					//2.assign
+					acceptableWorkerID = wid
+					logrus.SchedLogger.Infof("===== assign deal ap worker:%+v, wid:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, acceptableWorkerID, task.sector, task.taskType)
+					sh.assignWorker(acceptableWorkerID, sh.workers[acceptableWorkerID], task)
+					//3.bind
+					taskRd.taskStatus = ADDPIECE_WAITING
+					taskRd.workerFortask = acceptableWorker
+					sh.taskRecorder.Store(task.sector, taskRd)
+					logrus.SchedLogger.Infof("===== start bind , worker [%s] , workerID [%+v] , sectorID [%+v] \n",
+						acceptableWorker, acceptableWorkerID, task.sector)
+
+					sh.schedQueue.Remove(sqi)
+					sqi--
+					continue
+				}
+				logrus.SchedLogger.Warnf("===== worker closed , worker:%+v, sectorid(%+v)，taskType:%s", acceptableWorker, task.sector, task.taskType)
+				continue
+			}
+			logrus.SchedLogger.Infof("===== deal ap worker not exist, workScopeRecorder:%+v", sh.workScopeRecorder)
 			continue
 
 		case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:

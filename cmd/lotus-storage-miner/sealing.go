@@ -30,6 +30,7 @@ var sealingCmd = &cli.Command{
 		sealingSchedDiagCmd,
 		setTasksNumberCmd,
 		getTasksNumberCmd,
+		dealTransCountCmd,
 	},
 }
 
@@ -239,7 +240,7 @@ var setTasksNumberCmd = &cli.Command{
 			Usage: "the number of commit1 tasks the worker can accept",
 			Value: DefaultSize,
 		},
-		&cli.UintFlag{
+		&cli.Uint64Flag{
 			Name:  "c2size",
 			Usage: "the number of commit2 tasks the worker can accept",
 			Value: 20070920,
@@ -276,8 +277,8 @@ var setTasksNumberCmd = &cli.Command{
 		}
 		tc.Commit1 = uint8(c1Size)
 
-		c2Size := cctx.Uint("c2size")
-		tc.Commit2 = uint64(c2Size)
+		c2Size := cctx.Uint64("c2size")
+		tc.Commit2 = c2Size
 
 		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
 		if err != nil {
@@ -337,6 +338,45 @@ var getTasksNumberCmd = &cli.Command{
 		}
 		fmt.Printf("Worker:    【%s】 \n"+tcf+tct, hostname)
 
+		return nil
+	},
+}
+
+var dealTransCountCmd = &cli.Command{
+	Name:  "trans_count",
+	Usage: "deal the number of trans",
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:  "size",
+			Usage: "the number of the trans the miner can accept",
+			Value: 20070920,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		size := cctx.Int("size")
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		res, err := nodeApi.DealTransCount(ctx, size)
+
+		if err != nil {
+			return xerrors.Errorf("deal trans number err: %w", err)
+		}
+
+		switch size {
+		case 20070920:
+			fmt.Println("============================")
+			fmt.Printf("trans-count:%d\n", res)
+			fmt.Println("============================")
+		default:
+			fmt.Printf("\nSet successfully !\nTrans-Count:%d\n", res)
+		}
 		return nil
 	},
 }

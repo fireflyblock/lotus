@@ -110,6 +110,10 @@ func (sm *StorageMinerAPI) GetSwitchStatus(ctx context.Context) ([]bool, error) 
 	return sm.StorageMgr.GetSwitchStatus()
 }
 
+func (sm *StorageMinerAPI) DealTransCount(ctx context.Context, size int) (int, error) {
+	return sm.StorageMgr.DealTransCount(size)
+}
+
 func (sm *StorageMinerAPI) ActorAddress(context.Context) (address.Address, error) {
 	return sm.Miner.Address(), nil
 }

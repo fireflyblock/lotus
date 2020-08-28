@@ -348,11 +348,26 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	var tt sealtasks.TaskType
-	if apType == "_pledgeSector" {
-		tt = sealtasks.TTAddPiecePl
-	} else {
+	switch apType {
+	case "_seal":
 		tt = sealtasks.TTAddPiece
+		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
+
+	case "_filPledgeToDealSector":
+		tt = sealtasks.TTAddPiece
+		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
+
+	case "_pledgeSector":
+		tt = sealtasks.TTAddPiecePl
+		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
 	}
+	//if apType == "_pledgeSector" {
+	//	logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
+	//	tt = sealtasks.TTAddPiecePl
+	//} else {
+	//	tt = sealtasks.TTAddPiece
+	//	logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
+	//}
 
 	var out abi.PieceInfo
 	err = m.sched.Schedule(ctx, sector, tt, selector, schedNop, func(ctx context.Context, w Worker) error {

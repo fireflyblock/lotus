@@ -265,6 +265,7 @@ type StorageMinerStruct struct {
 		GetWorkerConf   func(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) `perm:"admin"`
 		PledgeSwitch    func(ctx context.Context, signal string) error                                 `perm:"admin"`
 		GetSwitchStatus func(ctx context.Context) ([]bool, error)                                      `perm:"admin"`
+		DealTransCount  func(ctx context.Context, size int) (int, error)                               `perm:"admin"`
 
 		SealingSchedDiag func(context.Context) (interface{}, error) `perm:"admin"`
 
@@ -1026,6 +1027,10 @@ func (c *StorageMinerStruct) PledgeSwitch(ctx context.Context, signal string) er
 
 func (c *StorageMinerStruct) GetSwitchStatus(ctx context.Context) ([]bool, error) {
 	return c.Internal.GetSwitchStatus(ctx)
+}
+
+func (c *StorageMinerStruct) DealTransCount(ctx context.Context, size int) (int, error) {
+	return c.Internal.DealTransCount(ctx, size)
 }
 
 func (c *StorageMinerStruct) StorageAttach(ctx context.Context, si stores.StorageInfo, st fsutil.FsStat) error {

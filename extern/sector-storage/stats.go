@@ -6,6 +6,8 @@ import (
 	"golang.org/x/xerrors"
 )
 
+const EASTEREGG = 20070920
+
 func (m *Manager) WorkerStats() map[uint64]storiface.WorkerStats {
 	m.sched.workersLk.RLock()
 	defer m.sched.workersLk.RUnlock()
@@ -72,7 +74,7 @@ func (m *Manager) WorkerConfSet(hostname string, config []byte) WorkerID {
 				}
 				handle.taskConf.Commit1 = taskConf.Commit1
 			}
-			if taskConf.Commit2 != 20070920 {
+			if taskConf.Commit2 != EASTEREGG {
 				if taskConf.Commit2 > handle.taskConf.Commit2 {
 					m.sched.isExistFreeWorker = true
 				}
@@ -152,4 +154,14 @@ func (m *Manager) GetSwitchStatus() ([]bool, error) {
 	statusList[0] = m.sched.masterSwitch
 	statusList[1] = m.sched.isExistFreeWorker
 	return statusList, nil
+}
+
+func (m *Manager) DealTransCount(size int) (int, error) {
+	if size == EASTEREGG {
+		return m.maxTransCount, nil
+	} else {
+		m.maxTransCount = size
+	}
+
+	return m.maxTransCount, nil
 }

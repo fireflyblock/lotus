@@ -25,7 +25,7 @@ import (
 
 var log = logging.Logger("rpcenc")
 
-var Timeout = 30 * time.Second
+var Timeout = 300 * time.Second
 
 type StreamType string
 
