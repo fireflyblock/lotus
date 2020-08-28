@@ -86,6 +86,8 @@ type Manager struct {
 
 	// 存储ip -> 传输数量映射
 	transIP2Count sync.Map
+	transLK       sync.Mutex
+	maxTransCount int
 }
 
 type SealerConfig struct {
@@ -127,6 +129,9 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 		sched: newScheduler(cfg.SealProofType),
 
 		Prover: prover,
+
+		transLK:       sync.Mutex{},
+		maxTransCount: 7, // 控制最大传输并发量
 	}
 
 	//err = m.sched.StartLoad()
@@ -593,32 +598,38 @@ RetryFindStorage:
 				continue
 			}
 
-			// 绑定传输，设置传输数量最多同时为3
+			// 绑定传输，设置传输数量最多同时为8
+			m.transLK.Lock()
 			_, ok = m.transIP2Count.Load(ip)
 			if !ok {
 				m.transIP2Count.Store(ip, 0)
 			}
 			v, _ := m.transIP2Count.Load(ip)
-			if v.(int) >= 4 {
-				log.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据", v.(int), ip)
+			if v.(int) >= m.maxTransCount {
+				log.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据,配置最大值为%d", v.(int), ip, m.maxTransCount)
+				m.transLK.Unlock()
 				continue
 			}
 			m.transIP2Count.Store(ip, v.(int)+1)
 			//v, _ = m.transIP2Count.Load(ip)
-			log.Infof("ip(%s) transfor task count is %d", ip, v.(int)+1)
+			log.Infof("ip(%s) transfor task count is %d,sector(%+v) try to it", ip, v.(int)+1, sector)
+			m.transLK.Unlock()
 
 			// 开始传输数据
 			err = w.PushDataToStorage(ctx, sector, p)
+
+			m.transLK.Lock()
 			v, _ = m.transIP2Count.Load(ip)
 			m.transIP2Count.Store(ip, v.(int)-1)
-			log.Infof("ip(%s) transfor task count is %d", ip, v.(int)-1)
+			log.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
+			m.transLK.Unlock()
 
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, destPath, err)
+				log.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
 			} else {
 				// 传输成功，返回
-				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, destPath)
-				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, destPath)
+				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
+				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
 				return p, si.ID
 			}
 		}
@@ -629,7 +640,7 @@ RetryFindStorage:
 		time.Sleep(time.Minute)
 		goto RetryFindStorage
 	}
-	logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+	log.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
 	//}
 	return "", ""
 }
