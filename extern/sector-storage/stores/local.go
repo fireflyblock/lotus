@@ -461,7 +461,7 @@ func (st *Local) getLayersAndTreeCAndTreeDFiles(url string, proofType abi.Regist
 	return files
 }
 
-func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID, proofType abi.RegisteredSealProof, typ SectorFileType) error {
+func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID, proofType abi.RegisteredSealProof, typ SectorFileType, isDealWorker bool) error {
 
 	log.Infof("===== try to remove sector [%+v] from worker", sid)
 
@@ -501,18 +501,21 @@ func (st *Local) RemoveLayersAndTreeCAndD(ctx context.Context, sid abi.SectorID,
 			}
 		}
 
-		// delete unseal
-		spath = filepath.Join(p.local, "unsealed", SectorName(sid))
-		log.Infof("remove %s", spath)
-		if err := os.RemoveAll(spath); err != nil {
-			log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+		// 非deal worker则删除数据，否则不删除
+		if !isDealWorker {
+			// delete unseal
+			spath = filepath.Join(p.local, "unsealed", SectorName(sid))
+			log.Infof("remove %s", spath)
+			if err := os.RemoveAll(spath); err != nil {
+				log.Errorf("removing sector (%v) from %s: %+v", sid, spath, err)
+			}
 		}
 
 	}
 	log.Infof("===== who call me ??????????????????????????")
 	return nil
 }
-func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, proofType abi.RegisteredSealProof, dest string) error {
+func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, proofType abi.RegisteredSealProof, dest string, isDealWorker bool) error {
 	// 获取worker存储
 	pathCfg, err := st.localStorage.GetStorage()
 	if err != nil || len(pathCfg.StoragePaths) == 0 {
@@ -525,7 +528,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 
 	// 删除数据,完成传输文件
 	log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
-	st.RemoveLayersAndTreeCAndD(ctx, sector, proofType, FTCache)
+	st.RemoveLayersAndTreeCAndD(ctx, sector, proofType, FTCache, isDealWorker)
 
 	start := time.Now()
 	// send FTSealed

@@ -255,44 +255,38 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	best := make([]stores.SectorStorageInfo, 0)
-	var selector WorkerSelector
-	selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
-	var readOk bool
 	// passing 0 spt because we only need it when allowFetch is true
-	//best, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
-	//if err != nil {
-	//	return xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
-	//}
-	//
-	//var selector WorkerSelector
-	//if len(best) == 0 { // new
-	//	selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
-	//} else { // append to existing
-	//	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
-	//}
-	//
-	//var readOk bool
-	//logrus.SchedLogger.Infof("===== readpiece sector:%+v, best:%+v, selector:%+v\n", sector, best, selector)
-	//
-	//if len(best) > 0 {
-	//	// There is unsealed sector, see if we can read from it
-	//
-	//	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
-	//
-	//	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-	//		logrus.SchedLogger.Infof("===== readpiece TTReadUnsealed1  sector:%+v\n", sector)
-	//		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
-	//		return err
-	//	})
-	//	if err != nil {
-	//		return xerrors.Errorf("reading piece from sealed sector: %w", err)
-	//	}
-	//
-	//	if readOk {
-	//		return nil
-	//	}
-	//}
+	best, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
+	if err != nil {
+		return xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
+	}
+
+	var selector WorkerSelector
+	if len(best) == 0 { // new
+		selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
+	} else { // append to existing
+		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+	}
+
+	var readOk bool
+
+	if len(best) > 0 {
+		// There is unsealed sector, see if we can read from it
+
+		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+
+		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
+			return err
+		})
+		if err != nil {
+			return xerrors.Errorf("reading piece from sealed sector: %w", err)
+		}
+
+		if readOk {
+			return nil
+		}
+	}
 
 	unsealFetch := func(ctx context.Context, worker Worker) error {
 		if err := worker.Fetch(ctx, sector, stores.FTSealed|stores.FTCache, stores.PathSealing, stores.AcquireCopy); err != nil {
@@ -307,8 +301,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return nil
 	}
 
-	err := m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
-		logrus.SchedLogger.Infof("===== readpiece TTUnseal  sector:%+v\n", sector)
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTUnseal, selector, unsealFetch, func(ctx context.Context, w Worker) error {
 		return w.UnsealPiece(ctx, sector, offset, size, ticket, unsealed)
 	})
 	if err != nil {
@@ -318,7 +311,6 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-		logrus.SchedLogger.Infof("===== readpiece TTReadUnsealed2  sector:%+v\n", sector)
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 		return err
 	})
