@@ -623,13 +623,14 @@ func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	//	}
 	//}
 
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache|stores.FTSealed, 0, stores.PathStorage)
-	if err != nil {
-		return xerrors.Errorf("acquiring sector cache path: %w", err)
-	}
-	defer done()
+	//paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache|stores.FTSealed, 0, stores.PathStorage)
+	//if err != nil {
+	//	return xerrors.Errorf("acquiring sector cache path: %w", err)
+	//}
+	//defer done()
 
-	return ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	//return ffi.ClearCache(uint64(sb.ssize), paths.Cache)
+	return nil
 }
 
 func (sb *Sealer) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {

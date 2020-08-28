@@ -204,7 +204,17 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 	注意点：通过这个方法传输文件，则不使用FetchRealData来拉取数据
 */
 func (l *LocalWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
-	return l.localStore.TransforDataToStorageServer(ctx, sid, l.scfg.SealProofType, dest)
+	// 根据C2是否为存在C2类型来判断worker是否是做deal订单的机器
+	var isDealWorker bool
+	_, ok := l.acceptTasks[sealtasks.TTCommit2]
+	if !ok {
+		isDealWorker = true
+		log.Infof("===== I am deal worker....")
+	} else {
+		isDealWorker = false
+		log.Infof("===== I am normal worker....")
+	}
+	return l.localStore.TransforDataToStorageServer(ctx, sid, l.scfg.SealProofType, dest, isDealWorker)
 }
 
 // this method can only called by worker0
