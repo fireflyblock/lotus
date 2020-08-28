@@ -565,6 +565,7 @@ func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.
 	}
 
 	var hasNFS bool
+	var transErrCount int
 RetryFindStorage:
 	//var bestSi stores.StorageInfo
 	for _, si := range sis {
@@ -621,13 +622,15 @@ RetryFindStorage:
 			m.transLK.Lock()
 			v, _ = m.transIP2Count.Load(ip)
 			m.transIP2Count.Store(ip, v.(int)-1)
-			log.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
 			m.transLK.Unlock()
 
 			if err != nil {
+				// 如果发送错误次数超过10，则放弃，可能数据有问题
+				transErrCount += 1
 				log.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
 			} else {
 				// 传输成功，返回
+				//log.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
 				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
 				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
 				return p, si.ID
@@ -636,9 +639,14 @@ RetryFindStorage:
 	}
 	//if bestSi.ID == "" {
 	if hasNFS {
-		log.Warnf("all storage transfor task count is more then 3, please check it")
-		time.Sleep(time.Minute)
-		goto RetryFindStorage
+		log.Warnf("all storage transfor task count is more then %d, please check it", m.maxTransCount)
+		if transErrCount < 10 {
+			time.Sleep(time.Minute)
+			goto RetryFindStorage
+		} else {
+			log.Errorf("try to send sector (%+v) to storage Server, error more then %d times", sector, 10)
+			return "", ""
+		}
 	}
 	log.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
 	//}
