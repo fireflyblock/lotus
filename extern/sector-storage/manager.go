@@ -470,7 +470,8 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	})
 
 	// 如果任务失败返回则将状态重置回去
-	m.updateTaskRecordStatus(sector, PRE1_WAITTING)
+	m.sched.taskRecorder.Delete(sector)
+	//m.updateTaskRecordStatus(sector, PRE1_WAITTING)
 
 	return out, err
 }
@@ -519,7 +520,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	})
 
 	// 如果任务失败返回则将状态重置回去
-	m.updateTaskRecordStatus(sector, PRE2_WAITING)
+	m.sched.taskRecorder.Delete(sector)
+	//m.updateTaskRecordStatus(sector, PRE2_WAITING)
 	return out, err
 }
 
@@ -585,8 +587,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return nil
 	})
 
-	// 如果任务失败返回则将状态重置回去
-	m.updateTaskRecordStatus(sector, COMMIT1_WAITTING)
+	// 如果任务失败返回则将状态重置回去,删除掉大概率不会成功
+	m.sched.taskRecorder.Delete(sector)
+	//m.updateTaskRecordStatus(sector, COMMIT1_WAITTING)
 	return out, err
 }
 
