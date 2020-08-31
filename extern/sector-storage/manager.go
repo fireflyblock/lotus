@@ -457,6 +457,8 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
 		if err != nil {
+			// 如果任务失败直接删除任务
+			m.sched.taskRecorder.Delete(sector)
 			return err
 		}
 		out = p
@@ -468,10 +470,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		logrus.SchedLogger.Infof("===== worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
-
-	// 如果任务失败返回则将状态重置回去
-	m.sched.taskRecorder.Delete(sector)
-	//m.updateTaskRecordStatus(sector, PRE1_WAITTING)
 
 	return out, err
 }
@@ -507,6 +505,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
+			// 如果任务失败直接删除
+			m.sched.taskRecorder.Delete(sector)
 			return err
 		}
 		out = p
@@ -519,9 +519,6 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return nil
 	})
 
-	// 如果任务失败返回则将状态重置回去
-	m.sched.taskRecorder.Delete(sector)
-	//m.updateTaskRecordStatus(sector, PRE2_WAITING)
 	return out, err
 }
 
@@ -574,7 +571,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		// 申明新的存储路径
 		err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+			// 如果失败则删除任务记录，无法恢复
+			m.sched.taskRecorder.Delete(sector)
+			log.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
 			return xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
 		}
 
@@ -587,9 +586,6 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return nil
 	})
 
-	// 如果任务失败返回则将状态重置回去,删除掉大概率不会成功
-	m.sched.taskRecorder.Delete(sector)
-	//m.updateTaskRecordStatus(sector, COMMIT1_WAITTING)
 	return out, err
 }
 

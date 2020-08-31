@@ -202,13 +202,13 @@ func (sh *scheduler) canHandleRequestForTask(taskType sealtasks.TaskType, worker
 			logrus.SchedLogger.Warnf("workerHostName :%s is droped", workerHostName)
 			return false
 		}
-		logrus.SchedLogger.Infof("\n===== select worker\n"+
-			"select workerHostName :%s to do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
+		logrus.SchedLogger.Infof("\n===== select worker"+
+			"select workerHostName :%s to do  %s task for sector(%+v) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return true
 	} else {
-		logrus.SchedLogger.Errorf("\n===== check Task status \n"+
-			"select workerHostName :%s can't do  %s task for sector(%d) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
+		logrus.SchedLogger.Errorf("\n===== check Task status"+
+			"select workerHostName :%s can't do  %s task for sector(%+v) ----->worker task status  {addpiece:%d,precommit1:%d,precommit2:%d,commit1:%d,commit2:%d}\n",
 			workerHostName, taskType, sectorID, v.(*taskCounter).addpiece, v.(*taskCounter).precommit1, v.(*taskCounter).precommit2, v.(*taskCounter).commit1, v.(*taskCounter).commit2)
 		return false
 	}
@@ -249,7 +249,7 @@ func (sh *scheduler) sectorFilter(workerHostName string, wid WorkerID, taskType 
 	})
 	// TODO 此日志可以考虑删除
 	//logrus.SchedLogger.Infof("===== sectorFilter: [%+v] ", taskType)
-	//logrus.SchedLogger.Infof("===== workerHostName: [%+v] ,countForpre1Waiting: [%+v] , countForpre1Computing: [%+v] ", workerHostName, countForpre1Waiting, countForpre1Computing)
+	logrus.SchedLogger.Infof("===== workerHostName: [%+v] ,countForpre1Waiting: [%+v] , countForpre1Computing: [%+v] ", workerHostName, countForpre1Waiting, countForpre1Computing)
 	//logrus.SchedLogger.Infof("===== workerHostName: [%+v] ,countForpre2Waiting: [%+v] , countForpre2Computing: [%+v] ", workerHostName, countForpre2Waiting, countForpre2Computing)
 	switch taskType {
 	case sealtasks.TTPreCommit1:
