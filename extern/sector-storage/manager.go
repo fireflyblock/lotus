@@ -229,7 +229,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		taskRd := tr.(sectorTaskRecord)
 
 		if taskRd.taskStatus != 0 {
-			log.Infof("sector(%+v) bind ralationship is exist....")
+			log.Infof("sector(%+v) bind ralationship is exist....", sid)
 			continue
 		}
 		taskRd.taskStatus = PRE1_WAITTING
