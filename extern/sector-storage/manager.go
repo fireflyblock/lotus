@@ -558,12 +558,12 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		// 找不到合适的路径并且传输数据，否则使用miner的存储
 		destPath, sID := m.FindBestStoragePathToPushData(ctx, sector, w)
 		if destPath == "" {
-			logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
-			go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-			//任务结束，更改taskRecorder状态
-			taskRd.taskStatus = COMMIT2_WAITTING
-			m.sched.taskRecorder.Store(sector, taskRd)
-			logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+			//logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
+			//go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+			////任务结束，更改taskRecorder状态
+			//taskRd.taskStatus = COMMIT2_WAITTING
+			//m.sched.taskRecorder.Store(sector, taskRd)
+			//logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 			return nil
 			//return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
 		}
@@ -755,12 +755,12 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			logrus.SchedLogger.Infof("===== worker %s start do %s for sector %d mod keepUnseald 0", wInfo.Hostname, sealtasks.TTFinalize, sector)
 			m.sched.taskRecorder.Delete(sector)
 			// 找不到合适的路径让commit1执行失败并且不要删除数据
-			destPath, _ := m.FindBestStoragePathToPushData(ctx, sector, nil)
-			if destPath == "" {
-				// if not mount nfs disk then miner fetch form worker
-				return w.FinalizeSector(ctx, sector, []storage.Range{})
-			}
-			return nil
+			//destPath, _ := m.FindBestStoragePathToPushData(ctx, sector, nil)
+			//if destPath == "" {
+			//	// if not mount nfs disk then miner fetch form worker
+			//	return w.FinalizeSector(ctx, sector, []storage.Range{})
+			//}
+			//return nil
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)
 			//return w.FinalizeSector(ctx, sector, []storage.Range{})
 		})
