@@ -552,6 +552,8 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 		// 拉取数据
 		//go sh.tryFetchData(wid, req)
 
+		defer sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()
 
@@ -586,7 +588,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 
 			err = req.work(req.ctx, w.wt.worker(w.w))
 
-			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+			//sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 
 			select {
 			case req.ret <- workerResponse{err: err}:

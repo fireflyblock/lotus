@@ -3,9 +3,11 @@ package sectorstorage
 import (
 	"context"
 	"github.com/filecoin-project/sector-storage/docker"
+	"github.com/filecoin-project/sector-storage/fsutil"
 	"io"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/elastic/go-sysinfo"
@@ -41,6 +43,15 @@ type LocalWorker struct {
 	sindex     stores.SectorIndex
 
 	acceptTasks map[sealtasks.TaskType]struct{}
+
+	// 任务数量控制锁
+	taskContralLk    sync.Mutex
+	localTasksRecord map[abi.SectorID]LocalTask
+}
+
+type LocalTask struct {
+	//sector   abi.SectorID
+	taskType CurrentTaskStatus
 }
 
 func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, sindex stores.SectorIndex) *LocalWorker {
@@ -58,6 +69,8 @@ func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, 
 		sindex:     sindex,
 
 		acceptTasks: acceptTasks,
+
+		localTasksRecord: map[abi.SectorID]LocalTask{},
 	}
 }
 
@@ -120,6 +133,16 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
+
+	// check disk size
+	for {
+		if l.CheckCanDoTaskByAvaliableDisk(sector, 1) {
+			break
+		}
+		log.Warnf("Disk avaliable size is low, and can not do addpiece for sector(%+v)", sector)
+		time.Sleep(time.Minute * 5)
+	}
+
 	startAt := time.Now()
 	pi, err := sb.AddPiece(ctx, sector, epcs, sz, r, apType)
 	logrus.SchedLogger.Infof("===== worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
@@ -154,6 +177,15 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 		return nil, err
 	}
 
+	// check disk size
+	for {
+		if l.CheckCanDoTaskByAvaliableDisk(sector, 2) {
+			break
+		}
+		log.Warnf("Disk avaliable size is low, and can not do p1 for sector(%+v)", sector)
+		time.Sleep(time.Minute * 5)
+	}
+
 	startAt := time.Now()
 	out, err = sb.SealPreCommit1(ctx, sector, ticket, pieces)
 	logrus.SchedLogger.Infof("===== worker  finished %+v  [SealPreCommit1] start at:%s end at:%s cost time:%s",
@@ -168,6 +200,15 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 	sb, err := l.sb()
 	if err != nil {
 		return storage2.SectorCids{}, err
+	}
+
+	// check disk size
+	for {
+		if l.CheckCanDoTaskByAvaliableDisk(sector, 3) {
+			break
+		}
+		log.Warnf("Disk avaliable size is low, and can not do p2 for sector(%+v)", sector)
+		time.Sleep(time.Minute * 5)
 	}
 
 	startAt := time.Now()
@@ -365,6 +406,67 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 			GPUs: gpus,
 		},
 	}, nil
+}
+
+func (l *LocalWorker) CheckCanDoTaskByAvaliableDisk(sector abi.SectorID, typ uint8) bool {
+	l.taskContralLk.Lock() // 加锁防止多线程并行判断
+	defer l.taskContralLk.Unlock()
+
+	paths, err := l.Paths(context.TODO())
+	if err != nil || len(paths) < 1 {
+		log.Errorf("CheckCanDoTaskByAvaliableDisk can not found local path:%+v", err)
+		return true
+	}
+
+	fsst, err := fsutil.Statfs(paths[0].LocalPath)
+	if err != nil {
+		log.Errorf("CheckCanDoTaskByAvaliableDisk get disk info err:%+v", err)
+		return true
+	}
+
+	var needSize int64
+	avaliableDiskSize := fsst.Available
+	switch typ {
+	case 1: // addpiece
+		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
+		log.Debug("sector(%+v) try to do addpiece task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+	case 2: // p1
+		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
+		log.Debug("sector(%+v) try to do p1 task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+	case 3: // p2
+		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
+		log.Debug("sector(%+v) try to do p2 task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+	}
+
+	if needSize < avaliableDiskSize {
+		return true
+	}
+	return false
+
+	// 通过记录的任务获取可用size
+	//for sid, localTask := range l.localTasksRecord {
+	//	useSize, print := l.getSectorUseDiskSize(localTask.taskType)
+	//	log.Debug("sector(%+v)--->%s--->GB", print, useSize)
+	//}
+}
+
+// 获取对应任务对应的磁盘空间
+func (l *LocalWorker) getSectorUseDiskSize(taskType CurrentTaskStatus) (int64, string) {
+	switch taskType {
+	case ADDPIECE_WAITING | ADDPIECE_COMPUTING | PRE1_WAITTING:
+		return 32 << 30, "addpiece_waitting,addpiece_computing,p1_waitting"
+	case PRE1_COMPUTING | PRE2_WAITING:
+		return 416 << 30, "p1_computing,p2_waitting"
+	case COMMIT1_WAITTING | COMMIT1_COMPUTING:
+		return 40 << 30, "c1_waiting,c1_computing"
+	default:
+		return 0, "未知任务类型"
+	}
+}
+
+// 获取worker对应的sector
+func (l *LocalWorker) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
+	return l.localStore.GetBindSectors(ctx)
 }
 
 func (l *LocalWorker) Closing(ctx context.Context) (<-chan struct{}, error) {

@@ -56,6 +56,9 @@ type Worker interface {
 	// worker push sealed data to Storage
 	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
 
+	// init get worker bind sectors
+	GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
+
 	Close() error
 }
 
@@ -205,11 +208,33 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 	}
 
 	//计算worker配置信息
-	tc := CalculateResources(info.Resources, fsS.Available)
+	//tc := CalculateResources(info.Resources, fsS.Available)
+	// 修改为按容量计算
+	tc := CalculateResources(info.Resources, fsS.Capacity)
 	logrus.SchedLogger.Infof("===== CalculateResources worker[%s],taskConfig:[%+v],availableDisk:%d", info.Hostname, tc, fsS.Available)
 	if scope == PRIORITYCOMMIT2 {
 		tc.Commit2 = 10000
 		logrus.SchedLogger.Infof("===== c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
+	}
+
+	// 获取woeker做过的任务，并且建立绑定
+	sectors, err := w.GetBindSectors(ctx)
+	if err != nil {
+		log.Errorf("init worker init Bind sectors err :%+v", err)
+	}
+	log.Infof("init worker %s,Bind sectors:%+v", info.Hostname, sectors)
+	for _, sid := range sectors {
+		// 随便给的一个状态不知道是否正确
+		tr := m.getTaskRecord(sid)
+		taskRd := tr.(sectorTaskRecord)
+
+		if taskRd.taskStatus != 0 {
+			log.Infof("sector(%+v) bind ralationship is exist....")
+			continue
+		}
+		taskRd.taskStatus = PRE1_WAITTING
+		taskRd.workerFortask = info.Hostname
+		m.sched.taskRecorder.Store(sid, taskRd)
 	}
 
 	m.sched.newWorkers <- &workerHandle{
@@ -444,6 +469,9 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		return nil
 	})
 
+	// 如果任务失败返回则将状态重置回去
+	m.updateTaskRecordStatus(sector, PRE1_WAITTING)
+
 	return out, err
 }
 
@@ -489,6 +517,9 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		logrus.SchedLogger.Infof("===== worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
+
+	// 如果任务失败返回则将状态重置回去
+	m.updateTaskRecordStatus(sector, PRE2_WAITING)
 	return out, err
 }
 
@@ -553,6 +584,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
 		return nil
 	})
+
+	// 如果任务失败返回则将状态重置回去
+	m.updateTaskRecordStatus(sector, COMMIT1_WAITTING)
 	return out, err
 }
 
@@ -821,6 +855,24 @@ func (m *Manager) SchedDiag(ctx context.Context) (interface{}, error) {
 
 func (m *Manager) Close(ctx context.Context) error {
 	return m.sched.Close(ctx)
+}
+
+func (m *Manager) updateTaskRecordStatus(sector abi.SectorID, status CurrentTaskStatus) {
+
+	tr := m.getTaskRecord(sector)
+	taskRd := tr.(sectorTaskRecord)
+
+	taskRd.taskStatus = status
+	m.sched.taskRecorder.Store(sector, taskRd)
+}
+
+func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
+	_, ok := m.sched.taskRecorder.Load(sector)
+	if !ok {
+		m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+	}
+	tr, _ := m.sched.taskRecorder.Load(sector)
+	return tr
 }
 
 var _ SectorManager = &Manager{}

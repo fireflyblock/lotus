@@ -721,4 +721,49 @@ func (st *Local) FsStat(ctx context.Context, id ID) (fsutil.FsStat, error) {
 	return p.stat(st.localStorage)
 }
 
+func (st *Local) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
+	cfg, err := st.localStorage.GetStorage()
+	if err != nil {
+		return []abi.SectorID{}, xerrors.Errorf("getting local storage config: %w", err)
+	}
+
+	sectors := make([]abi.SectorID, 0)
+	for _, path := range cfg.StoragePaths {
+		sids, err := st.parseSectorsByPath(ctx, path.Path)
+		if err != nil {
+			return []abi.SectorID{}, xerrors.Errorf("opening path %s: %w", path.Path, err)
+		}
+		sectors = append(sectors, sids...)
+	}
+
+	return sectors, nil
+	//return nil
+}
+
+func (st *Local) parseSectorsByPath(ctx context.Context, p string) ([]abi.SectorID, error) {
+	sectors := make([]abi.SectorID, 0)
+
+	// 只获取sector path 足够
+	//for _, t := range PathTypes {
+	ents, err := ioutil.ReadDir(filepath.Join(p, FTUnsealed.String()))
+	if err != nil {
+		return sectors, xerrors.Errorf("not found dir '%s': %w", filepath.Join(p, FTUnsealed.String()), err)
+	}
+
+	for _, ent := range ents {
+		if ent.Name() == FetchTempSubdir {
+			continue
+		}
+
+		sid, err := ParseSectorID(ent.Name())
+		if err != nil {
+			return []abi.SectorID{}, xerrors.Errorf("parse sector id %s: %w", ent.Name(), err)
+		}
+		sectors = append(sectors, sid)
+	}
+	//}
+
+	return sectors, nil
+}
+
 var _ Store = &Local{}

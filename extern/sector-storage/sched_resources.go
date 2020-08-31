@@ -373,14 +373,14 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	var memSize uint64 = wr.MemPhysical - GB2
 	var apNum uint64 = 1
 	var p1Num uint64
-	var p2Num uint64 = 4
+	var p2Num uint64 = 3
 	var c1Num uint64 = 2
 	var c2Num uint64 = 3
 
 	p1MemCount := (memSize-GB56)/GB64 - p2Num + 2 //内存容量下p1的最大数量
 	logrus.SchedLogger.Infof("===== p1MemCount, p1MemCount [%d] , memSize: [%d] ", p1MemCount, memSize)
 	p1DiskCount := diskSize / GB416 //磁盘容量下p1的最大数量
-	logrus.SchedLogger.Infof("===== p1DiskCount, p1DiskCount [%s] ,diskSize: [%+v] ", p1DiskCount, diskSize)
+	logrus.SchedLogger.Infof("===== p1DiskCount, p1DiskCount [%d] ,diskSize: [%+v] ", p1DiskCount, diskSize)
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
 	tc.AddPieceSize = uint8(apNum)
