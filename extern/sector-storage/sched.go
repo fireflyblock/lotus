@@ -561,7 +561,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 			w.lk.Lock()
 			w.preparing.free(w.info.Resources, needRes)
 			w.lk.Unlock()
-			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+			//sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 			sh.workersLk.Unlock()
 
 			select {

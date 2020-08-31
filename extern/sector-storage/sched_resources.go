@@ -283,6 +283,11 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 	if v == nil {
 		return
 	}
+
+	// 加锁控制释放的时候并发释放,导致计数异常
+	v.(*taskCounter).tasksLK.Lock()
+	defer v.(*taskCounter).tasksLK.Unlock()
+
 	switch taskType {
 	case sealtasks.TTAddPiece, sealtasks.TTAddPiecePl:
 		if v.(*taskCounter).addpiece > 0 {
