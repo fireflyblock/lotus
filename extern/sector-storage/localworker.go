@@ -429,13 +429,13 @@ func (l *LocalWorker) CheckCanDoTaskByAvaliableDisk(sector abi.SectorID, typ uin
 	switch typ {
 	case 1: // addpiece
 		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
-		log.Debug("sector(%+v) try to do addpiece task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+		log.Debugf("sector(%+v) try to do addpiece task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	case 2: // p1
 		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
-		log.Debug("sector(%+v) try to do p1 task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+		log.Debugf("sector(%+v) try to do p1 task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	case 3: // p2
 		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
-		log.Debug("sector(%+v) try to do p2 task,needsize %d, avaliable size:%d GB", needSize>>30, avaliableDiskSize>>30)
+		log.Debugf("sector(%+v) try to do p2 task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	}
 
 	if needSize < avaliableDiskSize {
