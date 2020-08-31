@@ -760,7 +760,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			//	// if not mount nfs disk then miner fetch form worker
 			//	return w.FinalizeSector(ctx, sector, []storage.Range{})
 			//}
-			//return nil
+			return nil
 			//return w.FinalizeSector(ctx, sector, keepUnsealed)
 			//return w.FinalizeSector(ctx, sector, []storage.Range{})
 		})
