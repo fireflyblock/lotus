@@ -564,8 +564,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			//taskRd.taskStatus = COMMIT2_WAITTING
 			//m.sched.taskRecorder.Store(sector, taskRd)
 			//logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-			return nil
-			//return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
+			//return nil
+			return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
 		}
 
 		// 申明新的存储路径
