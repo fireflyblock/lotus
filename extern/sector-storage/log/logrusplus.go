@@ -161,6 +161,7 @@ func (lrs *Logrusplus) Logger(fileName string, maxSize int64, maxFiles int, leve
 		logger = _logger
 	} else {
 		logger = logrus.New()
+		logger.Hooks.Add(NewContextHook())
 		formatter := new(logrus.JSONFormatter)
 		formatter.TimestampFormat = time.RFC3339Nano
 		logger.Formatter = formatter
