@@ -88,12 +88,6 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 }
 
 func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {
-	//	log.Info("====== OnDealComplete Called")
-
-	//path := os.Getenv("LOTUS_STORAGE_PATH")
-	//filePath := path + "/" + fileName
-	//log.Infof("====== OnDealComplete --> \n filePath:%+v \n fileName: %+v",filePath,fileName)
-
 	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sealing.DealInfo{
 		DealID: deal.DealID,
 		DealSchedule: sealing.DealSchedule{

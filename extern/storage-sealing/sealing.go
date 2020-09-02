@@ -177,20 +177,20 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	m.unsealedInfoMap.lk.Lock()
-	sid, _, err := m.getSectorAndPadding(size)
+	sid, pads, err := m.getSectorAndPadding(size)
 	log.Infof("===== start paking sector infos:%+v, sid:%+v, DealID:%+v", m.unsealedInfoMap.infos[sid], sid, d.DealID)
 	if err != nil {
 		m.unsealedInfoMap.lk.Unlock()
 		return 0, 0, xerrors.Errorf("getting available sector: %w", err)
 	}
 
-	//for _, p := range pads {
-	//	err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
-	//	if err != nil {
-	//		m.unsealedInfoMap.lk.Unlock()
-	//		return 0, 0, xerrors.Errorf("writing pads: %w", err)
-	//	}
-	//}
+	for _, p := range pads {
+		err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
+		if err != nil {
+			m.unsealedInfoMap.lk.Unlock()
+			return 0, 0, xerrors.Errorf("writing pads: %w", err)
+		}
+	}
 
 	offset := m.unsealedInfoMap.infos[sid].stored
 	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:%+v ", offset)
@@ -203,15 +203,15 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 		return 0, 0, xerrors.Errorf("adding piece to sector: %w", err)
 	}
 
-	//startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
+	startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
 
 	m.unsealedInfoMap.lk.Unlock()
 
-	//if startPacking {
-	if err := m.StartPacking(sid); err != nil {
-		return 0, 0, xerrors.Errorf("start packing: %w", err)
+	if startPacking {
+		if err := m.StartPacking(sid); err != nil {
+			return 0, 0, xerrors.Errorf("start packing: %w", err)
+		}
 	}
-	//}
 
 	return sid, offset, nil
 }
@@ -268,14 +268,13 @@ func (m *Sealing) StartPacking(sectorID abi.SectorNumber) error {
 
 // Caller should hold m.unsealedInfoMap.lk
 func (m *Sealing) getSectorAndPadding(size abi.UnpaddedPieceSize) (abi.SectorNumber, []abi.PaddedPieceSize, error) {
-	//ss := abi.PaddedPieceSize(m.sealer.SectorSize())
-	//for k, v := range m.unsealedInfoMap.infos {
-	//	pads, padLength := ffiwrapper.GetRequiredPadding(v.stored, size.Padded())
-	//	if v.stored+size.Padded()+padLength <= ss {
-	//		log.Infof("===== start1 paking sector infos:%+v, k:%+v, pads:%+v", m.unsealedInfoMap.infos,k, pads)
-	//		return k, pads, nil
-	//	}
-	//}
+	ss := abi.PaddedPieceSize(m.sealer.SectorSize())
+	for k, v := range m.unsealedInfoMap.infos {
+		pads, padLength := ffiwrapper.GetRequiredPadding(v.stored, size.Padded())
+		if v.stored+size.Padded()+padLength <= ss {
+			return k, pads, nil
+		}
+	}
 	ns, err := m.newDealSector()
 	if err != nil {
 		return 0, nil, err
@@ -375,20 +374,21 @@ func (m *Sealing) newDealSector() (abi.SectorNumber, error) {
 		return 0, xerrors.Errorf("starting the sector fsm: %w", err)
 	}
 
-	_, err = m.getConfig()
+	cf, err := m.getConfig()
 	if err != nil {
 		return 0, xerrors.Errorf("getting the sealing delay: %w", err)
 	}
 
-	//if cf.WaitDealsDelay > 0 {
-	//	timer := time.NewTimer(cf.WaitDealsDelay)
-	//	go func() {
-	//		<-timer.C
-	//		if err := m.StartPacking(sid); err != nil {
-	//			log.Errorf("starting sector %d: %+v", sid, err)
-	//		}
-	//	}()
-	//}
+	log.Infof("===== start1 paking sector infos:%+v, sid:%+v, WaitDealsDelay:%+v", m.unsealedInfoMap.infos, sid, cf.WaitDealsDelay)
+	if cf.WaitDealsDelay > 0 {
+		timer := time.NewTimer(cf.WaitDealsDelay)
+		go func() {
+			<-timer.C
+			if err := m.StartPacking(sid); err != nil {
+				log.Errorf("starting sector %d: %+v", sid, err)
+			}
+		}()
+	}
 
 	return sid, nil
 }
