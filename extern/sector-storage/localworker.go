@@ -431,10 +431,10 @@ func (l *LocalWorker) CheckCanDoTaskByAvaliableDisk(sector abi.SectorID, typ uin
 		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
 		log.Debugf("sector(%+v) try to do addpiece task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	case 2: // p1
-		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
+		needSize, _ = l.getSectorUseDiskSize(PRE1_COMPUTING)
 		log.Debugf("sector(%+v) try to do p1 task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	case 3: // p2
-		needSize, _ = l.getSectorUseDiskSize(ADDPIECE_COMPUTING)
+		needSize, _ = l.getSectorUseDiskSize(COMMIT1_COMPUTING)
 		log.Debugf("sector(%+v) try to do p2 task,needsize %d, avaliable size:%d GB", sector, needSize>>30, avaliableDiskSize>>30)
 	}
 
@@ -453,11 +453,11 @@ func (l *LocalWorker) CheckCanDoTaskByAvaliableDisk(sector abi.SectorID, typ uin
 // 获取对应任务对应的磁盘空间
 func (l *LocalWorker) getSectorUseDiskSize(taskType CurrentTaskStatus) (int64, string) {
 	switch taskType {
-	case ADDPIECE_WAITING | ADDPIECE_COMPUTING | PRE1_WAITTING:
+	case ADDPIECE_WAITING, ADDPIECE_COMPUTING, PRE1_WAITTING:
 		return 32 << 30, "addpiece_waitting,addpiece_computing,p1_waitting"
-	case PRE1_COMPUTING | PRE2_WAITING:
+	case PRE1_COMPUTING, PRE2_WAITING:
 		return 416 << 30, "p1_computing,p2_waitting"
-	case COMMIT1_WAITTING | COMMIT1_COMPUTING:
+	case COMMIT1_WAITTING, COMMIT1_COMPUTING:
 		return 40 << 30, "c1_waiting,c1_computing"
 	default:
 		return 0, "未知任务类型"
