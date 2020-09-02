@@ -196,3 +196,12 @@ func (m *Manager) DealTransCount(size int) (int, error) {
 
 	return m.maxTransCount, nil
 }
+
+func (m *Manager) DeleteTaskCount(hostname string) (bool, error) {
+	_, ok := m.sched.tasks.Load(hostname)
+	if !ok {
+		m.sched.tasks.Delete(hostname)
+		return true, nil
+	}
+	return false, nil
+}

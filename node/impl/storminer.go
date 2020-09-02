@@ -114,6 +114,10 @@ func (sm *StorageMinerAPI) DealTransCount(ctx context.Context, size int) (int, e
 	return sm.StorageMgr.DealTransCount(size)
 }
 
+func (sm *StorageMinerAPI) DeleteTaskCount(ctx context.Context, hostname string) (bool, error) {
+	return sm.StorageMgr.DeleteTaskCount(hostname)
+}
+
 func (sm *StorageMinerAPI) ActorAddress(context.Context) (address.Address, error) {
 	return sm.Miner.Address(), nil
 }

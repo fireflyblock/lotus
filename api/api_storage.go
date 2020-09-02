@@ -70,6 +70,7 @@ type StorageMiner interface {
 	PledgeSwitch(ctx context.Context, signal string) error
 	GetSwitchStatus(ctx context.Context) ([]bool, error)
 	DealTransCount(ctx context.Context, size int) (int, error)
+	DeleteTaskCount(ctx context.Context, hostname string) (bool, error)
 
 	// SealingSchedDiag dumps internal sealing scheduler state
 	SealingSchedDiag(context.Context) (interface{}, error)

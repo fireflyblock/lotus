@@ -31,6 +31,7 @@ var sealingCmd = &cli.Command{
 		setTasksNumberCmd,
 		getTasksNumberCmd,
 		dealTransCountCmd,
+		deleteTaskConfigCmd,
 	},
 }
 
@@ -382,6 +383,42 @@ var dealTransCountCmd = &cli.Command{
 			fmt.Println("============================")
 		default:
 			fmt.Printf("\nSet successfully !\nTrans-Count:%d\n", res)
+		}
+		return nil
+	},
+}
+
+var deleteTaskConfigCmd = &cli.Command{
+	Name:  "delete-task-config",
+	Usage: "delete taskconfig",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "hostname",
+			Usage: "hostname of target worker",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		hn := cctx.String("hostname")
+
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		res, err := nodeApi.DeleteTaskCount(ctx, hn)
+
+		if err != nil {
+			return xerrors.Errorf("deal trans number err: %w", err)
+		}
+
+		switch res {
+		case true:
+			fmt.Printf("successfully deleted\n")
+		case false:
+			fmt.Printf("target does not exist\n")
 		}
 		return nil
 	},
