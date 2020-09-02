@@ -92,3 +92,14 @@ type TaskConfig struct {
 	Commit1        uint8  `json:"commit_1"`
 	Commit2        uint64 `json:"commit_2"`
 }
+
+type TasksNumber struct {
+	AddPieceSize   uint8  `json:"add_piece_size"`
+	Pre1CommitSize uint8  `json:"pre_1_commit_size"`
+	Pre2CommitSize uint8  `json:"pre_2_commit_size"`
+	Commit1        uint8  `json:"commit_1"`
+	Commit2        uint64 `json:"commit_2"`
+	P1WatingSize   uint8  `json:"p_1_wating_size"`
+	P2WatingSize   uint8  `json:"p_2_wating_size"`
+	C1Wating       uint8  `json:"c_1_wating"`
+}

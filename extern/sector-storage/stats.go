@@ -86,12 +86,16 @@ func (m *Manager) WorkerConfSet(hostname string, config []byte) WorkerID {
 	return 0
 }
 
-func (m *Manager) WorkerConfGet(hostname string) ([]TaskConfig, error) {
+func (m *Manager) WorkerConfGet(hostname string) ([]TasksNumber, error) {
 	//log.Infof("================ 远程查询config【%+v】", taskConf)
 	var tc TaskConfig
 	var ctc *taskCounter
 	var tcCount uint
-	taskList := make([]TaskConfig, 4)
+	var countForP1Waiting uint8
+	var countForP2Waiting uint8
+	var countForC1Waiting uint8
+
+	taskList := make([]TasksNumber, 5)
 	for _, handle := range m.sched.workers {
 		if handle.info.Hostname == hostname {
 			tc = *handle.taskConf
@@ -100,38 +104,65 @@ func (m *Manager) WorkerConfGet(hostname string) ([]TaskConfig, error) {
 	}
 	v, ok := m.sched.tasks.Load(hostname)
 
+	//拿出pre1已做完的任务数量
+	m.sched.taskRecorder.Range(func(key, value interface{}) bool {
+		if value.(sectorTaskRecord).workerFortask == hostname {
+			if value.(sectorTaskRecord).taskStatus == PRE1_WAITTING {
+				countForP1Waiting++
+			}
+			if value.(sectorTaskRecord).taskStatus == PRE2_WAITING {
+				countForP2Waiting++
+			}
+			if value.(sectorTaskRecord).taskStatus == COMMIT1_WAITTING {
+				countForC1Waiting++
+			}
+		}
+		return true
+	})
+
 	if tcCount > 0 && ok {
 		ctc = v.(*taskCounter)
 
-		taskList[0] = tc
+		taskList[0].AddPieceSize = tc.AddPieceSize
+		taskList[0].Pre1CommitSize = tc.Pre1CommitSize
+		taskList[0].Pre2CommitSize = tc.Pre2CommitSize
+		taskList[0].Commit1 = tc.Commit1
+		taskList[0].Commit2 = tc.Commit2
 
 		taskList[1].AddPieceSize = ctc.addpiece
 		taskList[1].Pre1CommitSize = ctc.precommit1
 		taskList[1].Pre2CommitSize = ctc.precommit2
 		taskList[1].Commit1 = ctc.commit1
 		taskList[1].Commit2 = ctc.commit2
+		taskList[1].P1WatingSize = countForP1Waiting
+		taskList[1].P2WatingSize = countForP2Waiting
+		taskList[1].C1Wating = countForC1Waiting
 
 		return taskList, nil
 	}
-	if tcCount == 0 {
-		taskList[2] = TaskConfig{AddPieceSize: 255} //means return err= "No taskConfig found. "
-	}
-	if tcCount > 0 {
-		taskList[0] = tc
-		taskList[1] = TaskConfig{}
-	}
-	if !ok {
-		taskList[3] = TaskConfig{AddPieceSize: 255} //means return err= "No current taskCount. "
-	}
 	if ok {
-		taskList[0] = TaskConfig{}
-
 		ctc = v.(*taskCounter)
 		taskList[1].AddPieceSize = ctc.addpiece
 		taskList[1].Pre1CommitSize = ctc.precommit1
 		taskList[1].Pre2CommitSize = ctc.precommit2
 		taskList[1].Commit1 = ctc.commit1
 		taskList[1].Commit2 = ctc.commit2
+		taskList[1].P1WatingSize = countForP1Waiting
+		taskList[1].P2WatingSize = countForP2Waiting
+		taskList[1].C1Wating = countForC1Waiting
+
+		taskList[0] = TasksNumber{}
+		taskList[2] = TasksNumber{AddPieceSize: 255} //means return err= "No taskConfig found. "
+	}
+	if !ok {
+		taskList[0].AddPieceSize = tc.AddPieceSize
+		taskList[0].Pre1CommitSize = tc.Pre1CommitSize
+		taskList[0].Pre2CommitSize = tc.Pre2CommitSize
+		taskList[0].Commit1 = tc.Commit1
+		taskList[0].Commit2 = tc.Commit2
+
+		taskList[1] = TasksNumber{}
+		taskList[3] = TasksNumber{AddPieceSize: 255} //means return err= "No current taskCount. "
 	}
 
 	return taskList, nil

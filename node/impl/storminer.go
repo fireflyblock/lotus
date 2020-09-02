@@ -98,7 +98,7 @@ func (sm *StorageMinerAPI) SetWorkerConf(ctx context.Context, hostname string, c
 	return nil
 }
 
-func (sm *StorageMinerAPI) GetWorkerConf(ctx context.Context, hostname string) ([]sectorstorage.TaskConfig, error) {
+func (sm *StorageMinerAPI) GetWorkerConf(ctx context.Context, hostname string) ([]sectorstorage.TasksNumber, error) {
 	return sm.StorageMgr.WorkerConfGet(hostname)
 }
 
