@@ -466,29 +466,67 @@ func (l *LocalWorker) getSectorUseDiskSize(taskType CurrentTaskStatus) (int64, s
 	}
 }
 
-func (l *LocalWorker) GetWorkerTaskCount() (uint8, uint8, uint8, uint8) {
-	paths, err := l.Paths(context.TODO())
-	if err != nil || len(paths) < 1 {
-		log.Errorf("GetWorkerTaskCount can not found local path:%+v", err)
-		return 0, 0, 0, 0
+func (l *LocalWorker) GetWorkerTaskCount(typ TaskType, path string) uint8 {
+
+	switch typ {
+	case TT_ADDPIECE:
+		return 1
+	case TT_PRECOMMIT2:
+		return 3
+	case TT_COMMIT1:
+		return 2
 	}
 
-	fsst, err := fsutil.Statfs(paths[0].LocalPath)
+	fsst, err := fsutil.Statfs(path)
 	if err != nil {
 		log.Errorf("GetWorkerTaskCount get disk info err:%+v", err)
-		return 0, 0, 0, 0
+		return 0
 	}
 
 	diskSize := fsst.Capacity
 
-	info, err := l.Info(context.TODO())
+	info, err := info(context.TODO())
 	if err != nil {
 		log.Errorf("GetWorkerTaskCount get source info err:%+v", err)
-		return 0, 0, 0, 0
+		return 0
 	}
 	tc := CalculateResources(info.Resources, diskSize)
-	return tc.AddPieceSize, tc.Pre1CommitSize, tc.Pre2CommitSize, tc.Commit1
+	return tc.Pre1CommitSize
+}
 
+func info(context.Context) (storiface.WorkerInfo, error) {
+	hostname, err := os.Hostname() // TODO: allow overriding from config
+	if err != nil {
+		panic(err)
+	}
+
+	gpus, err := ffi.GetGPUDevices()
+	if err != nil {
+		logrus.SchedLogger.Errorf("getting gpu devices failed: %+v", err)
+	}
+
+	h, err := sysinfo.Host()
+	if err != nil {
+		return storiface.WorkerInfo{}, xerrors.Errorf("getting host info: %w", err)
+	}
+
+	mem, err := h.Memory()
+	if err != nil {
+		return storiface.WorkerInfo{}, xerrors.Errorf("getting memory info: %w", err)
+	}
+
+	return storiface.WorkerInfo{
+		Hostname: hostname,
+		Resources: storiface.WorkerResources{
+			MemPhysical: mem.Total,
+			MemSwap:     mem.VirtualTotal,
+			// 物理内存使用情况,设置一个假内存
+			MemReserved: 2 << 30,
+			//MemReserved: mem.VirtualUsed + mem.Total - mem.Available, // TODO: sub this process
+			CPUs: uint64(runtime.NumCPU()),
+			GPUs: gpus,
+		},
+	}, nil
 }
 
 // 获取worker对应的sector
