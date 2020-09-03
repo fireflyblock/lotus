@@ -329,7 +329,13 @@ var getTasksNumberCmd = &cli.Command{
 		if tcl[2].AddPieceSize == 255 {
 			tcf = fmt.Sprintf("TaskConfig: No taskConfig found.\n")
 		} else {
-			tcf = fmt.Sprintf("TaskConfig: %+v\n", tcl[0])
+			var tc = sectorstorage.TaskConfig{}
+			tc.AddPieceSize = tcl[0].AddPieceSize
+			tc.Pre1CommitSize = tcl[0].Pre1CommitSize
+			tc.Pre2CommitSize = tcl[0].Pre2CommitSize
+			tc.Commit1 = tcl[0].Commit1
+			tc.Commit2 = tcl[0].Commit2
+			tcf = fmt.Sprintf("TaskConfig: %+v\n", tc)
 		}
 		if tcl[3].AddPieceSize == 255 {
 			tct = fmt.Sprintf("CurrentTaskCount: No current taskCount.\n")
