@@ -146,5 +146,5 @@ replace github.com/filecoin-project/sector-storage => ./extern/sector-storage
 
 replace github.com/filecoin-project/specs-storage => ../specs-storage
 
-//replace github.com/filecoin-project/specs-actors => ../specs-actors
+replace github.com/filecoin-project/specs-actors => ../specs-actors
 //replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets

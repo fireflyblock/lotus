@@ -542,6 +542,7 @@ func (sh *scheduler) tryFetchData(wid WorkerID, req *workerRequest) {
 }
 
 func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequest) error {
+	logrus.SchedLogger.Infof("===== assignfree, sector:%+v, tasktype:%+v", req.sector, req.taskType)
 	needRes := ResourceTable[req.taskType][sh.spt]
 
 	w.lk.Lock()
@@ -552,7 +553,11 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 		// 拉取数据
 		//go sh.tryFetchData(wid, req)
 
-		defer sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+		//defer sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+		defer func() {
+			logrus.SchedLogger.Infof("===== defer free, sector:%+v, tasktype:%+v", req.sector, req.taskType)
+			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+		}()
 
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()

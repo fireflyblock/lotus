@@ -458,7 +458,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 		if err != nil {
 			// 如果任务失败直接删除任务
-			m.sched.taskRecorder.Delete(sector)
+			//m.sched.taskRecorder.Delete(sector)
 			return err
 		}
 		out = p
@@ -506,7 +506,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
 		if err != nil {
 			// 如果任务失败直接删除
-			m.sched.taskRecorder.Delete(sector)
+			//m.sched.taskRecorder.Delete(sector)
 			return err
 		}
 		out = p

@@ -279,7 +279,7 @@ func (sh *scheduler) freeTask(taskType sealtasks.TaskType, workerHostName string
 		return
 	}
 
-	logrus.SchedLogger.Infof("===== sh.tasks: %+v\n", v)
+	logrus.SchedLogger.Infof("===== check free sectorID:%+v, taskType:%+v, workerHostName:%+v, sh.tasks:%+v\n", sectorID, taskType, workerHostName, v)
 	if v == nil {
 		return
 	}

@@ -2,6 +2,7 @@ package sectorstorage
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/filecoin-project/sector-storage/storiface"
 	"golang.org/x/xerrors"
 )
@@ -198,9 +199,13 @@ func (m *Manager) DealTransCount(size int) (int, error) {
 }
 
 func (m *Manager) DeleteTaskCount(hostname string) (bool, error) {
-	_, ok := m.sched.tasks.Load(hostname)
-	if !ok {
+	v, ok := m.sched.tasks.Load(hostname)
+	if ok {
+		fmt.Println("===== delete1 tc", v)
 		m.sched.tasks.Delete(hostname)
+		//fmt.Println("===== delete2 tc",v)
+		//m.sched.tasks.Store(hostname,&taskCounter{})
+		//fmt.Println("===== delete3 tc",v)
 		return true, nil
 	}
 	return false, nil
