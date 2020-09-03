@@ -160,15 +160,17 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 	return nil
 }
 
-func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage2.PreCommit1Out, err error) {
-	{
-		// cleanup previous failed attempts if they exist
-		if err := l.storage.Remove(ctx, sector, stores.FTSealed, true); err != nil {
-			return nil, xerrors.Errorf("cleaning up sealed data: %w", err)
-		}
+func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage2.PreCommit1Out, err error) {
+	if !recover {
+		{
+			// cleanup previous failed attempts if they exist
+			if err := l.storage.Remove(ctx, sector, stores.FTSealed, true); err != nil {
+				return nil, xerrors.Errorf("cleaning up sealed data: %w", err)
+			}
 
-		if err := l.storage.Remove(ctx, sector, stores.FTCache, true); err != nil {
-			return nil, xerrors.Errorf("cleaning up cache data: %w", err)
+			if err := l.storage.Remove(ctx, sector, stores.FTCache, true); err != nil {
+				return nil, xerrors.Errorf("cleaning up cache data: %w", err)
+			}
 		}
 	}
 
@@ -187,7 +189,7 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 	}
 
 	startAt := time.Now()
-	out, err = sb.SealPreCommit1(ctx, sector, ticket, pieces)
+	out, err = sb.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 	logrus.SchedLogger.Infof("===== worker  finished %+v  [SealPreCommit1] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
@@ -462,6 +464,31 @@ func (l *LocalWorker) getSectorUseDiskSize(taskType CurrentTaskStatus) (int64, s
 	default:
 		return 0, "未知任务类型"
 	}
+}
+
+func (l *LocalWorker) GetWorkerTaskCount() (uint8, uint8, uint8, uint8) {
+	paths, err := l.Paths(context.TODO())
+	if err != nil || len(paths) < 1 {
+		log.Errorf("GetWorkerTaskCount can not found local path:%+v", err)
+		return 0, 0, 0, 0
+	}
+
+	fsst, err := fsutil.Statfs(paths[0].LocalPath)
+	if err != nil {
+		log.Errorf("GetWorkerTaskCount get disk info err:%+v", err)
+		return 0, 0, 0, 0
+	}
+
+	diskSize := fsst.Capacity
+
+	info, err := l.Info(context.TODO())
+	if err != nil {
+		log.Errorf("GetWorkerTaskCount get source info err:%+v", err)
+		return 0, 0, 0, 0
+	}
+	tc := CalculateResources(info.Resources, diskSize)
+	return tc.AddPieceSize, tc.Pre1CommitSize, tc.Pre2CommitSize, tc.Commit1
+
 }
 
 // 获取worker对应的sector
