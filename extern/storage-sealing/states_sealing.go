@@ -103,7 +103,19 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("getting ticket failed: %w", err)})
 	}
 
-	pc1o, err := m.sealer.SealPreCommit1(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos())
+	// 如果ticketEpoch存在，或许曾经做个P1，
+	// 判断Epoch是否会超时，预计我们一轮Seal过程耗时720个Epoch
+	//height-(si.TicketEpoch+SealRandomnessLookback) > SealRandomnessLookbackLimit(si.SectorType)
+	recover := false
+	if sector.TicketEpoch.String() != "" && len(sector.TicketValue) > 0 &&
+		ticketEpoch-(sector.TicketEpoch+SealRandomnessLookback)+abi.ChainEpoch(720) > abi.ChainEpoch(10000) {
+		ticketValue = sector.TicketValue
+		ticketEpoch = sector.TicketEpoch
+		recover = true
+		log.Infof("sector(%+v) recovering do p1 use TicketEpoch %+v, TicketValue %+v", m.minerSector(sector.SectorNumber), sector.TicketEpoch, sector.TicketValue)
+	}
+
+	pc1o, err := m.sealer.SealPreCommit1(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos(), recover)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 	}

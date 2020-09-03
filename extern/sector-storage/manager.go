@@ -429,7 +429,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	return out, err
 }
 
-func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage.PreCommit1Out, err error) {
+func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -455,7 +455,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		m.sched.taskRecorder.Store(sector, taskRd)
 		logrus.SchedLogger.Infof("===== worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
 		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
+		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 		if err != nil {
 			// 如果任务失败直接删除任务
 			m.sched.taskRecorder.Delete(sector)

@@ -317,7 +317,7 @@ type WorkerStruct struct {
 
 		AddPiece func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) `perm:"admin"`
 		//AddPiece        func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error)            `perm:"admin"`
-		SealPreCommit1  func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (storage.PreCommit1Out, error)                                                           `perm:"admin"`
+		SealPreCommit1  func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error)                                             `perm:"admin"`
 		SealPreCommit2  func(context.Context, abi.SectorID, storage.PreCommit1Out) (cids storage.SectorCids, err error)                                                                                            `perm:"admin"`
 		SealCommit1     func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) `perm:"admin"`
 		SealCommit2     func(context.Context, abi.SectorID, storage.Commit1Out) (storage.Proof, error)                                                                                                             `perm:"admin"`
@@ -1225,8 +1225,8 @@ func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceS
 	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData, apTtype)
 }
 
-func (w *WorkerStruct) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (storage.PreCommit1Out, error) {
-	return w.Internal.SealPreCommit1(ctx, sector, ticket, pieces)
+func (w *WorkerStruct) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error) {
+	return w.Internal.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 }
 
 func (w *WorkerStruct) SealPreCommit2(ctx context.Context, sector abi.SectorID, p1o storage.PreCommit1Out) (storage.SectorCids, error) {

@@ -67,7 +67,7 @@ func (s *seal) precommit(t *testing.T, sb *Sealer, id abi.SectorID, done func())
 
 	s.ticket = sealRand
 
-	p1, err := sb.SealPreCommit1(context.TODO(), id, s.ticket, []abi.PieceInfo{s.pi})
+	p1, err := sb.SealPreCommit1(context.TODO(), id, s.ticket, []abi.PieceInfo{s.pi}, false)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
