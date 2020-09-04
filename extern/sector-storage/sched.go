@@ -19,11 +19,13 @@ type schedPrioCtxKey int
 
 var SchedPriorityKey schedPrioCtxKey
 var DefaultSchedPriority = 0
-var SelectorTimeout = 5 * time.Second
 
-var (
-	SchedWindows = 2
-)
+//var SelectorTimeout = 5 * time.Second
+//var InitWait = 3 * time.Second
+//
+//var (
+//	SchedWindows = 2
+//)
 
 func getPriority(ctx context.Context) int {
 	sp := ctx.Value(SchedPriorityKey)
@@ -90,6 +92,9 @@ type workerHandle struct {
 
 	lk sync.Mutex
 
+	wndLk sync.Mutex
+	//activeWindows []*schedWindow
+
 	// stats / tracking
 	wt *workTracker
 
@@ -102,16 +107,16 @@ type workerHandle struct {
 	closingMgr     chan struct{}
 }
 
-type schedWindowRequest struct {
-	worker WorkerID
+//type schedWindowRequest struct {
+//	worker WorkerID
+//
+//	done chan *schedWindow
+//}
 
-	done chan *schedWindow
-}
-
-type schedWindow struct {
-	allocated activeResources
-	todo      []*workerRequest
-}
+//type schedWindow struct {
+//	allocated activeResources
+//	todo      []*workerRequest
+//}
 
 type activeResources struct {
 	memUsedMin uint64
@@ -132,6 +137,8 @@ type workerRequest struct {
 
 	prepare WorkerAction
 	work    WorkerAction
+
+	//start time.Time
 
 	index int // The index of the item in the heap.
 
@@ -198,6 +205,8 @@ func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType
 
 		prepare: prepare,
 		work:    work,
+
+		//start: time.Now(),
 
 		ret: ret,
 		ctx: ctx,
@@ -649,14 +658,19 @@ func (sh *scheduler) dropWorker(wid WorkerID) {
 }
 
 func (sh *scheduler) workerCleanup(wid WorkerID, w *workerHandle) {
-	if !w.cleanupStarted {
+	select {
+	case <-w.closingMgr:
+	default:
 		close(w.closingMgr)
 	}
+
+	sh.workersLk.Unlock()
 	select {
 	case <-w.closedMgr:
 	case <-time.After(time.Second):
 		logrus.SchedLogger.Errorf("timeout closing worker manager goroutine %d:%+v", wid, w.info.Hostname)
 	}
+	sh.workersLk.Lock()
 
 	if !w.cleanupStarted {
 		w.cleanupStarted = true

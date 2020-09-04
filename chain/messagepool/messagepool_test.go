@@ -352,6 +352,12 @@ func TestRevertMessages(t *testing.T) {
 }
 
 func TestPruningSimple(t *testing.T) {
+	oldMaxNonceGap := MaxNonceGap
+	MaxNonceGap = 1000
+	defer func() {
+		MaxNonceGap = oldMaxNonceGap
+	}()
+
 	tma := newTestMpoolAPI()
 
 	w, err := wallet.NewWallet(wallet.NewMemKeyStore())
@@ -373,6 +379,7 @@ func TestPruningSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tma.setBalance(sender, 1) // in FIL
 	target := mock.Address(1001)
 
 	for i := 0; i < 5; i++ {
@@ -430,6 +437,8 @@ func TestLoadLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	tma.setBalance(a1, 1) // in FIL
+	tma.setBalance(a2, 1) // in FIL
 	gasLimit := gasguess.Costs[gasguess.CostKey{Code: builtin.StorageMarketActorCodeID, M: 2}]
 	msgs := make(map[cid.Cid]struct{})
 	for i := 0; i < 10; i++ {
@@ -500,6 +509,8 @@ func TestClearAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	tma.setBalance(a1, 1) // in FIL
+	tma.setBalance(a2, 1) // in FIL
 	gasLimit := gasguess.Costs[gasguess.CostKey{Code: builtin.StorageMarketActorCodeID, M: 2}]
 	for i := 0; i < 10; i++ {
 		m := makeTestMessage(w1, a1, a2, uint64(i), gasLimit, uint64(i+1))
@@ -551,6 +562,9 @@ func TestClearNonLocal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	tma.setBalance(a1, 1) // in FIL
+	tma.setBalance(a2, 1) // in FIL
 
 	gasLimit := gasguess.Costs[gasguess.CostKey{Code: builtin.StorageMarketActorCodeID, M: 2}]
 	for i := 0; i < 10; i++ {
@@ -619,6 +633,10 @@ func TestUpdates(t *testing.T) {
 	}
 
 	gasLimit := gasguess.Costs[gasguess.CostKey{Code: builtin.StorageMarketActorCodeID, M: 2}]
+
+	tma.setBalance(a1, 1) // in FIL
+	tma.setBalance(a2, 1) // in FIL
+
 	for i := 0; i < 10; i++ {
 		m := makeTestMessage(w1, a1, a2, uint64(i), gasLimit, uint64(i+1))
 		_, err := mp.Push(m)

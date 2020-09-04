@@ -80,7 +80,7 @@ type StorageMiner interface {
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error
 	MarketListDeals(ctx context.Context) ([]storagemarket.StorageDeal, error)
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)
-	MarketGetDealUpdates(ctx context.Context, d cid.Cid) (<-chan storagemarket.MinerDeal, error)
+	MarketGetDealUpdates(ctx context.Context) (<-chan storagemarket.MinerDeal, error)
 	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)
 	MarketSetAsk(ctx context.Context, price types.BigInt, verifiedPrice types.BigInt, duration abi.ChainEpoch, minPieceSize abi.PaddedPieceSize, maxPieceSize abi.PaddedPieceSize) error
 	MarketGetAsk(ctx context.Context) (*storagemarket.SignedStorageAsk, error)
@@ -127,16 +127,18 @@ type SectorLog struct {
 }
 
 type SectorInfo struct {
-	SectorID  abi.SectorNumber
-	State     SectorState
-	CommD     *cid.Cid
-	CommR     *cid.Cid
-	Proof     []byte
-	Deals     []abi.DealID
-	Ticket    SealTicket
-	Seed      SealSeed
-	Retries   uint64
-	ToUpgrade bool
+	SectorID     abi.SectorNumber
+	State        SectorState
+	CommD        *cid.Cid
+	CommR        *cid.Cid
+	Proof        []byte
+	Deals        []abi.DealID
+	Ticket       SealTicket
+	Seed         SealSeed
+	PreCommitMsg *cid.Cid
+	CommitMsg    *cid.Cid
+	Retries      uint64
+	ToUpgrade    bool
 
 	LastErr string
 

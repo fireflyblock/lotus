@@ -11,7 +11,7 @@ import (
 )
 
 func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResources, r Resources, locker sync.Locker, cb func() error) error {
-	for !a.canHandleRequest(r, id, wr) {
+	for !a.canHandleRequest(r, id, "withResources", wr) {
 		if a.cond == nil {
 			a.cond = sync.NewCond(locker)
 		}
@@ -74,7 +74,7 @@ func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
 	a.memUsedMax -= r.MaxMemory
 }
 
-func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res storiface.WorkerResources) bool {
+func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, caller string, res storiface.WorkerResources) bool {
 
 	// TODO: dedupe needRes.BaseMinMemory per task type (don't add if that task is already running)
 	//minNeedMem := res.MemReserved + a.memUsedMin + needRes.MinMemory + needRes.BaseMinMemory
@@ -362,6 +362,20 @@ func (a *activeResources) utilization(wr storiface.WorkerResources) float64 {
 	}
 
 	return max
+}
+
+func (wh *workerHandle) utilization() float64 {
+	wh.lk.Lock()
+	u := wh.active.utilization(wh.info.Resources)
+	u += wh.preparing.utilization(wh.info.Resources)
+	wh.lk.Unlock()
+	//wh.wndLk.Lock()
+	//for _, window := range wh.activeWindows {
+	//	u += window.allocated.utilization(wh.info.Resources)
+	//}
+	//wh.wndLk.Unlock()
+
+	return u
 }
 
 var GB416 uint64 = 416 << 30

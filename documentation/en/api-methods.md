@@ -36,6 +36,7 @@
   * [ClientFindData](#ClientFindData)
   * [ClientGenCar](#ClientGenCar)
   * [ClientGetDealInfo](#ClientGetDealInfo)
+  * [ClientGetDealUpdates](#ClientGetDealUpdates)
   * [ClientHasLocal](#ClientHasLocal)
   * [ClientImport](#ClientImport)
   * [ClientListDataTransfers](#ClientListDataTransfers)
@@ -83,7 +84,11 @@
   * [MsigSwapPropose](#MsigSwapPropose)
 * [Net](#Net)
   * [NetAddrsListen](#NetAddrsListen)
+  * [NetAgentVersion](#NetAgentVersion)
   * [NetAutoNatStatus](#NetAutoNatStatus)
+  * [NetBandwidthStats](#NetBandwidthStats)
+  * [NetBandwidthStatsByPeer](#NetBandwidthStatsByPeer)
+  * [NetBandwidthStatsByProtocol](#NetBandwidthStatsByProtocol)
   * [NetConnect](#NetConnect)
   * [NetConnectedness](#NetConnectedness)
   * [NetDisconnect](#NetDisconnect)
@@ -92,6 +97,7 @@
   * [NetPubsubScores](#NetPubsubScores)
 * [Paych](#Paych)
   * [PaychAllocateLane](#PaychAllocateLane)
+  * [PaychAvailableFunds](#PaychAvailableFunds)
   * [PaychCollect](#PaychCollect)
   * [PaychGet](#PaychGet)
   * [PaychGetWaitReady](#PaychGetWaitReady)
@@ -197,7 +203,7 @@ Response:
 ```json
 {
   "Version": "string value",
-  "APIVersion": 3072,
+  "APIVersion": 3584,
   "BlockDelay": 42
 }
 ```
@@ -267,6 +273,9 @@ blockchain, but that do not require any form of state computation.
 
 ### ChainExport
 ChainExport returns a stream of bytes with CAR dump of chain data.
+The exported chain data includes the header chain from the given tipset
+back to genesis, the entire genesis state, and the most recent 'nroots'
+state trees.
 
 
 Perms: read
@@ -274,6 +283,7 @@ Perms: read
 Inputs:
 ```json
 [
+  10101,
   [
     {
       "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
@@ -886,6 +896,42 @@ Inputs:
   }
 ]
 ```
+
+Response:
+```json
+{
+  "ProposalCid": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "State": 42,
+  "Message": "string value",
+  "Provider": "t01234",
+  "DataRef": {
+    "TransferType": "string value",
+    "Root": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "PieceCid": null,
+    "PieceSize": 1024
+  },
+  "PieceCID": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "Size": 42,
+  "PricePerEpoch": "0",
+  "Duration": 42,
+  "DealID": 5432,
+  "CreationTime": "0001-01-01T00:00:00Z"
+}
+```
+
+### ClientGetDealUpdates
+ClientGetDealUpdates returns the status of updated deals
+
+
+Perms: read
+
+Inputs: `null`
 
 Response:
 ```json
@@ -2003,6 +2049,20 @@ Response:
 }
 ```
 
+### NetAgentVersion
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+]
+```
+
+Response: `"string value"`
+
 ### NetAutoNatStatus
 
 
@@ -2015,6 +2075,61 @@ Response:
 {
   "Reachability": 1,
   "PublicAddr": "string value"
+}
+```
+
+### NetBandwidthStats
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "TotalIn": 9,
+  "TotalOut": 9,
+  "RateIn": 12.3,
+  "RateOut": 12.3
+}
+```
+
+### NetBandwidthStatsByPeer
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "12D3KooWSXmXLJmBR1M7i9RW9GQPNUhZSzXKzxDHWtAgNuJAbyEJ": {
+    "TotalIn": 174000,
+    "TotalOut": 12500,
+    "RateIn": 100,
+    "RateOut": 50
+  }
+}
+```
+
+### NetBandwidthStatsByProtocol
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "/fil/hello/1.0.0": {
+    "TotalIn": 174000,
+    "TotalOut": 12500,
+    "RateIn": 100,
+    "RateOut": 50
+  }
 }
 ```
 
@@ -2118,6 +2233,30 @@ Inputs:
 ```
 
 Response: `42`
+
+### PaychAvailableFunds
+There are not yet any comments for this method.
+
+Perms: sign
+
+Inputs:
+```json
+[
+  "t01234"
+]
+```
+
+Response:
+```json
+{
+  "Channel": "\u003cempty\u003e",
+  "ConfirmedAmt": "0",
+  "PendingAmt": "0",
+  "PendingWaitSentinel": null,
+  "QueuedAmt": "0",
+  "VoucherReedeemedAmt": "0"
+}
+```
 
 ### PaychCollect
 There are not yet any comments for this method.
@@ -2374,24 +2513,27 @@ Inputs:
 Response:
 ```json
 {
-  "ChannelAddr": "t01234",
-  "TimeLockMin": 10101,
-  "TimeLockMax": 10101,
-  "SecretPreimage": "Ynl0ZSBhcnJheQ==",
-  "Extra": {
-    "Actor": "t01234",
-    "Method": 1,
-    "Data": "Ynl0ZSBhcnJheQ=="
+  "Voucher": {
+    "ChannelAddr": "t01234",
+    "TimeLockMin": 10101,
+    "TimeLockMax": 10101,
+    "SecretPreimage": "Ynl0ZSBhcnJheQ==",
+    "Extra": {
+      "Actor": "t01234",
+      "Method": 1,
+      "Data": "Ynl0ZSBhcnJheQ=="
+    },
+    "Lane": 42,
+    "Nonce": 42,
+    "Amount": "0",
+    "MinSettleHeight": 10101,
+    "Merges": null,
+    "Signature": {
+      "Type": 2,
+      "Data": "Ynl0ZSBhcnJheQ=="
+    }
   },
-  "Lane": 42,
-  "Nonce": 42,
-  "Amount": "0",
-  "MinSettleHeight": 10101,
-  "Merges": null,
-  "Signature": {
-    "Type": 2,
-    "Data": "Ynl0ZSBhcnJheQ=="
-  }
+  "Shortfall": "0"
 }
 ```
 
@@ -2437,7 +2579,9 @@ Inputs:
       "Type": 2,
       "Data": "Ynl0ZSBhcnJheQ=="
     }
-  }
+  },
+  "Ynl0ZSBhcnJheQ==",
+  "Ynl0ZSBhcnJheQ=="
 ]
 ```
 
@@ -3603,7 +3747,7 @@ Response:
 ```
 
 ### StateSectorGetInfo
-StateSectorGetInfo returns the on-chain info for the specified miner's sector
+StateSectorGetInfo returns the on-chain info for the specified miner's sector. Returns null in case the sector info isn't found
 NOTE: returned info.Expiration may not be accurate in some cases, use StateSectorExpiration to get accurate
 expiration epoch
 
