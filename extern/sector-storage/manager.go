@@ -232,7 +232,7 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 			log.Infof("sector(%+v) bind ralationship is exist....", sid)
 			continue
 		}
-		taskRd.taskStatus = PRE1_WAITTING
+		taskRd.taskStatus = 0
 		taskRd.workerFortask = info.Hostname
 		m.sched.taskRecorder.Store(sid, taskRd)
 	}
