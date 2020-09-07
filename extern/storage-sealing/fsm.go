@@ -378,6 +378,7 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 
 	m.unsealedInfoMap.lk.Lock()
 	defer m.unsealedInfoMap.lk.Unlock()
+	log.Info("===== 检测sector并重试版本。。。。。")
 	for _, sector := range trackedSectors {
 		// TODO 重启矿工过滤掉非Proving的sector，这样是否有问题 待验证
 		//if sector.State != Proving {

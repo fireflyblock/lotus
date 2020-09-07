@@ -41,7 +41,6 @@ import (
 	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-multistore"
-	paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-storedcounter"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 
@@ -78,22 +77,23 @@ func minerAddrFromDS(ds dtypes.MetadataDS) (address.Address, error) {
 }
 
 func GetParams(sbc *ffiwrapper.Config) error {
-	ssize, err := sbc.SealProofType.SectorSize()
-	if err != nil {
-		return err
-	}
-
-	// If built-in assets are disabled, we expect the user to have placed the right
-	// parameters in the right location on the filesystem (/var/tmp/filecoin-proof-parameters).
-	if build.DisableBuiltinAssets {
-		return nil
-	}
-
-	if err := paramfetch.GetParams(context.TODO(), build.ParametersJSON(), uint64(ssize)); err != nil {
-		return xerrors.Errorf("fetching proof parameters: %w", err)
-	}
-
 	return nil
+	//ssize, err := sbc.SealProofType.SectorSize()
+	//if err != nil {
+	//	return err
+	//}
+
+	//// If built-in assets are disabled, we expect the user to have placed the right
+	//// parameters in the right location on the filesystem (/var/tmp/filecoin-proof-parameters).
+	//if build.DisableBuiltinAssets {
+	//	return nil
+	//}
+
+	//if err := paramfetch.GetParams(context.TODO(), build.ParametersJSON(), uint64(ssize)); err != nil {
+	//	return xerrors.Errorf("fetching proof parameters: %w", err)
+	//}
+
+	//return nil
 }
 
 func MinerAddress(ds dtypes.MetadataDS) (dtypes.MinerAddress, error) {
