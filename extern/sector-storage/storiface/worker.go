@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/sector-storage/sealtasks"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/go-state-types/abi"
 )
 
 type WorkerInfo struct {

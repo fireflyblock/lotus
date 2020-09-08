@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-address"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/sector-storage/mock"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	sealing "github.com/filecoin-project/storage-sealing"
 	miner2 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 
 	"github.com/filecoin-project/lotus/api"

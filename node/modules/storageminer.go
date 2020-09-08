@@ -41,8 +41,9 @@ import (
 	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-multistore"
+	//paramfetch "github.com/filecoin-project/go-paramfetch"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-storedcounter"
-	"github.com/filecoin-project/specs-actors/actors/abi"
 
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	sectorstorage "github.com/filecoin-project/sector-storage"

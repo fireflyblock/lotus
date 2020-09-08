@@ -14,7 +14,7 @@ import (
 
 	"github.com/filecoin-project/lotus/build"
 
-	"github.com/filecoin-project/specs-actors/actors/abi/big"
+	"github.com/filecoin-project/go-state-types/big"
 	saminer "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/filecoin-project/specs-actors/actors/builtin/power"
 	"github.com/filecoin-project/specs-actors/actors/builtin/verifreg"
@@ -30,10 +30,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/test"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	builder "github.com/filecoin-project/lotus/node/test"
-	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
@@ -64,10 +64,10 @@ func TestPaymentChannels(t *testing.T) {
 	creatorCLI := mockCLI.client(paymentCreator.ListenAddr)
 	receiverCLI := mockCLI.client(paymentReceiver.ListenAddr)
 
-	// creator: paych get <creator> <receiver> <amount>
+	// creator: paych add-funds <creator> <receiver> <amount>
 	channelAmt := "100000"
 	cmd := []string{creatorAddr.String(), receiverAddr.String(), channelAmt}
-	chstr := creatorCLI.runCmd(paychGetCmd, cmd)
+	chstr := creatorCLI.runCmd(paychAddFundsCmd, cmd)
 
 	chAddr, err := address.NewFromString(chstr)
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestPaymentChannelStatus(t *testing.T) {
 	creatorCLI := mockCLI.client(paymentCreator.ListenAddr)
 
 	cmd := []string{creatorAddr.String(), receiverAddr.String()}
-	out := creatorCLI.runCmd(paychStatusCmd, cmd)
+	out := creatorCLI.runCmd(paychStatusByFromToCmd, cmd)
 	fmt.Println(out)
 	noChannelState := "Channel does not exist"
 	require.Regexp(t, regexp.MustCompile(noChannelState), out)
@@ -125,15 +125,15 @@ func TestPaymentChannelStatus(t *testing.T) {
 	channelAmt := uint64(100)
 	create := make(chan string)
 	go func() {
-		// creator: paych get <creator> <receiver> <amount>
+		// creator: paych add-funds <creator> <receiver> <amount>
 		cmd = []string{creatorAddr.String(), receiverAddr.String(), fmt.Sprintf("%d", channelAmt)}
-		create <- creatorCLI.runCmd(paychGetCmd, cmd)
+		create <- creatorCLI.runCmd(paychAddFundsCmd, cmd)
 	}()
 
 	// Wait for the output to stop being "Channel does not exist"
 	for regexp.MustCompile(noChannelState).MatchString(out) {
 		cmd = []string{creatorAddr.String(), receiverAddr.String()}
-		out = creatorCLI.runCmd(paychStatusCmd, cmd)
+		out = creatorCLI.runCmd(paychStatusByFromToCmd, cmd)
 	}
 	fmt.Println(out)
 
@@ -153,7 +153,7 @@ func TestPaymentChannelStatus(t *testing.T) {
 	// Wait for create channel to complete
 	chstr := <-create
 
-	cmd = []string{creatorAddr.String(), receiverAddr.String()}
+	cmd = []string{chstr}
 	out = creatorCLI.runCmd(paychStatusCmd, cmd)
 	fmt.Println(out)
 	// Output should have the channel address
@@ -169,7 +169,7 @@ func TestPaymentChannelStatus(t *testing.T) {
 	cmd = []string{chAddr.String(), fmt.Sprintf("%d", voucherAmt)}
 	creatorCLI.runCmd(paychVoucherCreateCmd, cmd)
 
-	cmd = []string{creatorAddr.String(), receiverAddr.String()}
+	cmd = []string{chstr}
 	out = creatorCLI.runCmd(paychStatusCmd, cmd)
 	fmt.Println(out)
 	voucherAmtAtto := types.BigMul(types.NewInt(voucherAmt), types.NewInt(build.FilecoinPrecision))
@@ -196,10 +196,10 @@ func TestPaymentChannelVouchers(t *testing.T) {
 	creatorCLI := mockCLI.client(paymentCreator.ListenAddr)
 	receiverCLI := mockCLI.client(paymentReceiver.ListenAddr)
 
-	// creator: paych get <creator> <receiver> <amount>
+	// creator: paych add-funds <creator> <receiver> <amount>
 	channelAmt := "100000"
 	cmd := []string{creatorAddr.String(), receiverAddr.String(), channelAmt}
-	chstr := creatorCLI.runCmd(paychGetCmd, cmd)
+	chstr := creatorCLI.runCmd(paychAddFundsCmd, cmd)
 
 	chAddr, err := address.NewFromString(chstr)
 	require.NoError(t, err)
@@ -344,10 +344,10 @@ func TestPaymentChannelVoucherCreateShortfall(t *testing.T) {
 	mockCLI := newMockCLI(t)
 	creatorCLI := mockCLI.client(paymentCreator.ListenAddr)
 
-	// creator: paych get <creator> <receiver> <amount>
+	// creator: paych add-funds <creator> <receiver> <amount>
 	channelAmt := 100
 	cmd := []string{creatorAddr.String(), receiverAddr.String(), fmt.Sprintf("%d", channelAmt)}
-	chstr := creatorCLI.runCmd(paychGetCmd, cmd)
+	chstr := creatorCLI.runCmd(paychAddFundsCmd, cmd)
 
 	chAddr, err := address.NewFromString(chstr)
 	require.NoError(t, err)

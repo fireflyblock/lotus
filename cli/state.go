@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/specs-actors/actors/runtime"
+
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/ipfs/go-cid"
@@ -24,10 +26,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/exported"
-	"github.com/filecoin-project/specs-actors/actors/runtime/exitcode"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -1167,7 +1169,11 @@ func sumGas(changes []*types.GasTrace) types.GasTrace {
 }
 
 func jsonParams(code cid.Cid, method abi.MethodNum, params []byte) (string, error) {
-	re := reflect.New(stmgr.MethodsMap[code][method].Params.Elem())
+	methodMeta, found := stmgr.MethodsMap[code][method]
+	if !found {
+		return "", fmt.Errorf("method %d not found on actor %s", method, code)
+	}
+	re := reflect.New(methodMeta.Params.Elem())
 	p := re.Interface().(cbg.CBORUnmarshaler)
 	if err := p.UnmarshalCBOR(bytes.NewReader(params)); err != nil {
 		return "", err
@@ -1178,7 +1184,11 @@ func jsonParams(code cid.Cid, method abi.MethodNum, params []byte) (string, erro
 }
 
 func jsonReturn(code cid.Cid, method abi.MethodNum, ret []byte) (string, error) {
-	re := reflect.New(stmgr.MethodsMap[code][method].Ret.Elem())
+	methodMeta, found := stmgr.MethodsMap[code][method]
+	if !found {
+		return "", fmt.Errorf("method %d not found on actor %s", method, code)
+	}
+	re := reflect.New(methodMeta.Ret.Elem())
 	p := re.Interface().(cbg.CBORUnmarshaler)
 	if err := p.UnmarshalCBOR(bytes.NewReader(ret)); err != nil {
 		return "", err
@@ -1438,7 +1448,7 @@ func parseParamsForMethod(act cid.Cid, method uint64, args []string) ([]byte, er
 		return nil, nil
 	}
 
-	var target abi.Invokee
+	var target runtime.Invokee
 	for _, actor := range exported.BuiltinActors() {
 		if actor.Code() == act {
 			target = actor

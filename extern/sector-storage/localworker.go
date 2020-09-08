@@ -17,7 +17,7 @@ import (
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
 	logrus "github.com/filecoin-project/sector-storage/log"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/go-state-types/abi"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"

@@ -8,11 +8,11 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/grpc/config"
 	"github.com/filecoin-project/sector-storage/grpc/proto"
 	pb "github.com/filecoin-project/sector-storage/grpc/proto"
-	"github.com/filecoin-project/specs-actors/actors/abi"
 	"google.golang.org/grpc"
 )
 

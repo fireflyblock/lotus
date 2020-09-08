@@ -2,14 +2,11 @@ package sealing
 
 import (
 	"context"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	"golang.org/x/xerrors"
-	//nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
-)
 
-//func (m *Sealing) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
-//	return io.LimitReader(&nr.Reader{}, int64(size))
-//}
+	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-state-types/abi"
+)
 
 func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
 	// 说明

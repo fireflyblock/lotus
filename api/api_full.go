@@ -4,21 +4,24 @@ import (
 	"context"
 	"time"
 
+	"github.com/filecoin-project/specs-actors/actors/runtime/proof"
+
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-multistore"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	"github.com/filecoin-project/specs-actors/actors/abi/big"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/filecoin-project/specs-actors/actors/builtin/paych"
 	"github.com/filecoin-project/specs-actors/actors/builtin/power"
 	"github.com/filecoin-project/specs-actors/actors/builtin/verifreg"
-	"github.com/filecoin-project/specs-actors/actors/crypto"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	marketevents "github.com/filecoin-project/lotus/markets/loggers"
@@ -270,6 +273,9 @@ type FullNode interface {
 	// ClientListTransfers returns the status of all ongoing transfers of data
 	ClientListDataTransfers(ctx context.Context) ([]DataTransferChannel, error)
 	ClientDataTransferUpdates(ctx context.Context) (<-chan DataTransferChannel, error)
+	// ClientRetrieveTryRestartInsufficientFunds attempts to restart stalled retrievals on a given payment channel
+	// which are stuck due to insufficient funds
+	ClientRetrieveTryRestartInsufficientFunds(ctx context.Context, paymentChannel address.Address) error
 
 	// ClientUnimport removes references to the specified file from filestore
 	//ClientUnimport(path string)
@@ -300,7 +306,7 @@ type FullNode interface {
 	// StateMinerSectors returns info about the given miner's sectors. If the filter bitfield is nil, all sectors are included.
 	// If the filterOut boolean is set to true, any sectors in the filter are excluded.
 	// If false, only those sectors in the filter are included.
-	StateMinerSectors(context.Context, address.Address, *abi.BitField, bool, types.TipSetKey) ([]*ChainSectorInfo, error)
+	StateMinerSectors(context.Context, address.Address, *bitfield.BitField, bool, types.TipSetKey) ([]*ChainSectorInfo, error)
 	// StateMinerActiveSectors returns info about sectors that a given miner is actively proving.
 	StateMinerActiveSectors(context.Context, address.Address, types.TipSetKey) ([]*ChainSectorInfo, error)
 	// StateMinerProvingDeadline calculates the deadline at some epoch for a proving period
@@ -315,11 +321,11 @@ type FullNode interface {
 	// StateMinerPartitions loads miner partitions for the specified miner/deadline
 	StateMinerPartitions(context.Context, address.Address, uint64, types.TipSetKey) ([]*miner.Partition, error)
 	// StateMinerFaults returns a bitfield indicating the faulty sectors of the given miner
-	StateMinerFaults(context.Context, address.Address, types.TipSetKey) (abi.BitField, error)
+	StateMinerFaults(context.Context, address.Address, types.TipSetKey) (bitfield.BitField, error)
 	// StateAllMinerFaults returns all non-expired Faults that occur within lookback epochs of the given tipset
 	StateAllMinerFaults(ctx context.Context, lookback abi.ChainEpoch, ts types.TipSetKey) ([]*Fault, error)
 	// StateMinerRecoveries returns a bitfield indicating the recovering sectors of the given miner
-	StateMinerRecoveries(context.Context, address.Address, types.TipSetKey) (abi.BitField, error)
+	StateMinerRecoveries(context.Context, address.Address, types.TipSetKey) (bitfield.BitField, error)
 	// StateMinerInitialPledgeCollateral returns the precommit deposit for the specified miner's sector
 	StateMinerPreCommitDepositForPower(context.Context, address.Address, miner.SectorPreCommitInfo, types.TipSetKey) (types.BigInt, error)
 	// StateMinerInitialPledgeCollateral returns the initial pledge collateral for the specified miner's sector
@@ -421,7 +427,8 @@ type FullNode interface {
 
 	PaychGet(ctx context.Context, from, to address.Address, amt types.BigInt) (*ChannelInfo, error)
 	PaychGetWaitReady(context.Context, cid.Cid) (address.Address, error)
-	PaychAvailableFunds(from, to address.Address) (*ChannelAvailableFunds, error)
+	PaychAvailableFunds(ch address.Address) (*ChannelAvailableFunds, error)
+	PaychAvailableFundsByFromTo(from, to address.Address) (*ChannelAvailableFunds, error)
 	PaychList(context.Context) ([]address.Address, error)
 	PaychStatus(context.Context, address.Address) (*PaychStatus, error)
 	PaychSettle(context.Context, address.Address) (cid.Cid, error)
@@ -540,7 +547,12 @@ type ChannelInfo struct {
 }
 
 type ChannelAvailableFunds struct {
+	// Channel is the address of the channel
 	Channel *address.Address
+	// From is the from address of the channel (channel creator)
+	From address.Address
+	// To is the to address of the channel
+	To address.Address
 	// ConfirmedAmt is the amount of funds that have been confirmed on-chain
 	// for the channel
 	ConfirmedAmt types.BigInt
@@ -732,7 +744,7 @@ type CirculatingSupply struct {
 type MiningBaseInfo struct {
 	MinerPower      types.BigInt
 	NetworkPower    types.BigInt
-	Sectors         []abi.SectorInfo
+	Sectors         []proof.SectorInfo
 	WorkerKey       address.Address
 	SectorSize      abi.SectorSize
 	PrevBeaconEntry types.BeaconEntry
@@ -749,7 +761,7 @@ type BlockTemplate struct {
 	Messages         []*types.SignedMessage
 	Epoch            abi.ChainEpoch
 	Timestamp        uint64
-	WinningPoStProof []abi.PoStProof
+	WinningPoStProof []proof.PoStProof
 }
 
 type DataSize struct {

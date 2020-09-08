@@ -46,6 +46,7 @@
   * [ClientQueryAsk](#ClientQueryAsk)
   * [ClientRemoveImport](#ClientRemoveImport)
   * [ClientRetrieve](#ClientRetrieve)
+  * [ClientRetrieveTryRestartInsufficientFunds](#ClientRetrieveTryRestartInsufficientFunds)
   * [ClientRetrieveWithEvents](#ClientRetrieveWithEvents)
   * [ClientStartDeal](#ClientStartDeal)
 * [Gas](#Gas)
@@ -98,6 +99,7 @@
 * [Paych](#Paych)
   * [PaychAllocateLane](#PaychAllocateLane)
   * [PaychAvailableFunds](#PaychAvailableFunds)
+  * [PaychAvailableFundsByFromTo](#PaychAvailableFundsByFromTo)
   * [PaychCollect](#PaychCollect)
   * [PaychGet](#PaychGet)
   * [PaychGetWaitReady](#PaychGetWaitReady)
@@ -1153,6 +1155,22 @@ Inputs:
     "Path": "string value",
     "IsCAR": true
   }
+]
+```
+
+Response: `{}`
+
+### ClientRetrieveTryRestartInsufficientFunds
+ClientRetrieveTryRestartInsufficientFunds attempts to restart stalled retrievals on a given payment channel
+which are stuck due to insufficient funds
+
+
+Perms: write
+
+Inputs:
+```json
+[
+  "t01234"
 ]
 ```
 
@@ -2239,6 +2257,27 @@ There are not yet any comments for this method.
 
 Perms: sign
 
+Inputs: `null`
+
+Response:
+```json
+{
+  "Channel": "\u003cempty\u003e",
+  "From": "t01234",
+  "To": "t01234",
+  "ConfirmedAmt": "0",
+  "PendingAmt": "0",
+  "PendingWaitSentinel": null,
+  "QueuedAmt": "0",
+  "VoucherReedeemedAmt": "0"
+}
+```
+
+### PaychAvailableFundsByFromTo
+There are not yet any comments for this method.
+
+Perms: sign
+
 Inputs:
 ```json
 [
@@ -2250,6 +2289,8 @@ Response:
 ```json
 {
   "Channel": "\u003cempty\u003e",
+  "From": "t01234",
+  "To": "t01234",
   "ConfirmedAmt": "0",
   "PendingAmt": "0",
   "PendingWaitSentinel": null,

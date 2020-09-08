@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/filecoin-project/sector-storage/fsutil"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/go-state-types/abi"
 )
 
 type PathType string
