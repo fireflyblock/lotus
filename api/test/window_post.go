@@ -13,8 +13,8 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/sector-storage/mock"
-	sealing "github.com/filecoin-project/storage-sealing"
 	miner2 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 
 	"github.com/filecoin-project/lotus/api"
@@ -192,7 +192,7 @@ func TestWindowPost(t *testing.T, b APIBuilder, blocktime time.Duration, nSector
 
 		// Drop the partition
 		err = parts[0].Sectors.ForEach(func(sid uint64) error {
-			return miner.StorageMiner.(*impl.StorageMinerAPI).IStorageMgr.(*mock.SectorMgr).MarkFailed(abi.SectorID{
+			return miner.StorageMiner.(*impl.StorageMinerAPI).IStorageMgr.(*mock.SectorMgr).MarkCorrupted(abi.SectorID{
 				Miner:  abi.ActorID(mid),
 				Number: abi.SectorNumber(sid),
 			}, true)

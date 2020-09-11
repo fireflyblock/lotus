@@ -6,6 +6,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/dline"
+
 	"github.com/ipfs/go-cid"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -94,7 +96,7 @@ type FullNodeStruct struct {
 		ChainGetNode                  func(ctx context.Context, p string) (*api.IpldObject, error)                                                       `perm:"read"`
 		ChainGetMessage               func(context.Context, cid.Cid) (*types.Message, error)                                                             `perm:"read"`
 		ChainGetPath                  func(context.Context, types.TipSetKey, types.TipSetKey) ([]*api.HeadChange, error)                                 `perm:"read"`
-		ChainExport                   func(context.Context, abi.ChainEpoch, types.TipSetKey) (<-chan []byte, error)                                      `perm:"read"`
+		ChainExport                   func(context.Context, abi.ChainEpoch, bool, types.TipSetKey) (<-chan []byte, error)                                `perm:"read"`
 
 		BeaconGetEntry func(ctx context.Context, epoch abi.ChainEpoch) (*types.BeaconEntry, error) `perm:"read"`
 
@@ -163,7 +165,7 @@ type FullNodeStruct struct {
 		StateNetworkName                   func(context.Context) (dtypes.NetworkName, error)                                                                   `perm:"read"`
 		StateMinerSectors                  func(context.Context, address.Address, *bitfield.BitField, bool, types.TipSetKey) ([]*api.ChainSectorInfo, error)   `perm:"read"`
 		StateMinerActiveSectors            func(context.Context, address.Address, types.TipSetKey) ([]*api.ChainSectorInfo, error)                             `perm:"read"`
-		StateMinerProvingDeadline          func(context.Context, address.Address, types.TipSetKey) (*miner.DeadlineInfo, error)                                `perm:"read"`
+		StateMinerProvingDeadline          func(context.Context, address.Address, types.TipSetKey) (*dline.Info, error)                                        `perm:"read"`
 		StateMinerPower                    func(context.Context, address.Address, types.TipSetKey) (*api.MinerPower, error)                                    `perm:"read"`
 		StateMinerInfo                     func(context.Context, address.Address, types.TipSetKey) (api.MinerInfo, error)                                      `perm:"read"`
 		StateMinerDeadlines                func(context.Context, address.Address, types.TipSetKey) ([]*miner.Deadline, error)                                  `perm:"read"`
@@ -202,10 +204,14 @@ type FullNodeStruct struct {
 		StateCirculatingSupply             func(context.Context, types.TipSetKey) (api.CirculatingSupply, error)                                               `perm:"read"`
 
 		MsigGetAvailableBalance func(context.Context, address.Address, types.TipSetKey) (types.BigInt, error)                                                                    `perm:"read"`
+		MsigGetVested           func(context.Context, address.Address, types.TipSetKey, types.TipSetKey) (types.BigInt, error)                                                   `perm:"read"`
 		MsigCreate              func(context.Context, uint64, []address.Address, abi.ChainEpoch, types.BigInt, address.Address, types.BigInt) (cid.Cid, error)                   `perm:"sign"`
 		MsigPropose             func(context.Context, address.Address, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error)                          `perm:"sign"`
 		MsigApprove             func(context.Context, address.Address, uint64, address.Address, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error) `perm:"sign"`
 		MsigCancel              func(context.Context, address.Address, uint64, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error)                  `perm:"sign"`
+		MsigAddPropose          func(context.Context, address.Address, address.Address, address.Address, bool) (cid.Cid, error)                                                  `perm:"sign"`
+		MsigAddApprove          func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address, bool) (cid.Cid, error)                         `perm:"sign"`
+		MsigAddCancel           func(context.Context, address.Address, address.Address, uint64, address.Address, bool) (cid.Cid, error)                                          `perm:"sign"`
 		MsigSwapPropose         func(context.Context, address.Address, address.Address, address.Address, address.Address) (cid.Cid, error)                                       `perm:"sign"`
 		MsigSwapApprove         func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address, address.Address) (cid.Cid, error)              `perm:"sign"`
 		MsigSwapCancel          func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address) (cid.Cid, error)                               `perm:"sign"`
@@ -697,8 +703,8 @@ func (c *FullNodeStruct) ChainGetPath(ctx context.Context, from types.TipSetKey,
 	return c.Internal.ChainGetPath(ctx, from, to)
 }
 
-func (c *FullNodeStruct) ChainExport(ctx context.Context, nroots abi.ChainEpoch, tsk types.TipSetKey) (<-chan []byte, error) {
-	return c.Internal.ChainExport(ctx, nroots, tsk)
+func (c *FullNodeStruct) ChainExport(ctx context.Context, nroots abi.ChainEpoch, iom bool, tsk types.TipSetKey) (<-chan []byte, error) {
+	return c.Internal.ChainExport(ctx, nroots, iom, tsk)
 }
 
 func (c *FullNodeStruct) BeaconGetEntry(ctx context.Context, epoch abi.ChainEpoch) (*types.BeaconEntry, error) {
@@ -745,7 +751,7 @@ func (c *FullNodeStruct) StateMinerActiveSectors(ctx context.Context, addr addre
 	return c.Internal.StateMinerActiveSectors(ctx, addr, tsk)
 }
 
-func (c *FullNodeStruct) StateMinerProvingDeadline(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*miner.DeadlineInfo, error) {
+func (c *FullNodeStruct) StateMinerProvingDeadline(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*dline.Info, error) {
 	return c.Internal.StateMinerProvingDeadline(ctx, addr, tsk)
 }
 
@@ -893,6 +899,10 @@ func (c *FullNodeStruct) MsigGetAvailableBalance(ctx context.Context, a address.
 	return c.Internal.MsigGetAvailableBalance(ctx, a, tsk)
 }
 
+func (c *FullNodeStruct) MsigGetVested(ctx context.Context, a address.Address, sTsk types.TipSetKey, eTsk types.TipSetKey) (types.BigInt, error) {
+	return c.Internal.MsigGetVested(ctx, a, sTsk, eTsk)
+}
+
 func (c *FullNodeStruct) MsigCreate(ctx context.Context, req uint64, addrs []address.Address, duration abi.ChainEpoch, val types.BigInt, src address.Address, gp types.BigInt) (cid.Cid, error) {
 	return c.Internal.MsigCreate(ctx, req, addrs, duration, val, src, gp)
 }
@@ -907,6 +917,18 @@ func (c *FullNodeStruct) MsigApprove(ctx context.Context, msig address.Address, 
 
 func (c *FullNodeStruct) MsigCancel(ctx context.Context, msig address.Address, txID uint64, to address.Address, amt types.BigInt, src address.Address, method uint64, params []byte) (cid.Cid, error) {
 	return c.Internal.MsigCancel(ctx, msig, txID, to, amt, src, method, params)
+}
+
+func (c *FullNodeStruct) MsigAddPropose(ctx context.Context, msig address.Address, src address.Address, newAdd address.Address, inc bool) (cid.Cid, error) {
+	return c.Internal.MsigAddPropose(ctx, msig, src, newAdd, inc)
+}
+
+func (c *FullNodeStruct) MsigAddApprove(ctx context.Context, msig address.Address, src address.Address, txID uint64, proposer address.Address, newAdd address.Address, inc bool) (cid.Cid, error) {
+	return c.Internal.MsigAddApprove(ctx, msig, src, txID, proposer, newAdd, inc)
+}
+
+func (c *FullNodeStruct) MsigAddCancel(ctx context.Context, msig address.Address, src address.Address, txID uint64, newAdd address.Address, inc bool) (cid.Cid, error) {
+	return c.Internal.MsigAddCancel(ctx, msig, src, txID, newAdd, inc)
 }
 
 func (c *FullNodeStruct) MsigSwapPropose(ctx context.Context, msig address.Address, src address.Address, oldAdd address.Address, newAdd address.Address) (cid.Cid, error) {

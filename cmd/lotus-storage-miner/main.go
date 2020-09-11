@@ -37,6 +37,8 @@ func main() {
 	go func() {
 		http.ListenAndServe("0.0.0.0:6060", nil)
 	}()
+	build.RunningNodeType = build.NodeMiner
+
 	lotuslog.SetupLogLevels()
 
 	local := []*cli.Command{
