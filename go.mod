@@ -12,13 +12,13 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/coreos/go-systemd/v22 v22.0.0
-	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e // indirect
+	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e
 	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/docker/go-units v0.4.0
 	github.com/drand/drand v1.1.2-0.20200905144319-79c957281b32
 	github.com/drand/kyber v1.1.2
 	github.com/dustin/go-humanize v1.0.0
-	github.com/elastic/go-sysinfo v1.3.0 // indirect
+	github.com/elastic/go-sysinfo v1.3.0
 	github.com/fatih/color v1.8.0
 	github.com/filecoin-project/filecoin-ffi v0.30.4-0.20200716204036-cddc56607e1d
 	github.com/filecoin-project/go-address v0.0.3
@@ -27,17 +27,17 @@ require (
 	github.com/filecoin-project/go-crypto v0.0.0-20191218222705-effae4ea9f03
 	github.com/filecoin-project/go-data-transfer v0.6.3
 	github.com/filecoin-project/go-fil-commcid v0.0.0-20200716160307-8f644712406f
-	github.com/filecoin-project/go-fil-markets v0.6.0
+	github.com/filecoin-project/go-fil-markets v0.6.1-0.20200911011457-2959ccca6a3c
 	github.com/filecoin-project/go-jsonrpc v0.1.2-0.20200822201400-474f4fdccc52
 	github.com/filecoin-project/go-multistore v0.0.3
 	github.com/filecoin-project/go-padreader v0.0.0-20200903213702-ed5fae088b20
 	github.com/filecoin-project/go-paramfetch v0.0.2-0.20200701152213-3e0f0afdc261
-	github.com/filecoin-project/go-state-types v0.0.0-20200909080127-001afaca718c
+	github.com/filecoin-project/go-state-types v0.0.0-20200911004822-964d6c679cfc
 	github.com/filecoin-project/go-statemachine v0.0.0-20200813232949-df9b130df370
 	github.com/filecoin-project/go-statestore v0.1.0
 	github.com/filecoin-project/go-storedcounter v0.0.0-20200421200003-1c99c62e8a5b
 	github.com/filecoin-project/sector-storage v0.0.0-20200810171746-eac70842d8e0
-	github.com/filecoin-project/specs-actors v0.9.8
+	github.com/filecoin-project/specs-actors v0.9.10
 	github.com/filecoin-project/specs-storage v0.1.1-0.20200907031224-ed2e5cd13796
 	github.com/filecoin-project/test-vectors/schema v0.0.1
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.1

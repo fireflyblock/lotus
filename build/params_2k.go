@@ -30,7 +30,7 @@ func init() {
 	BuildType |= Build2k
 }
 
-const BlockDelaySecs = uint64(30)
+const BlockDelaySecs = uint64(4)
 
 const PropagationDelaySecs = uint64(1)
 
