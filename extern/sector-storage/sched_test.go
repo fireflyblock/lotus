@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	InitWait = 10 * time.Millisecond
+	//InitWait = 10 * time.Millisecond
 }
 
 func TestWithPriority(t *testing.T) {
@@ -134,7 +134,7 @@ func (s *schedTestWorker) Close() error {
 	return nil
 }
 
-var _ Worker = &schedTestWorker{}
+//var _ Worker = &schedTestWorker{}
 
 func addTestWorker(t *testing.T, sched *scheduler, index *stores.Index, name string, taskTypes map[sealtasks.TaskType]struct{}) {
 	w := &schedTestWorker{
@@ -547,10 +547,10 @@ func BenchmarkTrySched(b *testing.B) {
 				}
 
 				for i := 0; i < windows; i++ {
-					sched.openWindows = append(sched.openWindows, &schedWindowRequest{
-						worker: 0,
-						done:   make(chan *schedWindow, 1000),
-					})
+					//sched.openWindows = append(sched.openWindows, &schedWindowRequest{
+					//	worker: 0,
+					//	done:   make(chan *schedWindow, 1000),
+					//})
 				}
 
 				for i := 0; i < queue; i++ {
@@ -575,45 +575,45 @@ func BenchmarkTrySched(b *testing.B) {
 }
 
 func TestWindowCompact(t *testing.T) {
-	sh := scheduler{
-		spt: abi.RegisteredSealProof_StackedDrg32GiBV1,
-	}
+	//sh := scheduler{
+	//	spt: abi.RegisteredSealProof_StackedDrg32GiBV1,
+	//}
 
 	test := func(start [][]sealtasks.TaskType, expect [][]sealtasks.TaskType) func(t *testing.T) {
 		return func(t *testing.T) {
-			wh := &workerHandle{
-				info: storiface.WorkerInfo{
-					Resources: decentWorkerResources,
-				},
-			}
+			//wh := &workerHandle{
+			//	info: storiface.WorkerInfo{
+			//		Resources: decentWorkerResources,
+			//	},
+			//}
 
-			for _, windowTasks := range start {
-				window := &schedWindow{}
-
-				for _, task := range windowTasks {
-					window.todo = append(window.todo, &workerRequest{taskType: task})
-					window.allocated.add(wh.info.Resources, ResourceTable[task][sh.spt])
-				}
-
-				wh.activeWindows = append(wh.activeWindows, window)
-			}
-
-			n := sh.workerCompactWindows(wh, 0)
-			require.Equal(t, len(start)-len(expect), n)
-
-			for wi, tasks := range expect {
-				var expectRes activeResources
-
-				for ti, task := range tasks {
-					require.Equal(t, task, wh.activeWindows[wi].todo[ti].taskType, "%d, %d", wi, ti)
-					expectRes.add(wh.info.Resources, ResourceTable[task][sh.spt])
-				}
-
-				require.Equal(t, expectRes.cpuUse, wh.activeWindows[wi].allocated.cpuUse, "%d", wi)
-				require.Equal(t, expectRes.gpuUsed, wh.activeWindows[wi].allocated.gpuUsed, "%d", wi)
-				require.Equal(t, expectRes.memUsedMin, wh.activeWindows[wi].allocated.memUsedMin, "%d", wi)
-				require.Equal(t, expectRes.memUsedMax, wh.activeWindows[wi].allocated.memUsedMax, "%d", wi)
-			}
+			//for _, windowTasks := range start {
+			//	window := &schedWindow{}
+			//
+			//	for _, task := range windowTasks {
+			//		window.todo = append(window.todo, &workerRequest{taskType: task})
+			//		window.allocated.add(wh.info.Resources, ResourceTable[task][sh.spt])
+			//	}
+			//
+			//	wh.activeWindows = append(wh.activeWindows, window)
+			//}
+			//
+			//n := sh.workerCompactWindows(wh, 0)
+			//require.Equal(t, len(start)-len(expect), n)
+			//
+			//for wi, tasks := range expect {
+			//	var expectRes activeResources
+			//
+			//	for ti, task := range tasks {
+			//		require.Equal(t, task, wh.activeWindows[wi].todo[ti].taskType, "%d, %d", wi, ti)
+			//		expectRes.add(wh.info.Resources, ResourceTable[task][sh.spt])
+			//	}
+			//
+			//	require.Equal(t, expectRes.cpuUse, wh.activeWindows[wi].allocated.cpuUse, "%d", wi)
+			//	require.Equal(t, expectRes.gpuUsed, wh.activeWindows[wi].allocated.gpuUsed, "%d", wi)
+			//	require.Equal(t, expectRes.memUsedMin, wh.activeWindows[wi].allocated.memUsedMin, "%d", wi)
+			//	require.Equal(t, expectRes.memUsedMax, wh.activeWindows[wi].allocated.memUsedMax, "%d", wi)
+			//}
 
 		}
 	}

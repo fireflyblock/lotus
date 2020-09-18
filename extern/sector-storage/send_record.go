@@ -99,14 +99,14 @@ func (sh *scheduler) StartLoad() error {
 
 func Store(data []byte) error {
 	var url string
-	c, err := initRequestConfig("conf.json")
+	c, err := InitRequestConfig("conf.json")
 	if err != nil {
 		fmt.Println("===== read conf.json err:", err)
 	}
-	if c.Url == "" {
+	if c.RecordUrl == "" {
 		url = defaultRequestURL
 	} else {
-		url = c.Url
+		url = c.RecordUrl
 	}
 
 	reader := bytes.NewReader(data)
@@ -124,15 +124,15 @@ func Store(data []byte) error {
 func Load() ([]IncompleteTask, error) {
 	var url string
 	var iT = make([]IncompleteTask, 0)
-	c, err := initRequestConfig("conf.json")
+	c, err := InitRequestConfig("conf.json")
 	if err != nil {
 		fmt.Println("===== read conf.json err:", err)
 		return iT, err
 	}
-	if c.Url == "" {
+	if c.RecordUrl == "" {
 		url = defaultRequestURL
 	} else {
-		url = c.Url
+		url = c.RecordUrl
 	}
 
 	resp, err := http.Get(url)
@@ -158,10 +158,12 @@ func Load() ([]IncompleteTask, error) {
 }
 
 type Config struct {
-	Url string
+	RecordUrl string
+	RedisUrl  []string
+	PassWord  string
 }
 
-func initRequestConfig(filePath string) (*Config, error) {
+func InitRequestConfig(filePath string) (*Config, error) {
 	var confInfo = new(Config)
 	if !isFileExist(filePath) {
 		fn, err := os.Create(filePath)

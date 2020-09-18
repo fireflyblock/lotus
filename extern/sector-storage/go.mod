@@ -12,9 +12,11 @@ require (
 	github.com/filecoin-project/go-fil-markets v0.5.6
 	github.com/filecoin-project/go-padreader v0.0.0-20200210211231-548257017ca6
 	github.com/filecoin-project/go-paramfetch v0.0.2-0.20200218225740-47c639bab663
-	github.com/filecoin-project/specs-actors v0.8.7-0.20200811203034-272d022c1923
+	github.com/filecoin-project/go-state-types v0.0.0-20200904021452-1883f36ca2f4
+	github.com/filecoin-project/specs-actors v0.9.4
 	github.com/filecoin-project/specs-storage v0.1.1-0.20200622113353-88a9704877ea
-	github.com/golang/protobuf v1.4.1
+	github.com/go-redis/redis/v8 v8.0.0
+	github.com/golang/protobuf v1.4.2
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/go-multierror v1.1.0

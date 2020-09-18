@@ -3,6 +3,8 @@ package sectorstorage
 import (
 	"context"
 	"errors"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
+	"github.com/go-redis/redis/v8"
 	"io"
 	"net/http"
 	"sync"
@@ -25,7 +27,15 @@ import (
 	"github.com/filecoin-project/sector-storage/storiface"
 )
 
-var log = logging.Logger("advmgr")
+var (
+	log             = logging.Logger("advmgr")
+	defaultRedisURL = []string{
+		"172.16.0.7:8001",
+		"172.16.0.7:8002",
+		"172.16.0.8:8001",
+	}
+	defaultRedisPassWord = "rcQuwPzASm"
+)
 
 var ErrNoWorkers = errors.New("no suitable workers found")
 
@@ -83,7 +93,8 @@ type Manager struct {
 	remoteHnd  *stores.FetchHandler
 	index      stores.SectorIndex
 
-	sched *scheduler
+	redisCli *gr.RedisClient
+	sched    *scheduler
 
 	storage.Prover
 
@@ -141,6 +152,30 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	//if err != nil {
 	//	return  nil,xerrors.Errorf("===== start load task record err: %w", err)
 	//}
+
+	//init redis data
+	var rurl = []string{}
+	var pw string
+	conf, err := InitRequestConfig("conf.json")
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== read conf.json err:", err)
+	}
+
+	if conf.RecordUrl == "" {
+		rurl = defaultRedisURL
+	} else {
+		rurl = conf.RedisUrl
+	}
+
+	if conf.PassWord == "" {
+		pw = defaultRedisPassWord
+	} else {
+		pw = conf.PassWord
+	}
+
+	rc := gr.NewRedisClusterCLi(ctx, rurl, pw)
+	m.redisCli = rc
+
 	go m.sched.runSched()
 
 	localTasks := []sealtasks.TaskType{
@@ -362,67 +397,48 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		return abi.PieceInfo{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	var selector WorkerSelector
-	var err error
-	if len(existingPieces) == 0 { // new
-		selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
-	} else { // use existing
-		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+	var out abi.PieceInfo
+	apInfo, err := gr.Serialization(gr.ParamsAp{
+		Sector:       sector,
+		PieceSizes:   existingPieces,
+		NewPieceSize: sz,
+		PieceData:    r,
+		ApType:       apType,
+	})
+	if err != nil {
+		return out, err
 	}
 
 	var tt sealtasks.TaskType
 	switch apType {
-	case "_seal":
-		tt = sealtasks.TTAddPiece
-		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
-
-	case "_filPledgeToDealSector":
-		tt = sealtasks.TTAddPiece
-		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
+	case "_seal", "_filPledgeToDealSector":
+		tt = sealtasks.TTAddPieceSe
+		//1.publish
+		err = m.PublishTask(sector.Number, tt, apInfo, 1)
+		if err != nil {
+			return out, err
+		}
+		//2.Subscribe res
+		subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+		if err != nil {
+			return out, err
+		}
+		return m.SubscribeResult(subCha, sector.Number, tt, 0)
 
 	case "_pledgeSector":
 		tt = sealtasks.TTAddPiecePl
-		logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
-	}
-	//if apType == "_pledgeSector" {
-	//	logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
-	//	tt = sealtasks.TTAddPiecePl
-	//} else {
-	//	tt = sealtasks.TTAddPiece
-	//	logrus.SchedLogger.Infof("===== AddPiece comming, sectorID:%+v, apType:%+v", sector, apType)
-	//}
-
-	var out abi.PieceInfo
-	err = m.sched.Schedule(ctx, sector, tt, selector, schedNop, func(ctx context.Context, w Worker) error {
-		wInfo, _ := w.Info(ctx)
-		_, ok := m.sched.taskRecorder.Load(sector)
-		if !ok {
-			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
-		}
-		tr, _ := m.sched.taskRecorder.Load(sector)
-		taskRd := tr.(sectorTaskRecord)
-
-		defer func() {
-			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("===== AddPiece finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v], masterSwitch:[%+v]",
-				wInfo.Hostname, sector, m.sched.isExistFreeWorker, m.sched.masterSwitch)
-		}()
-		taskRd.taskStatus = ADDPIECE_COMPUTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is computing AddPiece in sectorID[%+v], apTYpe:%s", wInfo.Hostname, sector, apType)
-		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r, apType)
+		//1.publish
+		err = m.PublishTask(sector.Number, tt, apInfo, 1)
 		if err != nil {
-			return err
+			return out, err
 		}
-		out = p
-		go m.sched.StartStore(sector.Number, sealtasks.TTAddPiece, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-		//任务结束，更改taskRecorder状态
-		taskRd.taskStatus = PRE1_WAITTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is PRE1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-		return nil
-	})
+		//2.Subscribe res
+		subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+		if err != nil {
+			return out, err
+		}
+		return m.SubscribeResult(subCha, sector.Number, tt, 0)
+	}
 
 	return out, err
 }
@@ -435,39 +451,66 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		return nil, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	// TODO: also consider where the unsealed data sits
-
-	selector := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathSealing)
-
-	//err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
-		wInfo, _ := w.Info(ctx)
-		_, ok := m.sched.taskRecorder.Load(sector)
-		if !ok {
-			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
-		}
-		tr, _ := m.sched.taskRecorder.Load(sector)
-		taskRd := tr.(sectorTaskRecord)
-
-		taskRd.taskStatus = PRE1_COMPUTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is computing PreCommit1 in sectorID[%+v]", wInfo.Hostname, sector)
-		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces, recover)
-		if err != nil {
-			// 如果任务失败直接删除任务
-			//m.sched.taskRecorder.Delete(sector)
-			return err
-		}
-		out = p
-		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-
-		//任务结束，更改taskRecorder状态
-		taskRd.taskStatus = PRE2_WAITING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is PRE2_WAITING in sectorID[%+v]", wInfo.Hostname, sector)
-		return nil
+	pp1Info, err := gr.Serialization(gr.ParamsP1{
+		Sector:  sector,
+		Ticket:  ticket,
+		Pieces:  pieces,
+		Recover: recover,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	//1.publish
+	err = m.PublishTask(sector.Number, sealtasks.TTPreCommit1, pp1Info, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	//2.Subscribe res
+	subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+	if err != nil {
+		return nil, err
+	}
+	for msg := range subCha {
+		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		pl := gr.RedisField(msg.Payload)
+		sid, tt, hostName, _, err := pl.TailoredSubMessage()
+		if err != nil {
+			log.Errorf("===== sub tailored err:", err)
+		}
+
+		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit1 {
+			//2.1 get params res
+			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+			paramsRes := &gr.ParamsResP1{}
+			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
+			if err != nil {
+				log.Errorf("===== get p1 res err:%+v", err)
+				return nil, err
+			}
+
+			if paramsRes.Err != nil {
+				log.Errorf("===== p1 computing err:%+v", paramsRes.Err)
+				return nil, paramsRes.Err
+			}
+
+			//2.2 update taskCount (need lock)
+			m.redisCli.TctRcLK.Lock()
+			ctk := gr.SplicingTaskCounntKey(hostName)
+			_, err = m.redisCli.Incr(ctk, gr.FIELDP1, -1)
+			if err != nil {
+				m.redisCli.TctRcLK.Unlock()
+				log.Errorf("===== sector %s p1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				return out, err
+			}
+			m.redisCli.TctRcLK.Unlock()
+
+			return paramsRes.Out, nil
+		} else {
+			continue
+		}
+	}
 
 	return out, err
 }
@@ -480,43 +523,62 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, true)
-
-	//err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
-		wInfo, _ := w.Info(ctx)
-		defer func() {
-			m.sched.isExistFreeWorker = true
-			logrus.SchedLogger.Infof("===== SealPreCommit2 finish, worker[%s],sectorID[%+v],isExistFreeWorker[%+v], masterSwitch:[%+v]",
-				wInfo.Hostname, sector, m.sched.isExistFreeWorker, m.sched.masterSwitch)
-		}()
-		_, ok := m.sched.taskRecorder.Load(sector)
-		if !ok {
-			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
-		}
-		tr, _ := m.sched.taskRecorder.Load(sector)
-		taskRd := tr.(sectorTaskRecord)
-
-		taskRd.taskStatus = PRE2_COMPUTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is computing PreCommit2 in sectorID[%+v]", wInfo.Hostname, sector)
-		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.SealPreCommit2(ctx, sector, phase1Out)
-		if err != nil {
-			// 如果任务失败直接删除
-			//m.sched.taskRecorder.Delete(sector)
-			return err
-		}
-		out = p
-		go m.sched.StartStore(sector.Number, sealtasks.TTPreCommit2, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-
-		//任务结束，更改taskRecorder状态
-		taskRd.taskStatus = COMMIT1_WAITTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is COMMIT1_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-		return nil
+	pp2Info, err := gr.Serialization(gr.ParamsP2{
+		Sector: sector,
+		Pc1o:   phase1Out,
 	})
+	if err != nil {
+		return out, err
+	}
+	//1.publish
+	err = m.PublishTask(sector.Number, sealtasks.TTPreCommit2, pp2Info, 1)
+	if err != nil {
+		return out, err
+	}
+	//2.Subscribe res
+	subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+	if err != nil {
+		return out, err
+	}
+	for msg := range subCha {
+		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		pl := gr.RedisField(msg.Payload)
+		sid, tt, hostName, _, err := pl.TailoredSubMessage()
+		if err != nil {
+			log.Errorf("===== sub tailored err:", err)
+		}
 
+		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit2 {
+			//2.1 get params res
+			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
+			paramsRes := &gr.ParamsResP2{}
+			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
+			if err != nil {
+				log.Errorf("===== get p2 res err:%+v", err)
+				return out, err
+			}
+
+			if paramsRes.Err != nil {
+				log.Errorf("===== p2 computing err:%+v", paramsRes.Err)
+				return out, paramsRes.Err
+			}
+
+			//2.2 update taskCount (need lock)
+			m.redisCli.TctRcLK.Lock()
+			ctk := gr.SplicingTaskCounntKey(hostName)
+			_, err = m.redisCli.Incr(ctk, gr.FIELDP2, -1)
+			if err != nil {
+				m.redisCli.TctRcLK.Unlock()
+				log.Errorf("===== sector %s p2 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				return out, err
+			}
+			m.redisCli.TctRcLK.Unlock()
+
+			return paramsRes.Out, nil
+		} else {
+			continue
+		}
+	}
 	return out, err
 }
 
@@ -528,61 +590,118 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return storage.Commit1Out{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	// NOTE: We set allowFetch to false in so that we always execute on a worker
-	// with direct access to the data. We want to do that because this step is
-	// generally very cheap / fast, and transferring data is not worth the effort
-	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, false)
-
 	//err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
-		wInfo, _ := w.Info(ctx)
-		_, ok := m.sched.taskRecorder.Load(sector)
-		if !ok {
-			m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
-		}
-		tr, _ := m.sched.taskRecorder.Load(sector)
-		taskRd := tr.(sectorTaskRecord)
+	//err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
+	//	wInfo, _ := w.Info(ctx)
+	//	_, ok := m.sched.taskRecorder.Load(sector)
+	//	if !ok {
+	//		m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
+	//	}
+	//	tr, _ := m.sched.taskRecorder.Load(sector)
+	//	taskRd := tr.(sectorTaskRecord)
+	//
+	//	taskRd.taskStatus = COMMIT1_COMPUTING
+	//	m.sched.taskRecorder.Store(sector, taskRd)
+	//	logrus.SchedLogger.Infof("===== worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
+	//	go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
+	//	p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	out = p
+	//
+	//	// 找不到合适的路径并且传输数据，否则使用miner的存储
+	//	destPath, sID := m.FindBestStoragePathToPushData(ctx, sector, w)
+	//	if destPath == "" {
+	//		//logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
+	//		//go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+	//		////任务结束，更改taskRecorder状态
+	//		//taskRd.taskStatus = COMMIT2_WAITTING
+	//		//m.sched.taskRecorder.Store(sector, taskRd)
+	//		//logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+	//		//return nil
+	//		return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
+	//	}
+	//
+	//	// 申明新的存储路径
+	//	err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
+	//	if err != nil {
+	//		// 如果失败则删除任务记录，无法恢复
+	//		m.sched.taskRecorder.Delete(sector)
+	//		log.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+	//		return xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
+	//	}
+	//
+	//	go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+	//
+	//	//任务结束，更改taskRecorder状态
+	//	taskRd.taskStatus = COMMIT2_WAITTING
+	//	m.sched.taskRecorder.Store(sector, taskRd)
+	//	logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
+	//	return nil
+	//})
 
-		taskRd.taskStatus = COMMIT1_COMPUTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
-		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-		p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
-		if err != nil {
-			return err
-		}
-		out = p
-
-		// 找不到合适的路径并且传输数据，否则使用miner的存储
-		destPath, sID := m.FindBestStoragePathToPushData(ctx, sector, w)
-		if destPath == "" {
-			//logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
-			//go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-			////任务结束，更改taskRecorder状态
-			//taskRd.taskStatus = COMMIT2_WAITTING
-			//m.sched.taskRecorder.Store(sector, taskRd)
-			//logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-			//return nil
-			return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
-		}
-
-		// 申明新的存储路径
-		err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
-		if err != nil {
-			// 如果失败则删除任务记录，无法恢复
-			m.sched.taskRecorder.Delete(sector)
-			log.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
-			return xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
-		}
-
-		go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-
-		//任务结束，更改taskRecorder状态
-		taskRd.taskStatus = COMMIT2_WAITTING
-		m.sched.taskRecorder.Store(sector, taskRd)
-		logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-		return nil
+	pc1Info, err := gr.Serialization(gr.ParamsC1{
+		Sector: sector,
+		Ticket: ticket,
+		Seed:   seed,
+		Pieces: pieces,
+		Cids:   cids,
 	})
+	if err != nil {
+		return out, err
+	}
+
+	//1.publish
+	err = m.PublishTask(sector.Number, sealtasks.TTCommit1, pc1Info, 1)
+	if err != nil {
+		return out, err
+	}
+
+	//2.Subscribe res
+	subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+	if err != nil {
+		return out, err
+	}
+	for msg := range subCha {
+		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		pl := gr.RedisField(msg.Payload)
+		sid, tt, hostName, _, err := pl.TailoredSubMessage()
+		if err != nil {
+			log.Errorf("===== sub tailored err:", err)
+		}
+
+		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTCommit1 {
+			//2.1 get params res
+			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
+			paramsRes := &gr.ParamsResC1{}
+			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
+			if err != nil {
+				log.Errorf("===== get c1 res err:%+v", err)
+				return out, err
+			}
+
+			if paramsRes.Err != nil {
+				log.Errorf("===== c1 computing err:%+v", paramsRes.Err)
+				return out, paramsRes.Err
+			}
+
+			//2.2 update taskCount (need lock)
+			m.redisCli.TctRcLK.Lock()
+			ctk := gr.SplicingTaskCounntKey(hostName)
+			_, err = m.redisCli.Incr(ctk, gr.FIELDC1, -1)
+			if err != nil {
+				m.redisCli.TctRcLK.Unlock()
+				log.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				return out, err
+			}
+			m.redisCli.TctRcLK.Unlock()
+
+			return paramsRes.Out, nil
+		} else {
+			continue
+		}
+	}
 
 	return out, err
 }
@@ -690,6 +809,7 @@ RetryFindStorage:
 	//}
 	return "", ""
 }
+
 func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
 	selector := newTaskSelector()
 
@@ -864,6 +984,248 @@ func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
 	}
 	tr, _ := m.sched.taskRecorder.Load(sector)
 	return tr
+}
+
+func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType) (hostName string, err error) {
+	for msg := range subCha {
+		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		pl := gr.RedisField(msg.Payload)
+		_, tt, hostName, _, err := pl.TailoredSubMessage()
+		if err != nil {
+			log.Errorf("sub tailored err:", err)
+		}
+
+		if tt.ToOfficalTaskType() == taskType {
+			return hostName, nil
+		} else {
+			continue
+		}
+	}
+	return
+}
+
+func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId int64) (out abi.PieceInfo, err error) {
+	for msg := range subCha {
+		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		pl := gr.RedisField(msg.Payload)
+		sid, tt, hostName, _, err := pl.TailoredSubMessage()
+		if err != nil {
+			log.Errorf("sub tailored err:", err)
+		}
+
+		if sid == sectorID && tt.ToOfficalTaskType() == taskType {
+			//get params res
+			resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
+
+			paramsRes := &gr.ParamsResAp{}
+			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
+			if err != nil {
+				log.Errorf("===== hget ap res err:%+v", err)
+				return out, err
+			}
+
+			if paramsRes.Err != nil {
+				log.Errorf("===== ap computing err:%+v", paramsRes.Err)
+				return out, paramsRes.Err
+			}
+
+			//update taskCount (need lock)
+			m.redisCli.TctRcLK.Lock()
+			ctk := gr.SplicingTaskCounntKey(hostName)
+			_, err = m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), -1)
+			if err != nil {
+				m.redisCli.TctRcLK.Unlock()
+				log.Errorf("===== sector %s ap finished , update %s taskCount err:%+v", taskType, hostName, paramsRes.Err)
+				return out, err
+			}
+			m.redisCli.TctRcLK.Unlock()
+
+			return paramsRes.PieceInfo, paramsRes.Err
+		} else {
+			continue
+		}
+	}
+	return
+}
+
+func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID int64) error {
+	m.redisCli.TctRcLK.Lock()
+	defer m.redisCli.TctRcLK.Unlock()
+
+	//1.1 select worker
+SEACHAGAIN:
+	hostName, err := m.SelectWorker(sectorID, taskType)
+	if err != nil {
+		return err
+	}
+	if hostName == "" {
+		switch taskType {
+		case sealtasks.TTAddPieceSe:
+			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+			if err != nil {
+				return err
+			}
+			hostName, err := m.SubscribeFreeWorker(subCha, taskType)
+			if err != nil {
+				return err
+			}
+			free, err := m.CanHandleTask(hostName, taskType)
+			if !free {
+				goto SEACHAGAIN
+			}
+
+		case sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+			return errors.New("No free workers")
+		}
+	}
+
+	//update sealAPID
+	if taskType == sealtasks.TTAddPieceSe {
+		sealAPID, err = m.redisCli.IncrSealAPID(sectorID, 1)
+	}
+
+	pubField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealAPID)
+	//1.2 backup params
+	err = m.redisCli.HSet(gr.PARAMS_NAME, pubField, params)
+	if err != nil {
+		return err
+	}
+
+	//1.3 buckup  pub
+	err = m.redisCli.HSet(gr.PUB_NAME, pubField, hostName)
+	if err != nil {
+		return err
+	}
+
+	//1.4 publish task
+	pubMsg := gr.SplicingPubMessage(sectorID, taskType, hostName, sealAPID)
+	_, err = m.redisCli.Publish(gr.PUBLISHCHANNEL, pubMsg)
+	if err != nil {
+		return err
+	}
+
+	//1.5 update taskCount (need lock)
+	ctk := gr.SplicingTaskCounntKey(hostName)
+	_, err = m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), 1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType) (hostName string, err error) {
+	//1.1 select worker
+	switch taskType {
+	case sealtasks.TTAddPieceSe:
+		pubFieldSe := gr.SplicingBackupPubAndParamsField(sectorID, taskType, 1)
+		count, err := m.redisCli.Exist(pubFieldSe)
+		if err != nil {
+			return "", err
+		}
+		if count == 0 {
+			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
+			if err != nil {
+				return "", err
+			}
+			return hostName, nil
+		} else {
+			hostName, err = m.BindWorker(sectorID, taskType, 1)
+			if err != nil {
+				return "", err
+			}
+			return hostName, nil
+		}
+
+	case sealtasks.TTAddPiecePl:
+		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
+		if err != nil {
+			return "", err
+		}
+		return hostName, nil
+
+	case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+		hostName, err := m.BindWorker(sectorID, taskType, 1)
+		if err != nil {
+			return "", err
+		}
+		return hostName, nil
+	default:
+		return "", errors.New("Unkown task type")
+	}
+}
+
+func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err error) {
+	m.redisCli.TcfRcLK.Lock()
+	defer m.redisCli.TcfRcLK.Unlock()
+	workerList, _ := m.redisCli.Keys(gr.WORKER_CONFIG)
+	for _, v := range workerList {
+		hostName = v.TailoredWorker()
+		free, err := m.CanHandleTask(hostName, taskType.ToOfficalTaskType())
+		if err != nil {
+			return "", err
+		}
+		if free {
+			return hostName, nil
+		} else {
+			continue
+		}
+	}
+	return "", nil //errors.New("hostname is not exist")
+}
+
+func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId int64) (hostName string, err error) {
+	pubFieldSe := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 1)
+	count, err := m.redisCli.Exist(pubFieldSe)
+	if err != nil {
+		return "", err
+	}
+	var pubFieldPl gr.RedisField
+	switch count {
+	case 0:
+		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, sealApId)
+	default:
+		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, sealApId)
+	}
+
+	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
+
+	free, err := m.CanHandleTask(hostName, taskType)
+	if err != nil {
+		return "", err
+	}
+	if free {
+		return hostName, nil
+	} else {
+		return "", nil //errors.New("worker is full of tasks")
+	}
+}
+
+func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (free bool, err error) {
+	// worker
+	tfk := gr.SplicingTaskConfigKey(hostname)
+	ttk := gr.SplicingTaskCounntKey(hostname)
+
+	//get config
+	var numberCf uint64
+	err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(taskType), numberCf)
+	if err != nil {
+		return free, err
+	}
+
+	//get count (need lock)
+	var numberCt uint64
+	err = m.redisCli.HGet(ttk, gr.ToFieldTaskType(taskType), numberCt)
+	if err != nil {
+		return free, err
+	}
+
+	//compare
+	if numberCf > numberCt {
+		free = true
+		return free, nil
+	} else {
+		return free, nil
+	}
 }
 
 var _ SectorManager = &Manager{}
