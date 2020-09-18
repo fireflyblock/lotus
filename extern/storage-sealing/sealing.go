@@ -212,9 +212,9 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 		return 0, 0, xerrors.Errorf("adding piece to sector: %w", err)
 	}
 
-	startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
+	//startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
+	startPacking := m.unsealedInfoMap.infos[sid].numDeals >= 5
 
-	log.Infof("====== compare 1:%+v, 2:%+v", m.unsealedInfoMap.infos[sid].numDeals, getDealPerSectorLimit(m.sealer.SectorSize()))
 	m.unsealedInfoMap.lk.Unlock()
 
 	if startPacking {
@@ -316,13 +316,13 @@ func (m *Sealing) newDealSector() (abi.SectorNumber, error) {
 		return 0, xerrors.Errorf("getting config: %w", err)
 	}
 
-	log.Info("===== MaxSealingSectorsForDeals : %+v", cfg.MaxSealingSectorsForDeals)
+	log.Infof("===== MaxSealingSectorsForDeals : %+v", cfg.MaxSealingSectorsForDeals)
 	if cfg.MaxSealingSectorsForDeals > 0 {
 		if m.stats.curSealing() > cfg.MaxSealingSectorsForDeals {
 			return 0, ErrTooManySectorsSealing
 		}
 	}
-	log.Info("===== MaxWaitDealsSectors : %+v", cfg.MaxWaitDealsSectors)
+	log.Infof("===== MaxWaitDealsSectors : %+v", cfg.MaxWaitDealsSectors)
 	if cfg.MaxWaitDealsSectors > 0 {
 		// run in a loop because we have to drop the map lock here for a bit
 		tries := 0
