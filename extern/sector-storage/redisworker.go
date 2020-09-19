@@ -181,6 +181,13 @@ RESRETURN:
 	if err != nil {
 		log.Errorf("===== hset ap params_res err:%+v", err)
 	}
+
+	//back pub-res
+	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	if err != nil {
+		log.Errorf("===== hset ap pub_res err:%+v", err)
+	}
+
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
@@ -210,9 +217,22 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 	}
 
 RESRETURN:
+	//back params-res
 	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
 	if err != nil {
-		log.Errorf("===== hget ap params err:%+v", err)
+		log.Errorf("===== hget seal params err:%+v", err)
+	}
+
+	//back pub-res
+	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	if err != nil {
+		log.Errorf("===== hset seal pub_res err:%+v", err)
+	}
+
+	//publish res
+	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	if err != nil {
+		log.Errorf("===== pub seal res err:%+v", err)
 	}
 }
 
@@ -238,10 +258,18 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 	}
 
 RESRETURN:
+	//back params-res
 	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset p1 params_res err:%+v", err)
 	}
+
+	//back pub-res
+	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	if err != nil {
+		log.Errorf("===== hset p1 pub_res err:%+v", err)
+	}
+
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
@@ -271,10 +299,18 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 	}
 
 RESRETURN:
+	//back params-res
 	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset p2 params_res err:%+v", err)
 	}
+
+	//back pub-res
+	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	if err != nil {
+		log.Errorf("===== hset p2 pub_res err:%+v", err)
+	}
+
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
@@ -304,10 +340,18 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 	}
 
 RESRETURN:
+	//back params-res
 	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset c1 params_res err:%+v", err)
 	}
+
+	//back pub-res
+	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	if err != nil {
+		log.Errorf("===== hset c1 pub_res err:%+v", err)
+	}
+
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {

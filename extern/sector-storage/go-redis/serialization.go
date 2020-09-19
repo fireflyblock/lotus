@@ -51,11 +51,12 @@ type ParamsResP2 struct {
 
 type ParamsC1 struct {
 	//Ctx    context.Context
-	Sector abi.SectorID                  `json:"sector"`
-	Ticket abi.SealRandomness            `json:"ticket"`
-	Seed   abi.InteractiveSealRandomness `json:"seed"`
-	Pieces []abi.PieceInfo               `json:"pieces"`
-	Cids   storage.SectorCids            `json:"cids"`
+	Sector   abi.SectorID                  `json:"sector"`
+	Ticket   abi.SealRandomness            `json:"ticket"`
+	Seed     abi.InteractiveSealRandomness `json:"seed"`
+	Pieces   []abi.PieceInfo               `json:"pieces"`
+	Cids     storage.SectorCids            `json:"cids"`
+	PathList []string                      `json:"path_list"`
 }
 
 type ParamsResC1 struct {

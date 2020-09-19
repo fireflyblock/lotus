@@ -30,8 +30,8 @@ import (
 var (
 	log             = logging.Logger("advmgr")
 	DefaultRedisURL = []string{
-		"172.16.0.7:8001",
-		"172.16.0.7:8002",
+		//"172.16.0.7:8001",
+		//"172.16.0.7:8002",
 		"172.16.0.8:8001",
 	}
 	DefaultRedisPassWord = "rcQuwPzASm"
