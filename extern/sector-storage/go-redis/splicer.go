@@ -21,26 +21,27 @@ const (
 	//FIELDP1         RedisField = "seal/v0/precommit/1"
 	//FIELDP2         RedisField = "seal/v0/precommit/2"
 	//FIELDC1         RedisField = "seal/v0/commit/1"
+	FIELDPAP     RedisField = "ap"
 	FIELDPLEDGEP RedisField = "pledge"
 	FIELDSEAL    RedisField = "seal"
 	FIELDP1      RedisField = "p1"
 	FIELDP2      RedisField = "p2"
 	FIELDC1      RedisField = "c1"
 
-	PUBLISHCHANNEL   = "pub_cha"
-	SUBSCRIBECHANNEL = "sub_cha"
+	PUBLISHCHANNEL   = "pub_cha" //miner pub task
+	SUBSCRIBECHANNEL = "sub_cha" //worker pub res
 )
 
 type RedisField string
 
 //拼接发布任务和参数的field
-func SplicingPubMessage(sectorID abi.SectorNumber, taskType sealtasks.TaskType, hostName string, sealApId int64) RedisField {
+func SplicingPubMessage(sectorID abi.SectorNumber, taskType sealtasks.TaskType, hostName string, sealApId uint64) RedisField {
 	switch taskType {
 	case sealtasks.TTAddPiecePl:
 		str := fmt.Sprintf("%d_%s_%s", sectorID, FIELDPLEDGEP, hostName)
 		return RedisField(str)
 	case sealtasks.TTAddPieceSe:
-		str := fmt.Sprintf("%d_%s_%d_%s", sectorID, FIELDSEAL, sealApId, hostName)
+		str := fmt.Sprintf("%d_%s_%s_%d", sectorID, FIELDSEAL, hostName, sealApId)
 		return RedisField(str)
 	case sealtasks.TTPreCommit1:
 		str := fmt.Sprintf("%d_%s_%s", sectorID, FIELDP1, hostName)
@@ -56,7 +57,7 @@ func SplicingPubMessage(sectorID abi.SectorNumber, taskType sealtasks.TaskType, 
 	}
 }
 
-func SplicingBackupPubAndParamsField(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId int64) RedisField {
+func SplicingBackupPubAndParamsField(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) RedisField {
 	switch taskType {
 	case sealtasks.TTAddPiecePl:
 		str := fmt.Sprintf("%d_%s", sectorID, "pledge")
@@ -80,6 +81,8 @@ func SplicingBackupPubAndParamsField(sectorID abi.SectorNumber, taskType sealtas
 
 func ToFieldTaskType(tt sealtasks.TaskType) RedisField {
 	switch tt {
+	case sealtasks.TTAddPiece:
+		return FIELDPAP
 	case sealtasks.TTAddPiecePl:
 		return FIELDPLEDGEP
 	case sealtasks.TTAddPieceSe:

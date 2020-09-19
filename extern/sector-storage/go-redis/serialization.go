@@ -15,7 +15,9 @@ type ParamsAp struct {
 	PieceSizes   []abi.UnpaddedPieceSize `json:"piece_sizes"`
 	NewPieceSize abi.UnpaddedPieceSize   `json:"new_piece_size"`
 	PieceData    storage.Data            `json:"piece_data"`
-	ApType       string                  `json:"ap_type"`
+	//FileName     string                  `json:"file_name"`
+	//FilePath     string                  `json:"file_path"`
+	ApType string `json:"ap_type"`
 }
 
 type ParamsResAp struct {

@@ -29,12 +29,12 @@ import (
 
 var (
 	log             = logging.Logger("advmgr")
-	defaultRedisURL = []string{
+	DefaultRedisURL = []string{
 		"172.16.0.7:8001",
 		"172.16.0.7:8002",
 		"172.16.0.8:8001",
 	}
-	defaultRedisPassWord = "rcQuwPzASm"
+	DefaultRedisPassWord = "rcQuwPzASm"
 )
 
 var ErrNoWorkers = errors.New("no suitable workers found")
@@ -162,13 +162,13 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	}
 
 	if conf.RecordUrl == "" {
-		rurl = defaultRedisURL
+		rurl = DefaultRedisURL
 	} else {
 		rurl = conf.RedisUrl
 	}
 
 	if conf.PassWord == "" {
-		pw = defaultRedisPassWord
+		pw = DefaultRedisPassWord
 	} else {
 		pw = conf.PassWord
 	}
@@ -1004,7 +1004,7 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 	return
 }
 
-func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId int64) (out abi.PieceInfo, err error) {
+func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
 	for msg := range subCha {
 		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
@@ -1048,7 +1048,7 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 	return
 }
 
-func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID int64) error {
+func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID uint64) error {
 	m.redisCli.TctRcLK.Lock()
 	defer m.redisCli.TctRcLK.Unlock()
 
@@ -1069,7 +1069,7 @@ SEACHAGAIN:
 			if err != nil {
 				return err
 			}
-			free, err := m.CanHandleTask(hostName, taskType)
+			free, err := m.CanHandleTask(hostName, sealtasks.TTAddPiece)
 			if !free {
 				goto SEACHAGAIN
 			}
@@ -1123,7 +1123,7 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			return "", err
 		}
 		if count == 0 {
-			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
+			hostName, err = m.SeachWorker(gr.ToFieldTaskType(sealtasks.TTAddPiece))
 			if err != nil {
 				return "", err
 			}
@@ -1137,7 +1137,7 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		}
 
 	case sealtasks.TTAddPiecePl:
-		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
+		hostName, err := m.SeachWorker(gr.ToFieldTaskType(sealtasks.TTAddPiece))
 		if err != nil {
 			return "", err
 		}
@@ -1173,7 +1173,7 @@ func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err erro
 	return "", nil //errors.New("hostname is not exist")
 }
 
-func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId int64) (hostName string, err error) {
+func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (hostName string, err error) {
 	pubFieldSe := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 1)
 	count, err := m.redisCli.Exist(pubFieldSe)
 	if err != nil {
@@ -1189,6 +1189,10 @@ func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskT
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
 
+	switch taskType {
+	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+		taskType = sealtasks.TTAddPiece
+	}
 	free, err := m.CanHandleTask(hostName, taskType)
 	if err != nil {
 		return "", err

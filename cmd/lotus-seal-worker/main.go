@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/go-units"
+	"sync"
+
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -149,6 +152,11 @@ var runCmd = &cli.Command{
 			Usage: "used when 'listen' is unspecified. must be a valid duration recognized by golang's time.ParseDuration function",
 			Value: "30m",
 		},
+		&cli.StringFlag{
+			Name:  "sector-size",
+			Usage: "worker pprof size",
+			Value: "2048",
+		},
 	},
 	Before: func(cctx *cli.Context) error {
 		if cctx.IsSet("address") {
@@ -176,6 +184,130 @@ var runCmd = &cli.Command{
 		workerType := os.Getenv("LOTUS_WORKER_TYPE")
 
 		switch workerType {
+		case "REDIS":
+			var taskTypes []sealtasks.TaskType
+
+			taskTypes = append(taskTypes, sealtasks.TTFetch, sealtasks.TTFinalize)
+
+			if cctx.Bool("addpiece") {
+				taskTypes = append(taskTypes, sealtasks.TTAddPiece)
+			}
+			if cctx.Bool("precommit1") {
+				taskTypes = append(taskTypes, sealtasks.TTPreCommit1)
+			}
+			if cctx.Bool("unseal") {
+				taskTypes = append(taskTypes, sealtasks.TTUnseal)
+				taskTypes = append(taskTypes, sealtasks.TTReadUnsealed)
+			}
+			if cctx.Bool("precommit2") {
+				taskTypes = append(taskTypes, sealtasks.TTPreCommit2)
+			}
+			if cctx.Bool("commit1") {
+				taskTypes = append(taskTypes, sealtasks.TTCommit1)
+			}
+			if cctx.Bool("commit2") {
+				taskTypes = append(taskTypes, sealtasks.TTCommit2)
+			}
+
+			if len(taskTypes) == 0 {
+				return xerrors.Errorf("no task types specified")
+			}
+
+			sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
+			if err != nil {
+				return err
+			}
+
+			ctx := lcli.ReqContext(cctx)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// Open repo
+			repoPath := cctx.String(FlagWorkerRepo)
+			r, err := repo.NewFS(repoPath)
+			if err != nil {
+				return err
+			}
+
+			ok, err := r.Exists()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				if err := r.Init(repo.Worker); err != nil {
+					return err
+				}
+
+				lr, err := r.Lock(repo.Worker)
+				if err != nil {
+					return err
+				}
+
+				var localPaths []stores.LocalPath
+
+				if !cctx.Bool("no-local-storage") {
+					b, err := json.MarshalIndent(&stores.LocalStorageMeta{
+						ID:       stores.ID(uuid.New().String()),
+						Weight:   10,
+						CanSeal:  true,
+						CanStore: false,
+					}, "", "  ")
+					if err != nil {
+						return xerrors.Errorf("marshaling storage config: %w", err)
+					}
+
+					if err := ioutil.WriteFile(filepath.Join(lr.Path(), "sectorstore.json"), b, 0644); err != nil {
+						return xerrors.Errorf("persisting storage metadata (%s): %w", filepath.Join(lr.Path(), "sectorstore.json"), err)
+					}
+
+					localPaths = append(localPaths, stores.LocalPath{
+						Path: lr.Path(),
+					})
+				}
+
+				if err := lr.SetStorage(func(sc *stores.StorageConfig) {
+					sc.StoragePaths = append(sc.StoragePaths, localPaths...)
+				}); err != nil {
+					return xerrors.Errorf("set storage config: %w", err)
+				}
+
+				{
+					// init datastore for r.Exists
+					_, err := lr.Datastore("/metadata")
+					if err != nil {
+						return err
+					}
+				}
+				if err := lr.Close(); err != nil {
+					return xerrors.Errorf("close repo: %w", err)
+				}
+			}
+
+			lr, err := r.Lock(repo.Worker)
+			if err != nil {
+				return err
+			}
+
+			sb, err := sectorstorage.NewSealer(sectorSizeInt, lr.Path())
+			if err != nil {
+				return xerrors.Errorf("new sealer err: %w", err)
+			}
+
+			err = sb.RegisterWorker(ctx, lr.Path())
+			if err != nil {
+				return xerrors.Errorf("register worker err: %w", err)
+			}
+			log.Info("===== register worker success ")
+
+			sw := sync.WaitGroup{}
+			sw.Add(1)
+			err = sb.StartWorker(ctx, sw)
+			if err != nil {
+				return xerrors.Errorf("start worker err: %w", err)
+			}
+			log.Info("===== start worker success ")
+			sw.Wait()
+
 		case "", "MINER":
 			// Connect to storage-miner
 			var nodeApi api.StorageMiner

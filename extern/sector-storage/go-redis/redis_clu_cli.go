@@ -158,10 +158,17 @@ func (rc *RedisClient) Subscribe(channel string) (<-chan *redis.Message, error) 
 }
 
 //seal的多重addpiece自增id
-func (rc *RedisClient) IncrSealAPID(sectorID abi.SectorNumber, value int64) (int64, error) {
+func (rc *RedisClient) IncrSealAPID(sectorID abi.SectorNumber, value int64) (uint64, error) {
 	name := fmt.Sprintf("seal_ap_%d", sectorID)
 
-	return rc.ClusterClient.IncrBy(rc.Ctx, name, value).Result()
+	id, err := rc.ClusterClient.IncrBy(rc.Ctx, name, value).Result()
+	if id < 0 {
+		res := id - id
+		rc.ClusterClient.IncrBy(rc.Ctx, name, res)
+		return 0, errors.New("value already < 0")
+	}
+
+	return uint64(id), err
 }
 
 //seal的多重addpiece递减id
