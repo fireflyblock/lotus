@@ -594,12 +594,18 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return storage.Commit1Out{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
+	storagePaths, path2sid := m.GetStoragePathList(ctx, sector)
+	if len(storagePaths) == 0 || len(path2sid) == 0 {
+		log.Errorf("try to doing sector(%+v) c1 task, but storagePaths = 0", sector)
+	}
+
 	pc1Info, err := gr.Serialization(gr.ParamsC1{
-		Sector: sector,
-		Ticket: ticket,
-		Seed:   seed,
-		Pieces: pieces,
-		Cids:   cids,
+		Sector:   sector,
+		Ticket:   ticket,
+		Seed:     seed,
+		Pieces:   pieces,
+		Cids:     cids,
+		PathList: storagePaths,
 	})
 	if err != nil {
 		return out, err
@@ -630,13 +636,24 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			paramsRes := &gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== get c1 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== sector(%+v) c1 res err:%+v", sector, err)
 				return out, err
 			}
 
 			if paramsRes.Err != nil {
-				logrus.SchedLogger.Errorf("===== c1 computing err:%+v", paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector(%+v) c1 computing err:%+v", sector, paramsRes.Err)
 				return out, paramsRes.Err
+			}
+
+			if paramsRes.StoragePath == "" {
+				logrus.SchedLogger.Errorf("===== sector(%+v) c1 transfor path is nil!!!!", sector)
+				return out, xerrors.Errorf("===== sector(%+v) c1 transfor path is nil!!!!, sector")
+			}
+
+			_, ok := path2sid[paramsRes.StoragePath]
+			if !ok {
+				logrus.SchedLogger.Errorf("===== sector(%+v) c1 transfor error,not find sid, path is :%s, ", sector, paramsRes.StoragePath)
+				return out, xerrors.Errorf("===== sector(%+v) c1 transfor error,not find sid, path is :%s, ", sector, paramsRes.StoragePath)
 			}
 
 			//2.2 update taskCount (need lock)
@@ -645,10 +662,33 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			_, err = m.redisCli.Incr(ctk, gr.FIELDC1, -1)
 			if err != nil {
 				m.redisCli.TctRcLK.Unlock()
-				logrus.SchedLogger.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sector, hostName, paramsRes.Err)
 				return out, err
 			}
 			m.redisCli.TctRcLK.Unlock()
+
+			// 2.3 declareSector  申明新的存储路径
+			// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
+			exist, err := m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 1))
+			if err != nil {
+				log.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", sector, err)
+				return out, err
+			}
+
+			if exist {
+				// deal sector 存储unseal文件
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache|stores.FTUnsealed, true)
+			} else {
+				// not deal sector 不存储unseal文件
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache, true)
+			}
+
+			if err != nil {
+				// 如果失败则删除任务记录，无法恢复
+				m.sched.taskRecorder.Delete(sector)
+				log.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, paramsRes.StoragePath, err)
+				return out, xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, paramsRes.StoragePath, err)
+			}
 
 			return paramsRes.Out, nil
 		} else {
@@ -657,6 +697,50 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	}
 
 	return out, err
+}
+
+// 获取存储路径列表
+func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) ([]string, map[string]string) {
+	// 筛选存储机器
+	sis, err := m.index.StorageBestAlloc(ctx, stores.FTSealed, abi.RegisteredSealProof_StackedDrg32GiBV1, stores.PathStorage)
+	//m.index.StorageList
+	if err != nil {
+		logrus.SchedLogger.Errorf("doing sector(%+v) c1 get storage paths error : %w", sector, err)
+		return []string{}, map[string]string{}
+	}
+	storagePaths, err := m.StorageLocal(ctx)
+	if err != nil {
+		logrus.SchedLogger.Errorf("doing  sector(%+v) c1 get storage local paths error : %w", sector, err)
+		return []string{}, map[string]string{}
+	}
+
+	paths := make([]string, len(sis))
+	path2sid := make(map[string]string, 0)
+	for _, si := range sis {
+		p, ok := storagePaths[si.ID]
+		if !ok {
+			logrus.SchedLogger.Errorf("doing  sector(%+v) c1 get %s storage local paths error : %w", sector, si.ID, err)
+			continue
+		}
+
+		if p == "" { // TODO: can that even be the case?
+			logrus.SchedLogger.Errorf("doing  sector(%+v) c1 get %s storage local paths is nil !!!", sector, si.ID)
+			continue
+		}
+
+		// 尝试 开始发送 通过解析p.local来获取NFS ip
+		ip, destPath := stores.PareseDestFromePath(p)
+		if ip == "" {
+			logrus.SchedLogger.Errorf("doing  sector(%+v) c1 parse path(%+v) error,not find dest ip", sector, p)
+		} else if destPath == "" {
+			logrus.SchedLogger.Errorf("doing  sector(%+v) c1 parse path(%+v) error,not find dest dest path", sector, p)
+		} else {
+			paths = append(paths, p)
+			path2sid[p] = string(si.ID)
+		}
+	}
+
+	return paths, path2sid
 }
 
 func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.SectorID, w Worker) (string, stores.ID) {
@@ -742,7 +826,7 @@ RetryFindStorage:
 				// 传输成功，返回
 				//logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
 				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
-				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
+				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
 				return p, si.ID
 			}
 		}
