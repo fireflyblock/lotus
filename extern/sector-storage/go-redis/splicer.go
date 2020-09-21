@@ -152,6 +152,8 @@ func (rf RedisField) TailoredSubMessage() (sid abi.SectorNumber, taskType RedisF
 
 func (rf RedisField) ToOfficalTaskType() sealtasks.TaskType {
 	switch rf {
+	case FIELDPAP:
+		return sealtasks.TTAddPiece
 	case FIELDPLEDGEP:
 		return sealtasks.TTAddPiecePl
 	case FIELDSEAL:
@@ -186,6 +188,10 @@ func (rk RedisKey) TailoredWorker() (hostname string) {
 		return res[2]
 	}
 	return ""
+}
+
+func (rk RedisKey) ToString() string {
+	return string(rk)
 }
 
 //拼接worker计数的key

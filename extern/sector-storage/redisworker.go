@@ -2,6 +2,7 @@ package sectorstorage
 
 import (
 	"context"
+	"errors"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/ffiwrapper/basicfs"
@@ -61,6 +62,9 @@ func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
 	}
 	ctx, _ := context.WithCancel(context.Background())
 	rc := gr.NewRedisClusterCLi(ctx, rurl, pw)
+	if rc == nil {
+		return nil, errors.New("new redis cluster client err")
+	}
 	hn, err := os.Hostname()
 	if err != nil {
 		log.Errorf("===== get hostname err:", err)
@@ -78,28 +82,43 @@ func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
 func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err error) {
 	tc := rw.InitWorkerConfig(path)
 
-	tcKey := gr.SplicingTaskConfigKey(rw.hostName)
+	tcfKey := gr.SplicingTaskConfigKey(rw.hostName)
+	tctKey := gr.SplicingTaskCounntKey(rw.hostName)
 
-	err = rw.redisCli.HSet(tcKey, gr.FIELDPAP, tc.AddPieceSize)
+	err = rw.redisCli.HSet(tcfKey, gr.FIELDPAP, uint64(tc.AddPieceSize))
 	if err != nil {
 		return
 	}
-	err = rw.redisCli.HSet(tcKey, gr.FIELDP1, tc.Pre1CommitSize)
+	err = rw.redisCli.HSet(tcfKey, gr.FIELDP1, uint64(tc.Pre1CommitSize))
 	if err != nil {
 		return
 	}
-	err = rw.redisCli.HSet(tcKey, gr.FIELDP2, tc.Pre2CommitSize)
+	err = rw.redisCli.HSet(tcfKey, gr.FIELDP2, uint64(tc.Pre2CommitSize))
 	if err != nil {
 		return
 	}
-	err = rw.redisCli.HSet(tcKey, gr.FIELDC1, tc.Commit1)
+	err = rw.redisCli.HSet(tcfKey, gr.FIELDC1, uint64(tc.Commit1))
 	if err != nil {
 		return
 	}
+
+	count, err := rw.redisCli.Exist(gr.RedisField(tctKey.ToString()))
+	if count == 0 {
+		rw.redisCli.HSet(tctKey, gr.FIELDPLEDGEP, 0)
+
+		rw.redisCli.HSet(tctKey, gr.FIELDSEAL, 0)
+
+		rw.redisCli.HSet(tctKey, gr.FIELDP1, 0)
+
+		rw.redisCli.HSet(tctKey, gr.FIELDP2, 0)
+
+		rw.redisCli.HSet(tctKey, gr.FIELDC1, 0)
+	}
+
 	return nil
 }
 
-func (rw *RedisWorker) StartWorker(ctx context.Context, sw sync.WaitGroup) (err error) {
+func (rw *RedisWorker) StartWorker(ctx context.Context, sw *sync.WaitGroup) (err error) {
 	//sub task
 	subCha, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNEL)
 	if err != nil {
@@ -111,7 +130,7 @@ func (rw *RedisWorker) StartWorker(ctx context.Context, sw sync.WaitGroup) (err 
 	return
 }
 
-func (rw *RedisWorker) SubscribeResult(ctx context.Context, subCha <-chan *redis.Message, sw sync.WaitGroup) {
+func (rw *RedisWorker) SubscribeResult(ctx context.Context, subCha <-chan *redis.Message, sw *sync.WaitGroup) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("====== SubscribeResult err", err)

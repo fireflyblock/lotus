@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/go-redis/redis/v8"
 	"log"
 	"sync"
@@ -13,6 +14,9 @@ import (
 
 type RedisClient struct {
 	ClusterClient *redis.ClusterClient
+	ClientMaster1 *redis.Client
+	ClientMaster2 *redis.Client
+	ClientMaster3 *redis.Client
 	Ctx           context.Context
 	TcfRcLK       sync.Mutex //lock TaskConfig
 	TctRcLK       sync.Mutex //lock TaskCount
@@ -31,6 +35,15 @@ func NewRedisClusterCLi(ctx context.Context, addrs []string, passWord string) *R
 		WriteTimeout: 1 * time.Second, // 设置写入超时
 	})
 
+	if len(addrs) != 3 {
+		logrus.SchedLogger.Error("insufficient number of address")
+		return nil
+	}
+
+	cm1 := redis.NewClient(&redis.Options{Addr: addrs[0], Password: passWord})
+	cm2 := redis.NewClient(&redis.Options{Addr: addrs[1], Password: passWord})
+	cm3 := redis.NewClient(&redis.Options{Addr: addrs[2], Password: passWord})
+
 	// 发送一个ping命令,测试是否通
 	pong, err := clusterClient.Ping(ctx).Result()
 	fmt.Println("pong :", pong)
@@ -38,7 +51,7 @@ func NewRedisClusterCLi(ctx context.Context, addrs []string, passWord string) *R
 		log.Println("ping redis err:", err)
 	}
 
-	return &RedisClient{clusterClient, ctx, sync.Mutex{}, sync.Mutex{}, sync.Mutex{}}
+	return &RedisClient{ClusterClient: clusterClient, ClientMaster1: cm1, ClientMaster2: cm2, ClientMaster3: cm3, Ctx: ctx, TcfRcLK: sync.Mutex{}, TctRcLK: sync.Mutex{}, PubRcLK: sync.Mutex{}}
 }
 
 // 模糊查询
@@ -89,7 +102,8 @@ func (rc *RedisClient) HSet(key RedisKey, field RedisField, value interface{}) e
 
 // 获取单个hash 中的值  params：KEY，获取类型
 func (rc *RedisClient) HGet(key RedisKey, field RedisField, v interface{}) error {
-	temp, err := rc.ClusterClient.HGet(rc.Ctx, string(key), string(field)).Bytes()
+	res := rc.ClusterClient.HGet(rc.Ctx, string(key), string(field))
+	temp, err := res.Bytes()
 	if err != nil {
 		return err
 	}
@@ -200,4 +214,8 @@ func (rc *RedisClient) Incr(key RedisKey, field RedisField, incr int64) (int64, 
 
 func (rc *RedisClient) Exist(key RedisField) (int64, error) {
 	return rc.ClusterClient.Exists(rc.Ctx, string(key)).Result()
+}
+
+func (rc *RedisClient) HExist(key RedisKey, field RedisField) (bool, error) {
+	return rc.ClusterClient.HExists(rc.Ctx, string(key), string(field)).Result()
 }

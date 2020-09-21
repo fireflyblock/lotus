@@ -30,8 +30,8 @@ import (
 var (
 	log             = logging.Logger("advmgr")
 	DefaultRedisURL = []string{
-		//"172.16.0.7:8001",
-		//"172.16.0.7:8002",
+		"172.16.0.7:8001",
+		"172.16.0.7:8002",
 		"172.16.0.8:8001",
 	}
 	DefaultRedisPassWord = "rcQuwPzASm"
@@ -174,6 +174,9 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	}
 
 	rc := gr.NewRedisClusterCLi(ctx, rurl, pw)
+	if rc == nil {
+		return nil, errors.New("new redis cluster client err")
+	}
 	m.redisCli = rc
 
 	go m.sched.runSched()
@@ -255,16 +258,16 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 	// 获取woeker做过的任务，并且建立绑定
 	sectors, err := w.GetBindSectors(ctx)
 	if err != nil {
-		log.Errorf("init worker init Bind sectors err :%+v", err)
+		logrus.SchedLogger.Errorf("init worker init Bind sectors err :%+v", err)
 	}
-	log.Infof("init worker %s,Bind sectors:%+v", info.Hostname, sectors)
+	logrus.SchedLogger.Infof("init worker %s,Bind sectors:%+v", info.Hostname, sectors)
 	for _, sid := range sectors {
 		// 随便给的一个状态不知道是否正确
 		tr := m.getTaskRecord(sid)
 		taskRd := tr.(sectorTaskRecord)
 
 		if taskRd.taskStatus != 0 {
-			log.Infof("sector(%+v) bind ralationship is exist....", sid)
+			logrus.SchedLogger.Infof("sector(%+v) bind ralationship is exist....", sid)
 			continue
 		}
 		taskRd.taskStatus = 0
@@ -473,11 +476,11 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		return nil, err
 	}
 	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		logrus.SchedLogger.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
 		sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		if err != nil {
-			log.Errorf("===== sub tailored err:", err)
+			logrus.SchedLogger.Errorf("===== sub tailored err:", err)
 		}
 
 		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit1 {
@@ -486,12 +489,12 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			paramsRes := &gr.ParamsResP1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				log.Errorf("===== get p1 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== get p1 res err:%+v", err)
 				return nil, err
 			}
 
 			if paramsRes.Err != nil {
-				log.Errorf("===== p1 computing err:%+v", paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== p1 computing err:%+v", paramsRes.Err)
 				return nil, paramsRes.Err
 			}
 
@@ -501,7 +504,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			_, err = m.redisCli.Incr(ctk, gr.FIELDP1, -1)
 			if err != nil {
 				m.redisCli.TctRcLK.Unlock()
-				log.Errorf("===== sector %s p1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector %s p1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
 				return out, err
 			}
 			m.redisCli.TctRcLK.Unlock()
@@ -541,11 +544,11 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return out, err
 	}
 	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		logrus.SchedLogger.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
 		sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		if err != nil {
-			log.Errorf("===== sub tailored err:", err)
+			logrus.SchedLogger.Errorf("===== sub tailored err:", err)
 		}
 
 		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit2 {
@@ -554,12 +557,12 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			paramsRes := &gr.ParamsResP2{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				log.Errorf("===== get p2 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== get p2 res err:%+v", err)
 				return out, err
 			}
 
 			if paramsRes.Err != nil {
-				log.Errorf("===== p2 computing err:%+v", paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== p2 computing err:%+v", paramsRes.Err)
 				return out, paramsRes.Err
 			}
 
@@ -569,7 +572,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			_, err = m.redisCli.Incr(ctk, gr.FIELDP2, -1)
 			if err != nil {
 				m.redisCli.TctRcLK.Unlock()
-				log.Errorf("===== sector %s p2 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector %s p2 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
 				return out, err
 			}
 			m.redisCli.TctRcLK.Unlock()
@@ -589,57 +592,6 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	if err := m.index.StorageLock(ctx, sector, stores.FTSealed, stores.FTCache); err != nil {
 		return storage.Commit1Out{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
-
-	//err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedFetch(sector, stores.FTCache|stores.FTSealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
-	//err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit1, selector, schedNop, func(ctx context.Context, w Worker) error {
-	//	wInfo, _ := w.Info(ctx)
-	//	_, ok := m.sched.taskRecorder.Load(sector)
-	//	if !ok {
-	//		m.sched.taskRecorder.Store(sector, sectorTaskRecord{})
-	//	}
-	//	tr, _ := m.sched.taskRecorder.Load(sector)
-	//	taskRd := tr.(sectorTaskRecord)
-	//
-	//	taskRd.taskStatus = COMMIT1_COMPUTING
-	//	m.sched.taskRecorder.Store(sector, taskRd)
-	//	logrus.SchedLogger.Infof("===== worker %s is computing Commit1 in sectorID[%+v]", wInfo.Hostname, sector)
-	//	go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
-	//	p, err := w.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	out = p
-	//
-	//	// 找不到合适的路径并且传输数据，否则使用miner的存储
-	//	destPath, sID := m.FindBestStoragePathToPushData(ctx, sector, w)
-	//	if destPath == "" {
-	//		//logrus.SchedLogger.Errorf("===== sector(%+v) finished Commit1 but not found a good storage path, replace destPath %s", sector, destPath)
-	//		//go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-	//		////任务结束，更改taskRecorder状态
-	//		//taskRd.taskStatus = COMMIT2_WAITTING
-	//		//m.sched.taskRecorder.Store(sector, taskRd)
-	//		//logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-	//		//return nil
-	//		return xerrors.Errorf("sector(%+v) finished Commit1 but not found a good storage path", sector)
-	//	}
-	//
-	//	// 申明新的存储路径
-	//	err = m.index.StorageDeclareSector(ctx, sID, sector, stores.FTSealed|stores.FTCache, true)
-	//	if err != nil {
-	//		// 如果失败则删除任务记录，无法恢复
-	//		m.sched.taskRecorder.Delete(sector)
-	//		log.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
-	//		return xerrors.Errorf("===== after sector(%+v) finished Commit1 and transfor data to destPath(%+v),but  failed to StorageDeclareSector. err:%+v", sector, destPath, err)
-	//	}
-	//
-	//	go m.sched.StartStore(sector.Number, sealtasks.TTCommit1, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
-	//
-	//	//任务结束，更改taskRecorder状态
-	//	taskRd.taskStatus = COMMIT2_WAITTING
-	//	m.sched.taskRecorder.Store(sector, taskRd)
-	//	logrus.SchedLogger.Infof("===== worker %s is COMMIT2_WAITTING in sectorID[%+v]", wInfo.Hostname, sector)
-	//	return nil
-	//})
 
 	pc1Info, err := gr.Serialization(gr.ParamsC1{
 		Sector: sector,
@@ -664,11 +616,11 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return out, err
 	}
 	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		logrus.SchedLogger.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
 		sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		if err != nil {
-			log.Errorf("===== sub tailored err:", err)
+			logrus.SchedLogger.Errorf("===== sub tailored err:", err)
 		}
 
 		if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTCommit1 {
@@ -677,12 +629,12 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			paramsRes := &gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				log.Errorf("===== get c1 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== get c1 res err:%+v", err)
 				return out, err
 			}
 
 			if paramsRes.Err != nil {
-				log.Errorf("===== c1 computing err:%+v", paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== c1 computing err:%+v", paramsRes.Err)
 				return out, paramsRes.Err
 			}
 
@@ -692,7 +644,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			_, err = m.redisCli.Incr(ctk, gr.FIELDC1, -1)
 			if err != nil {
 				m.redisCli.TctRcLK.Unlock()
-				log.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
 				return out, err
 			}
 			m.redisCli.TctRcLK.Unlock()
@@ -764,13 +716,13 @@ RetryFindStorage:
 			}
 			v, _ := m.transIP2Count.Load(ip)
 			if v.(int) >= m.maxTransCount {
-				log.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据,配置最大值为%d", v.(int), ip, m.maxTransCount)
+				logrus.SchedLogger.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据,配置最大值为%d", v.(int), ip, m.maxTransCount)
 				m.transLK.Unlock()
 				continue
 			}
 			m.transIP2Count.Store(ip, v.(int)+1)
 			//v, _ = m.transIP2Count.Load(ip)
-			log.Infof("ip(%s) transfor task count is %d,sector(%+v) try to it", ip, v.(int)+1, sector)
+			logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) try to it", ip, v.(int)+1, sector)
 			m.transLK.Unlock()
 
 			// 开始传输数据
@@ -784,28 +736,28 @@ RetryFindStorage:
 			if err != nil {
 				// 如果发送错误次数超过10，则放弃，可能数据有问题
 				transErrCount += 1
-				log.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
+				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
 			} else {
 				// 传输成功，返回
-				//log.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
+				//logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
 				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
-				log.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
+				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
 				return p, si.ID
 			}
 		}
 	}
 	//if bestSi.ID == "" {
 	if hasNFS {
-		log.Warnf("all storage transfor task count is more then %d, please check it", m.maxTransCount)
+		logrus.SchedLogger.Warnf("all storage transfor task count is more then %d, please check it", m.maxTransCount)
 		if transErrCount < 10 {
 			time.Sleep(time.Minute)
 			goto RetryFindStorage
 		} else {
-			log.Errorf("try to send sector (%+v) to storage Server, error more then %d times", sector, 10)
+			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, error more then %d times", sector, 10)
 			return "", ""
 		}
 	}
-	log.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+	logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
 	//}
 	return "", ""
 }
@@ -988,11 +940,11 @@ func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
 
 func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType) (hostName string, err error) {
 	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		logrus.SchedLogger.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
 		_, tt, hostName, _, err := pl.TailoredSubMessage()
 		if err != nil {
-			log.Errorf("sub tailored err:", err)
+			logrus.SchedLogger.Errorf("sub tailored err:", err)
 		}
 
 		if tt.ToOfficalTaskType() == taskType {
@@ -1006,11 +958,11 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 
 func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
 	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
+		logrus.SchedLogger.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
 		pl := gr.RedisField(msg.Payload)
 		sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		if err != nil {
-			log.Errorf("sub tailored err:", err)
+			logrus.SchedLogger.Errorf("sub tailored err:", err)
 		}
 
 		if sid == sectorID && tt.ToOfficalTaskType() == taskType {
@@ -1020,12 +972,12 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 			paramsRes := &gr.ParamsResAp{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				log.Errorf("===== hget ap res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget ap res err:%+v", err)
 				return out, err
 			}
 
 			if paramsRes.Err != nil {
-				log.Errorf("===== ap computing err:%+v", paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== ap computing err:%+v", paramsRes.Err)
 				return out, paramsRes.Err
 			}
 
@@ -1035,7 +987,7 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 			_, err = m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), -1)
 			if err != nil {
 				m.redisCli.TctRcLK.Unlock()
-				log.Errorf("===== sector %s ap finished , update %s taskCount err:%+v", taskType, hostName, paramsRes.Err)
+				logrus.SchedLogger.Errorf("===== sector %s ap finished , update %s taskCount err:%+v", taskType, hostName, paramsRes.Err)
 				return out, err
 			}
 			m.redisCli.TctRcLK.Unlock()
@@ -1069,7 +1021,7 @@ SEACHAGAIN:
 			if err != nil {
 				return err
 			}
-			free, err := m.CanHandleTask(hostName, sealtasks.TTAddPiece)
+			free, err := m.CanHandleTask(hostName, taskType)
 			if !free {
 				goto SEACHAGAIN
 			}
@@ -1123,7 +1075,8 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			return "", err
 		}
 		if count == 0 {
-			hostName, err = m.SeachWorker(gr.ToFieldTaskType(sealtasks.TTAddPiece))
+			logrus.SchedLogger.Info("===== rd  se search worker")
+			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
 			if err != nil {
 				return "", err
 			}
@@ -1137,7 +1090,8 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		}
 
 	case sealtasks.TTAddPiecePl:
-		hostName, err := m.SeachWorker(gr.ToFieldTaskType(sealtasks.TTAddPiece))
+		logrus.SchedLogger.Info("===== rd  pl search worker")
+		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
 		if err != nil {
 			return "", err
 		}
@@ -1157,9 +1111,19 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err error) {
 	m.redisCli.TcfRcLK.Lock()
 	defer m.redisCli.TcfRcLK.Unlock()
-	workerList, _ := m.redisCli.Keys(gr.WORKER_CONFIG)
+
+	list1, err := m.redisCli.ClientMaster1.Keys(m.redisCli.Ctx, gr.WORKER_CONFIG.ToString()).Result()
+	list2, err := m.redisCli.ClientMaster2.Keys(m.redisCli.Ctx, gr.WORKER_CONFIG.ToString()).Result()
+	list3, err := m.redisCli.ClientMaster3.Keys(m.redisCli.Ctx, gr.WORKER_CONFIG.ToString()).Result()
+
+	workerList := make([]string, 0)
+	workerList = append(workerList, list1...)
+	workerList = append(workerList, list2...)
+	workerList = append(workerList, list3...)
+	//workerList, _ := m.redisCli.Keys(gr.WORKER_CONFIG)
+	logrus.SchedLogger.Infof("===== rd SeachW  :%+v", workerList)
 	for _, v := range workerList {
-		hostName = v.TailoredWorker()
+		hostName = gr.RedisKey(v).TailoredWorker()
 		free, err := m.CanHandleTask(hostName, taskType.ToOfficalTaskType())
 		if err != nil {
 			return "", err
@@ -1189,10 +1153,10 @@ func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskT
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
 
-	switch taskType {
-	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
-		taskType = sealtasks.TTAddPiece
-	}
+	//switch taskType {
+	//case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+	//	taskType = sealtasks.TTAddPiece
+	//}
 	free, err := m.CanHandleTask(hostName, taskType)
 	if err != nil {
 		return "", err
@@ -1211,14 +1175,21 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 
 	//get config
 	var numberCf uint64
-	err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(taskType), numberCf)
-	if err != nil {
-		return free, err
+	switch taskType {
+	case sealtasks.TTAddPieceSe, sealtasks.TTAddPiecePl:
+		logrus.SchedLogger.Infof("===== rd hget worker %+v taskType1 :%+v taskType2 %+v", tfk, gr.ToFieldTaskType(sealtasks.TTAddPiece), sealtasks.TTAddPiece)
+		err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(sealtasks.TTAddPiece), &numberCf)
+		logrus.SchedLogger.Infof("===== rd canHT worker %+v config :%+v taskType %+v", hostname, numberCf, sealtasks.TTAddPiece)
+		if err != nil {
+			logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v config :%+v taskType %+v", err, hostname, numberCf, sealtasks.TTAddPiece)
+			return free, err
+		}
 	}
 
 	//get count (need lock)
 	var numberCt uint64
-	err = m.redisCli.HGet(ttk, gr.ToFieldTaskType(taskType), numberCt)
+	err = m.redisCli.HGet(ttk, gr.ToFieldTaskType(taskType), &numberCt)
+	logrus.SchedLogger.Infof("===== rd canHT worker %+v count :%+v taskType %+v", hostname, numberCt, taskType)
 	if err != nil {
 		return free, err
 	}

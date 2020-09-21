@@ -299,7 +299,7 @@ var runCmd = &cli.Command{
 			}
 			log.Info("===== register worker success ")
 
-			sw := sync.WaitGroup{}
+			sw := &sync.WaitGroup{}
 			sw.Add(1)
 			err = sb.StartWorker(ctx, sw)
 			if err != nil {
