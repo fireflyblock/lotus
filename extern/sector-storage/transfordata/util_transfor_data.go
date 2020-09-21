@@ -1,11 +1,11 @@
-package stores
+package transfordata
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	sectorstorage "github.com/filecoin-project/sector-storage"
+	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 	"io"
 	"io/ioutil"
@@ -16,14 +16,15 @@ import (
 	"strings"
 )
 
+var log = logging.Logger("transfordata") // nolint
 // 通过storagePath来解析NFS挂载路径和NFS源IP
 // 要求NFS挂载源格式统一：/mnt/nfs1 和 /mnt/nfs2
 // 要求NFS挂载目标命名统一：storage-10.11-00 和 storage-10.11-01
 func PareseDestFromePath(storagePath string) (ip, destPath string) {
 	spath := filepath.Base(storagePath)
-	//ip = "172.16."
-	//destPath = "/mnt/nfs"
-	ip, destPath = sectorstorage.GetStorageInfo()
+	ip = "172.16."
+	destPath = "/mnt/nfs"
+	//ip, destPath = GetStorageInfo()
 	sp := strings.Split(spath, "-")
 	if len(sp) != 3 {
 		ip = ""
