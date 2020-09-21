@@ -158,14 +158,19 @@ func Load() ([]IncompleteTask, error) {
 }
 
 type Config struct {
-	RecordUrl string
-	RedisUrl  []string
-	PassWord  string
+	RecordUrl   string
+	RedisUrl    []string
+	PassWord    string
+	StorageIP   string
+	StoragePath string
 }
 
 func InitRequestConfig(filePath string) (*Config, error) {
 	var confInfo = new(Config)
 	if !isFileExist(filePath) {
+		// default value
+		confInfo.StoragePath = "/mnt/nfs"
+		confInfo.StorageIP = "172.16."
 		fn, err := os.Create(filePath)
 		if err != nil {
 			return nil, err
@@ -191,6 +196,15 @@ func InitRequestConfig(filePath string) (*Config, error) {
 	}
 
 	return confInfo, nil
+}
+
+func GetStorageInfo() (string, string) {
+	conf, err := InitRequestConfig("conf.json")
+	if err != nil {
+		log.Errorf("GetStorageInfo Error: %+v", err)
+		return "172.16.", "/mnt/nfs"
+	}
+	return conf.StorageIP, conf.StoragePath
 }
 
 func isFileExist(filePath string) bool {
