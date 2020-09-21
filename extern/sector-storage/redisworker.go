@@ -10,6 +10,7 @@ import (
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
+	"github.com/filecoin-project/sector-storage/transfordata"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
 	"io"
@@ -426,7 +427,7 @@ RESRETURN:
 func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, dest string, removeUnseal bool) error {
 
 	// 尝试 开始发送 通过解析p.local来获取NFS ip
-	ip, destPath := stores.PareseDestFromePath(dest)
+	ip, destPath := transfordata.PareseDestFromePath(dest)
 
 	// 删除数据,完成传输文件
 	log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
@@ -438,7 +439,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 	src := stores.SectorName(sector)
 	sealedPath := filepath.Join(destPath, stores.FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
-	err := stores.SendFile(srcSealedPath, src, sealedPath, ip)
+	err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
 		return err
 	}
@@ -448,7 +449,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 	cachePath := filepath.Join(destPath, stores.FTCache.String()) + "/"
 	//src:=SectorName(sector)
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
-	err = stores.SendZipFile(srcCachePath, src, cachePath, ip)
+	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
 	if err != nil {
 		log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
 		return err
@@ -461,7 +462,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 		unsealPath := filepath.Join(destPath, stores.FTUnsealed.String()) + "/"
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
-		err = stores.SendFile(srcUnsealPath, src, unsealPath, ip)
+		err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
 		if err != nil {
 			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
 			return err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
+	"github.com/filecoin-project/sector-storage/transfordata"
 	"github.com/go-redis/redis/v8"
 	"io"
 	"net/http"
@@ -729,7 +730,7 @@ func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) (
 		}
 
 		// 尝试 开始发送 通过解析p.local来获取NFS ip
-		ip, destPath := stores.PareseDestFromePath(p)
+		ip, destPath := transfordata.PareseDestFromePath(p)
 		if ip == "" {
 			logrus.SchedLogger.Errorf("doing  sector(%+v) c1 parse path(%+v) error,not find dest ip", sector, p)
 		} else if destPath == "" {
@@ -775,7 +776,7 @@ RetryFindStorage:
 		}
 
 		// 尝试 开始发送 通过解析p.local来获取NFS ip
-		ip, destPath := stores.PareseDestFromePath(p)
+		ip, destPath := transfordata.PareseDestFromePath(p)
 		if ip == "" {
 			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest ip", sector, p)
 		} else if destPath == "" {
@@ -788,7 +789,7 @@ RetryFindStorage:
 			}
 
 			// 检测连通行
-			ok, err := stores.ConnectTest(destPath+"/firefly-miner", ip)
+			ok, err := transfordata.ConnectTest(destPath+"/firefly-miner", ip)
 			if !ok || err != nil {
 				continue
 			}
