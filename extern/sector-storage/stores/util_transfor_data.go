@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"golang.org/x/xerrors"
 	"io"
 	"io/ioutil"
@@ -20,8 +21,9 @@ import (
 // 要求NFS挂载目标命名统一：storage-10.11-00 和 storage-10.11-01
 func PareseDestFromePath(storagePath string) (ip, destPath string) {
 	spath := filepath.Base(storagePath)
-	ip = "172.16."
-	destPath = "/mnt/nfs"
+	//ip = "172.16."
+	//destPath = "/mnt/nfs"
+	ip, destPath = sectorstorage.GetStorageInfo()
 	sp := strings.Split(spath, "-")
 	if len(sp) != 3 {
 		ip = ""
