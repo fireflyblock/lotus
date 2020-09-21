@@ -116,7 +116,7 @@ func (rc *RedisClient) HGet(key RedisKey, field RedisField, v interface{}) error
 
 //发布消息到指定通道  params：通道，消息  return:订阅的消费者数量 error
 func (rc *RedisClient) Publish(channel string, message RedisField) (int64, error) {
-	reply, err := rc.ClusterClient.Publish(rc.Ctx, channel, message).Result()
+	reply, err := rc.ClusterClient.Publish(rc.Ctx, channel, string(message)).Result()
 	if err != nil {
 		return 0, err
 	}

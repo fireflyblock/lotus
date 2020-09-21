@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
+	"io"
 	"os"
 	"runtime/debug"
 	"sync"
@@ -187,7 +188,8 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 	}
 	//do task
 	{
-		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.PieceData, params.ApType)
+		data := rw.pledgeReader(params.NewPieceSize)
+		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: pi,
 			Err:       err,
@@ -228,7 +230,9 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 	}
 
 	{
-		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.PieceData, params.ApType)
+		//todo addpiece seal transfer file (io.reader)
+		data := rw.pledgeReader(params.NewPieceSize)
+		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: pi,
 			Err:       err,
@@ -393,4 +397,17 @@ func (rw *RedisWorker) InitWorkerConfig(path string) (tc *TaskConfig) {
 		return
 	}
 	return CalculateResources(info.Resources, diskSize)
+}
+
+type Reader struct{}
+
+func (Reader) Read(out []byte) (int, error) {
+	for i := range out {
+		out[i] = 0
+	}
+	return len(out), nil
+}
+
+func (rw *RedisWorker) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
+	return io.LimitReader(Reader{}, int64(size))
 }

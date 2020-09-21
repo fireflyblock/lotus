@@ -405,8 +405,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		Sector:       sector,
 		PieceSizes:   existingPieces,
 		NewPieceSize: sz,
-		PieceData:    r,
-		ApType:       apType,
+		//PieceData:    r,
+		ApType: apType,
 	})
 	if err != nil {
 		return out, err
@@ -429,6 +429,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		return m.SubscribeResult(subCha, sector.Number, tt, 0)
 
 	case "_pledgeSector":
+		logrus.SchedLogger.Info("===== rd pledge")
 		tt = sealtasks.TTAddPiecePl
 		//1.publish
 		err = m.PublishTask(sector.Number, tt, apInfo, 1)
@@ -1007,7 +1008,9 @@ func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.Task
 	//1.1 select worker
 SEACHAGAIN:
 	hostName, err := m.SelectWorker(sectorID, taskType)
+	logrus.SchedLogger.Infof("===== rd  select worker hostname %+v", hostName)
 	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd sid %+v taskType %+v select worker err: %+v", sectorID, taskType, err)
 		return err
 	}
 	if hostName == "" {
@@ -1038,20 +1041,24 @@ SEACHAGAIN:
 
 	pubField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealAPID)
 	//1.2 backup params
+	logrus.SchedLogger.Infof("===== rd backup params ")
 	err = m.redisCli.HSet(gr.PARAMS_NAME, pubField, params)
 	if err != nil {
 		return err
 	}
 
-	//1.3 buckup  pub
+	//1.3 backup  pub
+	logrus.SchedLogger.Infof("===== rd backup pub")
 	err = m.redisCli.HSet(gr.PUB_NAME, pubField, hostName)
 	if err != nil {
-		return err
+		return errors.New("backup pub err:" + err.Error())
 	}
 
 	//1.4 publish task
+	logrus.SchedLogger.Infof("===== rd start publish")
 	pubMsg := gr.SplicingPubMessage(sectorID, taskType, hostName, sealAPID)
 	_, err = m.redisCli.Publish(gr.PUBLISHCHANNEL, pubMsg)
+	logrus.SchedLogger.Infof("===== rd  publish  msg %+v, err %+v", pubMsg, err)
 	if err != nil {
 		return err
 	}
@@ -1082,6 +1089,7 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			}
 			return hostName, nil
 		} else {
+			logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.BindWorker(sectorID, taskType, 1)
 			if err != nil {
 				return "", err
@@ -1090,7 +1098,7 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		}
 
 	case sealtasks.TTAddPiecePl:
-		logrus.SchedLogger.Info("===== rd  pl search worker")
+		logrus.SchedLogger.Info("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
 		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
 		if err != nil {
 			return "", err
@@ -1098,6 +1106,7 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		return hostName, nil
 
 	case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+		logrus.SchedLogger.Info("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
 		hostName, err := m.BindWorker(sectorID, taskType, 1)
 		if err != nil {
 			return "", err
@@ -1126,9 +1135,11 @@ func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err erro
 		hostName = gr.RedisKey(v).TailoredWorker()
 		free, err := m.CanHandleTask(hostName, taskType.ToOfficalTaskType())
 		if err != nil {
+			logrus.SchedLogger.Infof("===== rd SeachW1111  :%+v", err)
 			return "", err
 		}
 		if free {
+			logrus.SchedLogger.Infof("===== rd SeachW2222  hohstname %+v err %+v", hostName, err)
 			return hostName, nil
 		} else {
 			continue
@@ -1152,11 +1163,8 @@ func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskT
 	}
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
+	logrus.SchedLogger.Infof("===== rd bindW worker %+v config :%+v, taskType %+v", hostName, sectorID, taskType)
 
-	//switch taskType {
-	//case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
-	//	taskType = sealtasks.TTAddPiece
-	//}
 	free, err := m.CanHandleTask(hostName, taskType)
 	if err != nil {
 		return "", err
@@ -1173,17 +1181,22 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 	tfk := gr.SplicingTaskConfigKey(hostname)
 	ttk := gr.SplicingTaskCounntKey(hostname)
 
+	var cfTT sealtasks.TaskType
+	//var ctTT sealtasks.TaskType
+
 	//get config
 	var numberCf uint64
-	switch taskType {
-	case sealtasks.TTAddPieceSe, sealtasks.TTAddPiecePl:
-		logrus.SchedLogger.Infof("===== rd hget worker %+v taskType1 :%+v taskType2 %+v", tfk, gr.ToFieldTaskType(sealtasks.TTAddPiece), sealtasks.TTAddPiece)
-		err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(sealtasks.TTAddPiece), &numberCf)
-		logrus.SchedLogger.Infof("===== rd canHT worker %+v config :%+v taskType %+v", hostname, numberCf, sealtasks.TTAddPiece)
-		if err != nil {
-			logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v config :%+v taskType %+v", err, hostname, numberCf, sealtasks.TTAddPiece)
-			return free, err
-		}
+	if taskType == sealtasks.TTAddPieceSe || taskType == sealtasks.TTAddPiecePl {
+		cfTT = sealtasks.TTAddPiece
+	} else {
+		cfTT = taskType
+	}
+
+	logrus.SchedLogger.Infof("===== rd hget worker %+v taskType1 :%+v taskType2 %+v", tfk, gr.ToFieldTaskType(cfTT), taskType)
+	err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(cfTT), &numberCf)
+	if err != nil {
+		logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v config :%+v taskType %+v", err, hostname, numberCf, taskType)
+		return free, err
 	}
 
 	//get count (need lock)
@@ -1191,9 +1204,10 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 	err = m.redisCli.HGet(ttk, gr.ToFieldTaskType(taskType), &numberCt)
 	logrus.SchedLogger.Infof("===== rd canHT worker %+v count :%+v taskType %+v", hostname, numberCt, taskType)
 	if err != nil {
+		logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v count :%+v taskType %+v", err, hostname, numberCt, taskType)
 		return free, err
 	}
-
+	logrus.SchedLogger.Infof("===== rd compare11  nf:%d nt:%d", numberCf, numberCt)
 	//compare
 	if numberCf > numberCt {
 		free = true

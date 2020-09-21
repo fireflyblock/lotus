@@ -156,10 +156,10 @@ func (m *Sealing) PledgeWatch(ctx context.Context) {
 		select {
 		case <-m.turnOnCh:
 			log.Infof("====== turnOnCh comming")
-			err := m.PledgeSector()
-			if err != nil {
-				log.Errorf("====== turnOnCh PledgeSector err:", err)
-			}
+			//err := m.PledgeSector()
+			//if err != nil {
+			//	log.Errorf("====== turnOnCh PledgeSector err:", err)
+			//}
 		}
 	}
 }
