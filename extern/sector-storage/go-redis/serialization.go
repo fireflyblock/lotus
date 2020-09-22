@@ -60,8 +60,9 @@ type ParamsC1 struct {
 }
 
 type ParamsResC1 struct {
-	Out storage.Commit1Out `json:"out"`
-	Err error              `json:"err"`
+	Out         storage.Commit1Out `json:"out"`
+	StoragePath string             `json:"storage_path"`
+	Err         error              `json:"err"`
 }
 
 type ParamsC2 struct {

@@ -9,17 +9,23 @@ import (
 	"github.com/filecoin-project/sector-storage/fsutil"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
+	"github.com/filecoin-project/sector-storage/stores"
+	"github.com/filecoin-project/sector-storage/transfordata"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
 	"os"
+	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"sync"
+	"time"
 )
 
 type RedisWorker struct {
-	sealer   *ffiwrapper.Sealer
-	redisCli *gr.RedisClient
-	hostName string
+	sealer     *ffiwrapper.Sealer
+	redisCli   *gr.RedisClient
+	hostName   string
+	workerPath string
 }
 
 func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
@@ -71,9 +77,10 @@ func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
 	}
 
 	redisWorker := &RedisWorker{
-		sealer:   sb,
-		redisCli: rc,
-		hostName: hn,
+		sealer:     sb,
+		redisCli:   rc,
+		hostName:   hn,
+		workerPath: path,
 	}
 	return redisWorker, err
 }
@@ -360,6 +367,41 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 		}
 	}
 
+	// 传输文件
+	{
+		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
+		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.Number, sealtasks.TTCommit1, 1))
+		if err != nil {
+			log.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", params.Sector, err)
+			paramsRes.StoragePath = ""
+			goto RESRETURN
+		}
+
+		if exist {
+			// deal sector 传输unseal文件
+			for _, dest := range params.PathList {
+				err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, false)
+				if err != nil {
+					log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
+					continue
+				}
+				paramsRes.StoragePath = dest
+				break
+			}
+		} else {
+			// not deal sector 不传输unseal文件
+			for _, dest := range params.PathList {
+				err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, true)
+				if err != nil {
+					log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
+					continue
+				}
+				paramsRes.StoragePath = dest
+				break
+			}
+		}
+	}
+
 RESRETURN:
 	//back params-res
 	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
@@ -377,6 +419,124 @@ RESRETURN:
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub c1 res err:%+v", err)
+	}
+}
+
+func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, dest string, removeUnseal bool) error {
+
+	// 尝试 开始发送 通过解析p.local来获取NFS ip
+	ip, destPath := transfordata.PareseDestFromePath(dest)
+
+	// 删除数据,完成传输文件
+	log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
+	rw.RemoveLayersAndTreeCAndD(ctx, sector, removeUnseal)
+
+	start := time.Now()
+	// send FTSealed
+	srcSealedPath := filepath.Join(rw.workerPath, stores.FTSealed.String()) + "/"
+	src := stores.SectorName(sector)
+	sealedPath := filepath.Join(destPath, stores.FTSealed.String()) + "/"
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
+	err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
+	if err != nil {
+		return err
+	}
+
+	// send FTCache
+	srcCachePath := filepath.Join(rw.workerPath, stores.FTCache.String()) + "/"
+	cachePath := filepath.Join(destPath, stores.FTCache.String()) + "/"
+	//src:=SectorName(sector)
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
+	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
+	if err != nil {
+		log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
+		return err
+	}
+	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))
+
+	if !removeUnseal {
+		// send FTUnseal
+		srcUnsealPath := filepath.Join(rw.workerPath, stores.FTUnsealed.String()) + "/"
+		unsealPath := filepath.Join(destPath, stores.FTUnsealed.String()) + "/"
+		//src:=SectorName(sector)
+		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
+		err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
+		if err != nil {
+			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
+			return err
+		}
+
+		// 删除unsealed文件
+		err = os.RemoveAll(srcUnsealPath + src)
+		if err != nil {
+			log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, unsealPath, srcUnsealPath)
+		}
+	}
+
+	// 删除sealed文件
+	err = os.Remove(srcSealedPath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, sealedPath, srcSealedPath)
+		//panic(err)
+	}
+
+	// 删除cache文件
+	err = os.RemoveAll(srcCachePath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, cachePath, srcCachePath)
+		//panic(err)
+	}
+
+	return nil
+}
+
+func getLayersAndTreeCAndTreeDFiles(url string, proofType abi.RegisteredSealProof) []string {
+	layerLabel := "/sc-02-data-layer-"
+	treeCLabel := "/sc-02-data-tree-c"
+	treeD := "/sc-02-data-tree-d.dat"
+	tailLabel := ".dat"
+	var files []string
+
+	if proofType == abi.RegisteredSealProof_StackedDrg2KiBV1 || proofType == abi.RegisteredSealProof_StackedDrg512MiBV1 {
+		files = append(files, url+layerLabel+"1"+tailLabel)
+		files = append(files, url+layerLabel+"2"+tailLabel)
+		files = append(files, url+treeD)
+		files = append(files, url+treeCLabel+tailLabel)
+	} else if proofType == abi.RegisteredSealProof_StackedDrg32GiBV1 {
+		for i := 0; i < 12; i++ {
+			files = append(files, url+layerLabel+strconv.Itoa(i)+tailLabel)
+		}
+		for j := 0; j < 8; j++ {
+			files = append(files, url+treeCLabel+"-"+strconv.Itoa(j)+tailLabel)
+		}
+		files = append(files, url+treeD)
+	}
+	return files
+}
+
+// 删除cache中的临时文件
+func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector abi.SectorID, removeUnseal bool) {
+	log.Infof("===== try to remove sector(%+v) from worker", sector)
+	spath := filepath.Join(rw.workerPath, stores.FTCache.String(), stores.SectorName(sector))
+
+	files := getLayersAndTreeCAndTreeDFiles(spath, rw.sealer.SealProofType())
+	log.Infof("===== try to remove sector [%+v] from worker--------->delete files:[%+v]", sector, files)
+	for _, file := range files {
+		log.Infof("remove %s", file)
+
+		if err := os.RemoveAll(file); err != nil {
+			log.Errorf("removing sector (%v) from %s: %+v", sector, spath, err)
+		}
+	}
+
+	// 是否删除Unseal文件
+	if removeUnseal {
+		// delete unseal
+		spath = filepath.Join(rw.workerPath, stores.FTUnsealed.String(), stores.SectorName(sector))
+		log.Infof("remove %s", spath)
+		if err := os.RemoveAll(spath); err != nil {
+			log.Errorf("removing sector (%v) from %s: %+v", sector, spath, err)
+		}
 	}
 }
 

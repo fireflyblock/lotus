@@ -3,6 +3,7 @@ package stores
 import (
 	"context"
 	"encoding/json"
+	"github.com/filecoin-project/sector-storage/transfordata"
 	"io/ioutil"
 	"math/bits"
 	"math/rand"
@@ -526,7 +527,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	}
 
 	// 尝试 开始发送 通过解析p.local来获取NFS ip
-	ip, destPath := PareseDestFromePath(dest)
+	ip, destPath := transfordata.PareseDestFromePath(dest)
 
 	// 删除数据,完成传输文件
 	log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
@@ -538,7 +539,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	src := SectorName(sector)
 	sealedPath := filepath.Join(destPath, FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
-	err = SendFile(srcSealedPath, src, sealedPath, ip)
+	err = transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
 		return err
 	}
@@ -548,7 +549,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	cachePath := filepath.Join(destPath, FTCache.String()) + "/"
 	//src:=SectorName(sector)
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
-	err = SendZipFile(srcCachePath, src, cachePath, ip)
+	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
 	if err != nil {
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
 		return err
