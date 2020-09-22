@@ -157,6 +157,7 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subCha <-chan *redis
 		}
 
 		if rw.hostName == hostName {
+			log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
 			//get params res
 			resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
 			pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
@@ -218,6 +219,7 @@ RESRETURN:
 
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	log.Infof("===== rd publish task, Cha %+v msg %+v\n", gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub ap res err:%+v", err)
 	}
@@ -261,6 +263,7 @@ RESRETURN:
 
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	log.Infof("===== rd publish task, Cha %+v msg %+v\n", gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub seal res err:%+v", err)
 	}
@@ -302,6 +305,7 @@ RESRETURN:
 
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	log.Infof("===== rd publish task, Cha %+v msg %+v\n", gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub p1 res err:%+v", err)
 	}
@@ -343,6 +347,7 @@ RESRETURN:
 
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	log.Infof("===== rd publish task, Cha %+v msg %+v\n", gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub p2 res err:%+v", err)
 	}
@@ -419,6 +424,7 @@ RESRETURN:
 
 	//publish res
 	_, err = rw.redisCli.Publish(gr.SUBSCRIBECHANNEL, pubMessage)
+	log.Infof("===== rd publish task, Cha %+v msg %+v\n", gr.SUBSCRIBECHANNEL, pubMessage)
 	if err != nil {
 		log.Errorf("===== pub c1 res err:%+v", err)
 	}
