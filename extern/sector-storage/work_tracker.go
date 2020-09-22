@@ -102,10 +102,16 @@ func (t *trackedWorker) FinalizeSector(ctx context.Context, sector abi.SectorID,
 	return t.Worker.FinalizeSector(ctx, sector, keepUnsealed)
 }
 
-func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) {
+/*func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) {
 	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
 
 	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData, apType)
+}*/
+
+func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
+
+	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName, apType)
 }
 func (t *trackedWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
 	return t.Worker.PushDataToStorage(ctx, sid, dest)

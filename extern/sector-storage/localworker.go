@@ -16,8 +16,8 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
-	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/go-state-types/abi"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
@@ -128,8 +128,8 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 }
 
 //func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
-func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
-	sb, err := l.sb()
+func (l *LocalWorker) AddPiece1(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
+	/*sb, err := l.sb()
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
@@ -148,7 +148,8 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 	logrus.SchedLogger.Infof("===== worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
 		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
-	return pi, err
+	return pi, err*/
+	return abi.PieceInfo{}, nil
 }
 
 func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
@@ -540,6 +541,29 @@ func (l *LocalWorker) Closing(ctx context.Context) (<-chan struct{}, error) {
 
 func (l *LocalWorker) Close() error {
 	return nil
+}
+
+func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath, fileName, apType string) (abi.PieceInfo, error) {
+	sb, err := l.sb()
+	if err != nil {
+		return abi.PieceInfo{}, err
+	}
+
+	// check disk size
+	for {
+		if l.CheckCanDoTaskByAvaliableDisk(sector, 1) {
+			break
+		}
+		log.Warnf("Disk avaliable size is low, and can not do addpiece for sector(%+v)", sector)
+		time.Sleep(time.Minute * 5)
+	}
+
+	startAt := time.Now()
+	pi, err := sb.AddPiece(ctx, sector, epcs, sz, filePath, fileName, apType)
+	logrus.SchedLogger.Infof("===== worker  finished %+v  [AddPiece] start at:%s end at:%s cost time:%s",
+		sector, startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+
+	return pi, err
 }
 
 var _ Worker = &LocalWorker{}

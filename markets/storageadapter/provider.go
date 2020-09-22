@@ -5,11 +5,10 @@ package storageadapter
 import (
 	"bytes"
 	"context"
-	"io"
-
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
+	"os"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -87,12 +86,13 @@ func (n *ProviderNodeAdapter) PublishDeals(ctx context.Context, deal storagemark
 	return smsg.Cid(), nil
 }
 
-func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {
+func (n *ProviderNodeAdapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, fileName string) (*storagemarket.PackingResult, error) {
 	if deal.PublishCid == nil {
 		return nil, xerrors.Errorf("deal.PublishCid can't be nil")
 	}
-
-	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sealing.DealInfo{
+	path := os.Getenv("LOTUS_STORAGE_PATH")
+	filePath := path + "/" + fileName
+	p, offset, err := n.secb.AddPiece(ctx, pieceSize, filePath, fileName, sealing.DealInfo{
 		DealID:     deal.DealID,
 		PublishCid: deal.PublishCid,
 		DealSchedule: sealing.DealSchedule{

@@ -4,8 +4,6 @@ import (
 	"context"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"io"
-
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 )
 
@@ -16,9 +14,9 @@ func (m *Miner) Address() address.Address {
 }
 
 //func (m *Miner) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-func (m *Miner) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (m *Miner) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d sealing.DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 
-	return m.sealing.AddPieceToAnySector(ctx, size, r, d)
+	return m.sealing.AddPieceToAnySector(ctx, size, filePath, fileName, d)
 }
 
 func (m *Miner) StartPackingSector(sectorNum abi.SectorNumber) error {

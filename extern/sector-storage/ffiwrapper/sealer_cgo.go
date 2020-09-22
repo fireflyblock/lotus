@@ -6,9 +6,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/filecoin-project/go-fil-markets/filestore"
+	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/sector-storage/miner"
 	"io"
+	"io/ioutil"
 	"math/bits"
+	"net/http"
 	"os"
 	"runtime"
 
@@ -68,8 +72,8 @@ func (sb *Sealer) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(Reader{}, int64(size))
 }
 
-//func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
-func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data, apType string) (abi.PieceInfo, error) {
+func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+	//func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data, apType string) (abi.PieceInfo, error) {
 	log.Infof("===== existingPieceSizes:%+v,apType:%+v", existingPieceSizes, apType)
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
@@ -122,10 +126,20 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	/////////////////////////////////////////////
-	//var file storage.Data
+	var file storage.Data
 	if apType == "_pledgeSector" || apType == "_filPledgeToDealSector" {
 		//file=sealing.NewNullReader(pieceSize)
 		file = sb.pledgeReader(pieceSize)
+	} else {
+		transferData(filePath, fileName)
+		paddedReader, _, err := handlerReader(fileName)
+		//	log.Infof("====== AddPiece--> handlerReader \n  paddedSize:%+v\n  pieceSize:%+v", paddedSize, pieceSize)
+
+		file = paddedReader
+		if err != nil {
+			log.Errorf("====== AddPiece--> handlerReader err: %+v", err)
+		}
+
 	}
 
 	w, err := stagedFile.Writer(storiface.UnpaddedByteIndex(offset).Padded(), pieceSize.Padded())
@@ -726,6 +740,51 @@ func GenerateUnsealedCID(proofType abi.RegisteredSealProof, pieces []abi.PieceIn
 	}
 
 	return ffi.GenerateUnsealedCID(proofType, allPieces)
+}
+
+func transferData(path, name string) {
+	//log.Info("====== transferData Called")
+	//log.Infof("====== transferData trans param --> \n path:%+v \n name:%+v", path, name)
+
+	addr := os.Getenv("MINER_LISTEN_ADDR")
+	url := "http://" + addr + "/TransferData"
+	//log.Infof("====== transferData get request url --> \n url:%+v ", url)
+
+	repReader := bytes.NewReader([]byte(path))
+	r, err := http.NewRequest("GET", url, repReader)
+	if err != nil {
+		log.Info("====== transferData newrequest err:", err)
+		return
+	}
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		log.Info("====== transferData transfer err:", err)
+		return
+	}
+	response, _ := ioutil.ReadAll(resp.Body)
+
+	//storage
+	tmp := os.Getenv("TMPDIR")
+	err = ioutil.WriteFile(tmp+"/"+name, response, 0755)
+	if err != nil {
+		log.Info("====== transferData transfer resp err:", err)
+	} else {
+		log.Info("====== transferData transfer resp success")
+	}
+}
+
+func handlerReader(name string) (io.Reader, abi.UnpaddedPieceSize, error) {
+	//log.Info("====== handlerReader Called")
+	//log.Infof("====== handlerReader trans param --> \n path:%+v \n name:%+v",  name)
+	tmp := os.Getenv("TMPDIR")
+	store, err := filestore.NewLocalFileStore(filestore.OsPath(tmp))
+	file, err := store.Open(filestore.Path(name))
+	if err != nil {
+		log.Info("====== handlerReader err:", err)
+		return nil, 0, err
+	}
+	reader, size := padreader.New(file, uint64(file.Size()))
+	return reader, size, nil
 }
 
 //func transferData(path, name string) {

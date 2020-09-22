@@ -394,8 +394,8 @@ func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
 	return nil
 }
 
-//func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
-func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
+func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+	//func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -409,7 +409,9 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		PieceSizes:   existingPieces,
 		NewPieceSize: sz,
 		//PieceData:    r,
-		ApType: apType,
+		FileName: fileName,
+		FilePath: apType,
+		ApType:   apType,
 	})
 	if err != nil {
 		return out, err
@@ -433,7 +435,6 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		return m.SubscribeResult(subCha, sector.Number, tt, 0)
 
 	case "_pledgeSector":
-		logrus.SchedLogger.Info("===== rd pledge")
 		tt = sealtasks.TTAddPiecePl
 		//1.publish
 		logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, tt)
@@ -1484,11 +1485,9 @@ func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err erro
 		hostName = gr.RedisKey(v).TailoredWorker()
 		free, err := m.CanHandleTask(hostName, taskType.ToOfficalTaskType())
 		if err != nil {
-			logrus.SchedLogger.Infof("===== rd SeachW1111  :%+v", err)
 			return "", err
 		}
 		if free {
-			logrus.SchedLogger.Infof("===== rd SeachW2222  hohstname %+v err %+v", hostName, err)
 			return hostName, nil
 		} else {
 			continue

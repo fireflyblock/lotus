@@ -196,8 +196,9 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 	}
 	//do task
 	{
-		data := rw.pledgeReader(params.NewPieceSize)
-		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
+		//data := rw.pledgeReader(params.NewPieceSize)
+		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
+		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: pi,
 			Err:       err,
@@ -240,8 +241,8 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 
 	{
 		//todo addpiece seal transfer file (io.reader)
-		data := rw.pledgeReader(params.NewPieceSize)
-		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
+		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.PieceData, params.ApType)
+		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: pi,
 			Err:       err,
