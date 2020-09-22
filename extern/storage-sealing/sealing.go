@@ -8,7 +8,6 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
-	"io"
 	"math"
 	"runtime/debug"
 	"sync"
@@ -165,7 +164,7 @@ func (m *Sealing) PledgeWatch(ctx context.Context) {
 }
 
 //func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, filePath, fileName string, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	log.Infof("Adding piece for deal %d (publish msg: %s)", d.DealID, d.PublishCid)
 	if (padreader.PaddedSize(uint64(size))) != size {
 		log.Warn("====== AddPieceToAnySector (padreader.PaddedSize(uint64(size))) != size")
@@ -185,7 +184,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	for _, p := range pads {
-		err = m.addPiece(ctx, sid, p.Unpadded(), NewNullReader(p.Unpadded()), nil)
+		err = m.addPiece(ctx, sid, p.Unpadded(), "", "_pledgeSector", nil)
 		if err != nil {
 			m.unsealedInfoMap.lk.Unlock()
 			return 0, 0, xerrors.Errorf("writing pads: %w", err)
@@ -196,7 +195,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	log.Infof("====== AddPieceToAnySector--> m.unsealedInfoMap.infos[sid].stored return \n offset:%+v ", offset)
 
 	//err = m.addPiece(ctx, sid, size, filePath, fileName, &d)
-	err = m.addPiece(ctx, sid, size, r, &d)
+	err = m.addPiece(ctx, sid, size, filePath, fileName, &d)
 
 	if err != nil {
 		m.unsealedInfoMap.lk.Unlock()
@@ -218,9 +217,9 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 }
 
 // Caller should hold m.unsealedInfoMap.lk
-func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, r io.Reader, di *DealInfo) error {
+func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size abi.UnpaddedPieceSize, filePath, fileName string, di *DealInfo) error {
 	log.Infof("Adding piece to sector %d", sectorID)
-	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, r, "_seal")
+	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), m.unsealedInfoMap.infos[sectorID].pieceSizes, size, filePath, fileName, "_seal")
 	if err != nil {
 		return xerrors.Errorf("writing piece: %w", err)
 	}
