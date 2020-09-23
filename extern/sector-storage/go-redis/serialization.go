@@ -14,9 +14,8 @@ type ParamsAp struct {
 	Sector       abi.SectorID            `json:"sector"`
 	PieceSizes   []abi.UnpaddedPieceSize `json:"piece_sizes"`
 	NewPieceSize abi.UnpaddedPieceSize   `json:"new_piece_size"`
-	//PieceData    storage.Data            `json:"piece_data"`
-	FileName     string                  `json:"file_name"`
 	FilePath     string                  `json:"file_path"`
+	FileName     string                  `json:"file_name"`
 	ApType       string                  `json:"ap_type"`
 }
 

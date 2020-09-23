@@ -408,10 +408,9 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		Sector:       sector,
 		PieceSizes:   existingPieces,
 		NewPieceSize: sz,
-		//PieceData:    r,
-		FileName: fileName,
-		FilePath: apType,
-		ApType:   apType,
+		FilePath:     filePath,
+		FileName:     fileName,
+		ApType:       apType,
 	})
 	if err != nil {
 		return out, err
@@ -419,7 +418,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	var tt sealtasks.TaskType
 	switch apType {
-	case "_seal", "_filPledgeToDealSector":
+	default:
+		//"_seal", "_filPledgeToDealSector":
 		tt = sealtasks.TTAddPieceSe
 		//1.publish
 		logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, tt)
@@ -449,8 +449,6 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		}
 		return m.SubscribeResult(subCha, sector.Number, tt, 0)
 	}
-
-	return out, err
 }
 
 func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
@@ -1363,6 +1361,7 @@ SEACHAGAIN:
 	if hostName == "" {
 		switch taskType {
 		case sealtasks.TTAddPieceSe:
+			logrus.SchedLogger.Infof("===== rd no free worker, sub free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
 			if err != nil {
 				return err
@@ -1412,6 +1411,11 @@ SEACHAGAIN:
 		return err
 	}
 
+	//if it si addpiece of seal >1,return directly  witnout updating taskCount
+	if sealAPID > 1 {
+		return nil
+	}
+
 	//1.5 update taskCount (need lock)
 	ctk := gr.SplicingTaskCounntKey(hostName)
 	count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), 1)
@@ -1427,11 +1431,11 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
 		pubFieldSe := gr.SplicingBackupPubAndParamsField(sectorID, taskType, 1)
-		count, err := m.redisCli.Exist(pubFieldSe)
+		exist, err := m.redisCli.HExist(gr.PUB_NAME, pubFieldSe)
 		if err != nil {
 			return "", err
 		}
-		if count == 0 {
+		if !exist {
 			logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
 			if err != nil {
@@ -1498,20 +1502,24 @@ func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err erro
 
 func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (hostName string, err error) {
 	pubFieldSe := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 1)
-	count, err := m.redisCli.Exist(pubFieldSe)
+	exist, err := m.redisCli.HExist(gr.PUB_NAME, pubFieldSe)
 	if err != nil {
 		return "", err
 	}
 	var pubFieldPl gr.RedisField
-	switch count {
-	case 0:
+	if !exist {
 		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, sealApId)
-	default:
+	} else {
 		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, sealApId)
 	}
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
 	logrus.SchedLogger.Infof("===== rd bindW worker %+v config :%+v, taskType %+v", hostName, sectorID, taskType)
+
+	//if it si addpiece of seal >1,return directly  witnout judging taskCount
+	if taskType == sealtasks.TTAddPieceSe {
+		return hostName, nil
+	}
 
 	free, err := m.CanHandleTask(hostName, taskType)
 	if err != nil {
@@ -1548,7 +1556,7 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 	}
 
 	//get count (need lock)
-	count, err := m.redisCli.Exist(gr.RedisField(ttk.ToString()))
+	count, err := m.redisCli.Exist(ttk)
 	if count == 0 {
 		m.redisCli.HSet(ttk, gr.FIELDPLEDGEP, 0)
 

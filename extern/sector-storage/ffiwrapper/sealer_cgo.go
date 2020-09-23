@@ -127,7 +127,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	/////////////////////////////////////////////
 	var file storage.Data
-	if apType == "_pledgeSector" || apType == "_filPledgeToDealSector" {
+	if fileName == "_pledgeSector" || fileName == "_filPledgeToDealSector" {
 		//file=sealing.NewNullReader(pieceSize)
 		file = sb.pledgeReader(pieceSize)
 	} else {

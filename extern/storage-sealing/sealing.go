@@ -184,7 +184,7 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 	}
 
 	for _, p := range pads {
-		err = m.addPiece(ctx, sid, p.Unpadded(), "", "_pledgeSector", nil)
+		err = m.addPiece(ctx, sid, p.Unpadded(), "", "_filPledgeToDealSector", nil)
 		if err != nil {
 			m.unsealedInfoMap.lk.Unlock()
 			return 0, 0, xerrors.Errorf("writing pads: %w", err)

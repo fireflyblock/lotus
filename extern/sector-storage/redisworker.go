@@ -110,7 +110,7 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 		return
 	}
 
-	count, err := rw.redisCli.Exist(gr.RedisField(tctKey.ToString()))
+	count, err := rw.redisCli.Exist(tctKey)
 	if count == 0 {
 		rw.redisCli.HSet(tctKey, gr.FIELDPLEDGEP, 0)
 
@@ -187,7 +187,7 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 	//get params
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
 	if err != nil {
-		log.Errorf("===== hget ap params err:%+v", err)
+		log.Errorf("===== hget pledge params err:%+v", err)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: abi.PieceInfo{},
 			Err:       err,
@@ -231,7 +231,7 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 	params := &gr.ParamsAp{}
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
 	if err != nil {
-		log.Errorf("===== hget ap params err:%+v", err)
+		log.Errorf("===== hget seal params err:%+v", err)
 		paramsRes = &gr.ParamsResAp{
 			PieceInfo: abi.PieceInfo{},
 			Err:       err,

@@ -212,7 +212,7 @@ func (rc *RedisClient) Incr(key RedisKey, field RedisField, incr int64) (int64, 
 	//return rc.ClusterClient.Incr(rc.Ctx, string(field)).Result()
 }
 
-func (rc *RedisClient) Exist(key RedisField) (int64, error) {
+func (rc *RedisClient) Exist(key RedisKey) (int64, error) {
 	return rc.ClusterClient.Exists(rc.Ctx, string(key)).Result()
 }
 
