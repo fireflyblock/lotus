@@ -88,6 +88,10 @@ type Sealing struct {
 	getConfig GetSealingConfigFunc
 
 	turnOnCh chan struct{}
+
+	// 记录丢失掉的sectorNumber重利用
+	recoverLk            sync.Mutex
+	recoverSectorNumbers map[abi.SectorNumber]struct{}
 }
 
 type FeeConfig struct {
@@ -132,7 +136,8 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		stats: SectorStats{
 			bySector: map[abi.SectorID]statSectorState{},
 		},
-		turnOnCh: make(chan struct{}),
+		turnOnCh:             make(chan struct{}),
+		recoverSectorNumbers: map[abi.SectorNumber]struct{}{},
 	}
 
 	s.sectors = statemachine.New(namespace.Wrap(ds, datastore.NewKey(SectorStorePrefix)), s, SectorInfo{})
@@ -145,6 +150,9 @@ func (m *Sealing) Run(ctx context.Context) error {
 		log.Errorf("%+v", err)
 		return xerrors.Errorf("failed load sector states: %w", err)
 	}
+
+	// 筛选出未使用的sectornumber
+	m.initRecoverSectorNumber(ctx)
 
 	return nil
 }

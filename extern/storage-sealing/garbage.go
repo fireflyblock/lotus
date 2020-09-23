@@ -2,10 +2,10 @@ package sealing
 
 import (
 	"context"
-
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/go-state-types/abi"
+	"golang.org/x/xerrors"
+	"gopkg.in/fatih/set.v0"
+	"time"
 )
 
 func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
@@ -79,11 +79,29 @@ func (m *Sealing) PledgeSector() error {
 
 		size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
 
-		sid, err := m.sc.Next()
-		if err != nil {
-			log.Errorf("%+v", err)
-			return
+		// 恢复garbage sid
+		var sid abi.SectorNumber
+		m.recoverLk.Lock()
+		recoverLen := len(m.recoverSectorNumbers)
+		if recoverLen > 0 {
+			for number := range m.recoverSectorNumbers {
+				sid = number
+				delete(m.recoverSectorNumbers, number)
+				break
+			}
+			log.Infof("===== PledgeSector use recoverSectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
 		}
+		m.recoverLk.Unlock()
+
+		if recoverLen > 0 {
+			sid, err = m.sc.Next()
+			if err != nil {
+				log.Errorf("%+v", err)
+				return
+			}
+			log.Infof("===== PledgeSector use m.sc.Next (%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
+		}
+
 		err = m.sealer.NewSector(ctx, m.minerSector(sid))
 		if err != nil {
 			log.Errorf("%+v", err)
@@ -92,6 +110,11 @@ func (m *Sealing) PledgeSector() error {
 
 		pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
 		if err != nil {
+			// 保存pledge garbage的sector
+			m.recoverLk.Lock()
+			m.recoverSectorNumbers[sid] = struct{}{}
+			log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
+			m.recoverLk.Unlock()
 			log.Errorf("%+v", err)
 			return
 		}
@@ -110,4 +133,38 @@ func (m *Sealing) PledgeSector() error {
 		}
 	}()
 	return nil
+}
+
+func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
+	start := time.Now()
+	sidMax, err := m.sc.Next()
+	if err != nil {
+		log.Errorf("===initRecoverSectorNumber get m.sc.Next() sid failed,error:%+v", err)
+		return
+	}
+	sectorsAll := set.New(set.ThreadSafe)
+	for i := abi.SectorNumber(0); i < sidMax; i++ {
+		sectorsAll.Add(i)
+	}
+
+	listSectors, err := m.ListSectors()
+	if err != nil {
+		log.Errorf("===initRecoverSectorNumber get m.ListSectors() list error:%+v", err)
+		return
+	}
+	sectorsList := set.New(set.ThreadSafe)
+	for _, sinfo := range listSectors {
+		sectorsList.Add(sinfo.SectorNumber)
+	}
+
+	// 属于sectorAll 但是不属于 sectorList的编号
+	recover := set.Difference(sectorsAll, sectorsList)
+	m.recoverLk.Lock()
+	for _, sid := range recover.List() {
+		m.recoverSectorNumbers[sid.(abi.SectorNumber)] = struct{}{}
+	}
+	log.Infof("==== recover sector number size %d,cost time %s\n", len(m.recoverSectorNumbers), time.Now().Sub(start))
+	log.Infof("==== recover sector number : %+v\n", m.recoverSectorNumbers)
+	m.recoverLk.Unlock()
+
 }
