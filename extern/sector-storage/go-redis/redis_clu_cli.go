@@ -18,9 +18,11 @@ type RedisClient struct {
 	ClientMaster2 *redis.Client
 	ClientMaster3 *redis.Client
 	Ctx           context.Context
-	TcfRcLK       sync.Mutex //lock TaskConfig
-	TctRcLK       sync.Mutex //lock TaskCount
-	PubRcLK       sync.Mutex
+	//TcfRcLK       sync.Mutex //lock TaskConfig
+	ApRcLK sync.Mutex //lock ap TaskCount
+	P1RcLK sync.Mutex //lock p1 TaskCount
+	P2RcLK sync.Mutex //lock p2 TaskCount
+	C1RcLK sync.Mutex //lock c1 TaskCount
 }
 
 func NewRedisClusterCLi(ctx context.Context, addrs []string, passWord string) *RedisClient {
@@ -51,7 +53,8 @@ func NewRedisClusterCLi(ctx context.Context, addrs []string, passWord string) *R
 		log.Println("ping redis err:", err)
 	}
 
-	return &RedisClient{ClusterClient: clusterClient, ClientMaster1: cm1, ClientMaster2: cm2, ClientMaster3: cm3, Ctx: ctx, TcfRcLK: sync.Mutex{}, TctRcLK: sync.Mutex{}, PubRcLK: sync.Mutex{}}
+	return &RedisClient{ClusterClient: clusterClient, ClientMaster1: cm1, ClientMaster2: cm2, ClientMaster3: cm3, Ctx: ctx,
+		ApRcLK: sync.Mutex{}, P1RcLK: sync.Mutex{}, P2RcLK: sync.Mutex{}, C1RcLK: sync.Mutex{}}
 }
 
 // 模糊查询
@@ -218,4 +221,12 @@ func (rc *RedisClient) Exist(key RedisKey) (int64, error) {
 
 func (rc *RedisClient) HExist(key RedisKey, field RedisField) (bool, error) {
 	return rc.ClusterClient.HExists(rc.Ctx, string(key), string(field)).Result()
+}
+
+func (rc *RedisClient) HDel(key RedisKey, field RedisField) (int64, error) {
+	return rc.ClusterClient.HDel(rc.Ctx, string(key), string(field)).Result()
+}
+
+func (rc *RedisClient) Del(key RedisKey) (int64, error) {
+	return rc.ClusterClient.Del(rc.Ctx, string(key)).Result()
 }

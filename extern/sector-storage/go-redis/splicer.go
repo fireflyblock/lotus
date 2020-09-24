@@ -28,8 +28,13 @@ const (
 	FIELDP2      RedisField = "p2"
 	FIELDC1      RedisField = "c1"
 
-	PUBLISHCHANNEL   = "pub_cha" //miner pub task
+	PUBLISHCHANNELAP = "pub_cha_ap" //miner pub task
+	PUBLISHCHANNELP1 = "pub_cha_p1" //miner pub task
+	PUBLISHCHANNELP2 = "pub_cha_p2" //miner pub task
+	PUBLISHCHANNELC1 = "pub_cha_c1" //miner pub task
+
 	SUBSCRIBECHANNEL = "sub_cha" //worker pub res
+
 )
 
 type RedisField string

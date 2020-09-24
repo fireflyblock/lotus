@@ -1,19 +1,16 @@
 package sectorstorage
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/fsutil"
-	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -116,37 +113,37 @@ func newTestMgr(ctx context.Context, t *testing.T) (*Manager, *stores.Local, *st
 	return m, lstor, stor, si
 }
 
-func TestSimple(t *testing.T) {
-	logging.SetAllLoggers(logging.LevelDebug)
-
-	ctx := context.Background()
-	m, lstor, _, _ := newTestMgr(ctx, t)
-
-	localTasks := []sealtasks.TaskType{
-		sealtasks.TTAddPiece, sealtasks.TTPreCommit1, sealtasks.TTCommit1, sealtasks.TTFinalize, sealtasks.TTFetch,
-	}
-
-	err := m.AddWorker(ctx, newTestWorker(WorkerConfig{
-		SealProof: abi.RegisteredSealProof_StackedDrg2KiBV1,
-		TaskTypes: localTasks,
-	}, lstor))
-	require.NoError(t, err)
-
-	sid := abi.SectorID{Miner: 1000, Number: 1}
-
-	pi, err := m.AddPiece(ctx, sid, nil, 1016, strings.NewReader(strings.Repeat("testthis", 127)))
-	require.NoError(t, err)
-	require.Equal(t, abi.PaddedPieceSize(1024), pi.Size)
-
-	piz, err := m.AddPiece(ctx, sid, nil, 1016, bytes.NewReader(make([]byte, 1016)[:]))
-	require.NoError(t, err)
-	require.Equal(t, abi.PaddedPieceSize(1024), piz.Size)
-
-	pieces := []abi.PieceInfo{pi, piz}
-
-	ticket := abi.SealRandomness{9, 9, 9, 9, 9, 9, 9, 9}
-
-	_, err = m.SealPreCommit1(ctx, sid, ticket, pieces)
-	require.NoError(t, err)
-
-}
+//func TestSimple(t *testing.T) {
+//	logging.SetAllLoggers(logging.LevelDebug)
+//
+//	ctx := context.Background()
+//	m, lstor, _, _ := newTestMgr(ctx, t)
+//
+//	localTasks := []sealtasks.TaskType{
+//		sealtasks.TTAddPiece, sealtasks.TTPreCommit1, sealtasks.TTCommit1, sealtasks.TTFinalize, sealtasks.TTFetch,
+//	}
+//
+//	err := m.AddWorker(ctx, newTestWorker(WorkerConfig{
+//		SealProof: abi.RegisteredSealProof_StackedDrg2KiBV1,
+//		TaskTypes: localTasks,
+//	}, lstor))
+//	require.NoError(t, err)
+//
+//	sid := abi.SectorID{Miner: 1000, Number: 1}
+//
+//	pi, err := m.AddPiece(ctx, sid, nil, 1016, strings.NewReader(strings.Repeat("testthis", 127)))
+//	require.NoError(t, err)
+//	require.Equal(t, abi.PaddedPieceSize(1024), pi.Size)
+//
+//	piz, err := m.AddPiece(ctx, sid, nil, 1016, bytes.NewReader(make([]byte, 1016)[:]))
+//	require.NoError(t, err)
+//	require.Equal(t, abi.PaddedPieceSize(1024), piz.Size)
+//
+//	pieces := []abi.PieceInfo{pi, piz}
+//
+//	ticket := abi.SealRandomness{9, 9, 9, 9, 9, 9, 9, 9}
+//
+//	_, err = m.SealPreCommit1(ctx, sid, ticket, pieces)
+//	require.NoError(t, err)
+//
+//}

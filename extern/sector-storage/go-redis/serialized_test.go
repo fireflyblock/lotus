@@ -2,7 +2,9 @@ package goredis
 
 import (
 	"context"
+	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/ipfs/go-cid"
 	"testing"
@@ -78,5 +80,94 @@ func TestPublish(t *testing.T) {
 		t.Errorf("pub err")
 	}
 	t.Log("res => ", res)
+
+}
+
+var (
+	DefaultRedisURL = []string{
+		"172.16.0.7:8001",
+		"172.16.0.7:8002",
+		"172.16.0.8:8001",
+	}
+	DefaultRedisPassWord = "rcQuwPzASm"
+)
+
+func TestDelete(t *testing.T) {
+	ctx := context.Background()
+	cc := NewRedisClusterCLi(ctx, DefaultRedisURL, DefaultRedisPassWord)
+	var sectorID abi.SectorNumber = 1
+	sealKey := RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
+	tasklist := make([]sealtasks.TaskType, 0)
+
+	c, err := cc.Exist(sealKey)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+	if c > 0 {
+		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	} else {
+
+		list := []sealtasks.TaskType{sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	}
+	fmt.Println(tasklist)
+
+	//1 backup params
+	for _, v := range tasklist {
+		f := SplicingBackupPubAndParamsField(sectorID, v, 0)
+		//2 backup  pub
+		count, err := cc.HDel(PARAMS_NAME, f)
+		t.Logf("delete params field:%+v count:%d", f, count)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
+		}
+		//3 backup res params
+		count, err = cc.HDel(PUB_NAME, f)
+		t.Logf("delete pub field:%+v count:%d", f, count)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
+		}
+		//4 backup res
+		count, err = cc.HDel(PUB_RES_NAME, f)
+		t.Logf("delete pub res field:%+v count:%d", f, count)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
+		}
+		//5 seal_ap_%d
+		count, err = cc.HDel(PARAMS_RES_NAME, f)
+		t.Logf("delete params res field:%+v count:%d", f, count)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
+		}
+	}
+
+	if c == 0 {
+		return
+	}
+
+	logrus.SchedLogger.Infof("===== rd DeleteDataForSid, sectorID %+v sealKey %+v", sectorID, sealKey)
+	var count int64
+	err = cc.Get(sealKey, &count)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+
+	cc.Del(sealKey)
+
+	var i int64 = 1
+	for i = 1; i <= count; i++ {
+		f := SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
+		//2 backup  pub
+		cc.HDel(PARAMS_NAME, f)
+		//3 backup res params
+		cc.HDel(PUB_NAME, f)
+		//4 backup res
+		cc.HDel(PUB_RES_NAME, f)
+		//5 seal_ap_%d
+		cc.HDel(PUB_RES_NAME, f)
+	}
 
 }

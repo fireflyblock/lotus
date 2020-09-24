@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"errors"
+	"fmt"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/transfordata"
 	"github.com/go-redis/redis/v8"
@@ -417,13 +418,12 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	var tt sealtasks.TaskType
-	switch apType {
+	switch fileName {
 	default:
 		//"_seal", "_filPledgeToDealSector":
 		tt = sealtasks.TTAddPieceSe
 		//1.publish
-		logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, tt)
-		err = m.PublishTask(sector.Number, tt, apInfo, 1)
+		currentSealApId, err := m.PublishTask(sector.Number, tt, apInfo, 1)
 		if err != nil {
 			return out, err
 		}
@@ -432,13 +432,12 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		if err != nil {
 			return out, err
 		}
-		return m.SubscribeResult(subCha, sector.Number, tt, 0)
+		return m.SubscribeResult(subCha, sector.Number, tt, currentSealApId)
 
 	case "_pledgeSector":
 		tt = sealtasks.TTAddPiecePl
 		//1.publish
-		logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, tt)
-		err = m.PublishTask(sector.Number, tt, apInfo, 1)
+		_, err = m.PublishTask(sector.Number, tt, apInfo, 1)
 		if err != nil {
 			return out, err
 		}
@@ -470,8 +469,8 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	}
 
 	//1.publish
-	logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit1)
-	err = m.PublishTask(sector.Number, sealtasks.TTPreCommit1, pp1Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit1)
+	_, err = m.PublishTask(sector.Number, sealtasks.TTPreCommit1, pp1Info, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -482,8 +481,18 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		return nil, err
 	}
 
-	tick := time.NewTicker(CHECK_RES_GAP)
-	time.Sleep(time.Hour * 3)
+	tick := &time.Ticker{}
+	switch m.scfg.SealProofType {
+	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+		time.Sleep(time.Hour * 3)
+	}
 
 	for {
 		select {
@@ -512,17 +521,12 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 				}
 
 				//2.2 update taskCount (need lock)
-				m.redisCli.TctRcLK.Lock()
-				ctk := gr.SplicingTaskCounntKey(hostName)
-				count, err := m.redisCli.Incr(ctk, gr.FIELDP1, -1)
-				logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v",
-					hostName, sector.Number, sealtasks.TTPreCommit1, count)
-				if err != nil {
-					m.redisCli.TctRcLK.Unlock()
-					logrus.SchedLogger.Errorf("===== sector %s p1 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
-					return out, err
-				}
-				m.redisCli.TctRcLK.Unlock()
+				defer func() {
+					err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+					if err != nil {
+						logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					}
+				}()
 
 				return paramsRes.Out, nil
 			} else {
@@ -563,16 +567,12 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			}
 
 			//update taskCount (need lock)
-			m.redisCli.TctRcLK.Lock()
-			ctk := gr.SplicingTaskCounntKey(hostName)
-			count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(sealtasks.TTPreCommit1), -1)
-			logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sector.Number, sealtasks.TTPreCommit1, count)
-			if err != nil {
-				m.redisCli.TctRcLK.Unlock()
-				logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.Number, hostName, paramsRes.Err)
-				continue
-			}
-			m.redisCli.TctRcLK.Unlock()
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+				}
+			}()
 
 			return paramsRes.Out, paramsRes.Err
 		}
@@ -595,8 +595,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return out, err
 	}
 	//1.publish
-	logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit2)
-	err = m.PublishTask(sector.Number, sealtasks.TTPreCommit2, pp2Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit2)
+	_, err = m.PublishTask(sector.Number, sealtasks.TTPreCommit2, pp2Info, 1)
 	if err != nil {
 		return out, err
 	}
@@ -606,8 +606,18 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return out, err
 	}
 
-	tick := time.NewTicker(CHECK_RES_GAP)
-	time.Sleep(time.Minute * 20)
+	tick := &time.Ticker{}
+	switch m.scfg.SealProofType {
+	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+		time.Sleep(time.Minute * 20)
+	}
 
 	for {
 		select {
@@ -636,17 +646,12 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 				}
 
 				//2.2 update taskCount (need lock)
-				m.redisCli.TctRcLK.Lock()
-				ctk := gr.SplicingTaskCounntKey(hostName)
-				count, err := m.redisCli.Incr(ctk, gr.FIELDP2, -1)
-				logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v",
-					hostName, sector.Number, sealtasks.TTPreCommit1, count)
-				if err != nil {
-					m.redisCli.TctRcLK.Unlock()
-					logrus.SchedLogger.Errorf("===== sector %s p2 finished , update %s taskCount err:%+v", sealtasks.TTPreCommit1, hostName, paramsRes.Err)
-					return out, err
-				}
-				m.redisCli.TctRcLK.Unlock()
+				defer func() {
+					err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit2, 0)
+					if err != nil {
+						logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					}
+				}()
 
 				return paramsRes.Out, nil
 			} else {
@@ -687,16 +692,12 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			}
 
 			//update taskCount (need lock)
-			m.redisCli.TctRcLK.Lock()
-			ctk := gr.SplicingTaskCounntKey(hostName)
-			count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(sealtasks.TTPreCommit2), -1)
-			logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sector.Number, sealtasks.TTPreCommit2, count)
-			if err != nil {
-				m.redisCli.TctRcLK.Unlock()
-				logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.Number, hostName, paramsRes.Err)
-				continue
-			}
-			m.redisCli.TctRcLK.Unlock()
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit2, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+				}
+			}()
 
 			return paramsRes.Out, paramsRes.Err
 		}
@@ -729,8 +730,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	}
 
 	//1.publish
-	logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTCommit1)
-	err = m.PublishTask(sector.Number, sealtasks.TTCommit1, pc1Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTCommit1)
+	_, err = m.PublishTask(sector.Number, sealtasks.TTCommit1, pc1Info, 1)
 	if err != nil {
 		return out, err
 	}
@@ -741,7 +742,17 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return out, err
 	}
 
-	tick := time.NewTicker(CHECK_RES_GAP)
+	tick := &time.Ticker{}
+	switch m.scfg.SealProofType {
+	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+	}
 
 	for {
 		select {
@@ -781,17 +792,12 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 				}
 
 				//2.2 update taskCount (need lock)
-				m.redisCli.TctRcLK.Lock()
-				ctk := gr.SplicingTaskCounntKey(hostName)
-				count, err := m.redisCli.Incr(ctk, gr.FIELDC1, -1)
-				logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v",
-					hostName, sector.Number, sealtasks.TTPreCommit1, count)
-				if err != nil {
-					m.redisCli.TctRcLK.Unlock()
-					logrus.SchedLogger.Errorf("===== sector %s c1 finished , update %s taskCount err:%+v", sector, hostName, paramsRes.Err)
-					return out, err
-				}
-				m.redisCli.TctRcLK.Unlock()
+				defer func() {
+					err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTCommit1, 0)
+					if err != nil {
+						logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					}
+				}()
 
 				// 2.3 declareSector  申明新的存储路径
 				// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
@@ -866,16 +872,12 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			}
 
 			//update taskCount (need lock)
-			m.redisCli.TctRcLK.Lock()
-			ctk := gr.SplicingTaskCounntKey(hostName)
-			count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(sealtasks.TTCommit1), -1)
-			logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sector.Number, sealtasks.TTCommit1, count)
-			if err != nil {
-				m.redisCli.TctRcLK.Unlock()
-				logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.Number, hostName, paramsRes.Err)
-				continue
-			}
-			m.redisCli.TctRcLK.Unlock()
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTCommit1, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+				}
+			}()
 
 			// declareSector  申明新的存储路径
 			// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
@@ -1129,6 +1131,8 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	if err != nil {
 		return err
 	}
+	logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.Number)
+	m.DeleteDataForSid(sector.Number)
 
 	//fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
 	//moveUnsealed := unsealed
@@ -1231,25 +1235,56 @@ func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
 }
 
 func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType) (hostName string, err error) {
-	for msg := range subCha {
-		//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v", msg.Channel, msg.Payload)
-		pl := gr.RedisField(msg.Payload)
-		_, tt, hostName, _, err := pl.TailoredSubMessage()
-		if err != nil {
-			logrus.SchedLogger.Errorf("sub tailored err:", err)
-		}
+	tick := time.NewTicker(CHECK_RES_GAP)
+	for {
+		select {
+		case msg := <-subCha:
+			//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v", msg.Channel, msg.Payload)
+			pl := gr.RedisField(msg.Payload)
+			_, tt, hostName, _, err := pl.TailoredSubMessage()
+			if err != nil {
+				logrus.SchedLogger.Errorf("sub tailored err:", err)
+			}
 
-		if tt.ToOfficalTaskType() == taskType {
+			if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
+				free, _ := m.CanHandleTask(hostName, taskType)
+				if free {
+					logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, taskType)
+					return hostName, nil
+				} else {
+					continue
+				}
+
+			} else {
+				continue
+			}
+
+		case <-tick.C:
+			logrus.SchedLogger.Infof("===== rd ticker free worker, taskType %+v", taskType)
+			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
+			if err != nil {
+				continue
+			}
+			if hostName == "" {
+				continue
+			}
 			return hostName, nil
-		} else {
-			continue
 		}
 	}
-	return
 }
 
 func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
-	tick := time.NewTicker(CHECK_RES_GAP)
+	tick := &time.Ticker{}
+	switch m.scfg.SealProofType {
+	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+	}
 
 	for {
 		select {
@@ -1257,15 +1292,15 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 			//check sub
 			//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v, sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
 			pl := gr.RedisField(msg.Payload)
-			sid, tt, hostName, _, err := pl.TailoredSubMessage()
+			sid, tt, hostName, sealID, err := pl.TailoredSubMessage()
 			if err != nil {
 				logrus.SchedLogger.Errorf("sub tailored err:", err)
 			}
 
-			if sid == sectorID && tt.ToOfficalTaskType() == taskType {
+			if sid == sectorID && tt.ToOfficalTaskType() == taskType && sealID == sealApId {
 				logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
 				//get params res
-				resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
+				resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealID)
 
 				paramsRes := &gr.ParamsResAp{}
 				err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
@@ -1280,16 +1315,12 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 				}
 
 				//update taskCount (need lock)
-				m.redisCli.TctRcLK.Lock()
-				ctk := gr.SplicingTaskCounntKey(hostName)
-				count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), -1)
-				logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sectorID, taskType, count)
-				if err != nil {
-					m.redisCli.TctRcLK.Unlock()
-					logrus.SchedLogger.Errorf("===== sector %s ap finished , update %s taskCount err:%+v", taskType, hostName, paramsRes.Err)
-					return out, err
-				}
-				m.redisCli.TctRcLK.Unlock()
+				defer func() {
+					err = m.FreeTaskCount(hostName, sectorID, taskType, sealApId)
+					if err != nil {
+						logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
+					}
+				}()
 
 				return paramsRes.PieceInfo, paramsRes.Err
 			} else {
@@ -1330,54 +1361,67 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 			}
 
 			//update taskCount (need lock)
-			m.redisCli.TctRcLK.Lock()
-			ctk := gr.SplicingTaskCounntKey(hostName)
-			count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), -1)
-			logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sectorID, taskType, count)
-			if err != nil {
-				m.redisCli.TctRcLK.Unlock()
-				logrus.SchedLogger.Errorf("===== sector %s ap finished , update %s taskCount err:%+v", taskType, hostName, paramsRes.Err)
-				continue
-			}
-			m.redisCli.TctRcLK.Unlock()
+			defer func() {
+				err = m.FreeTaskCount(hostName, sectorID, taskType, sealApId)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
+				}
+			}()
 
 			return paramsRes.PieceInfo, paramsRes.Err
 		}
 	}
-
 }
 
-func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID uint64) error {
-	m.redisCli.TctRcLK.Lock()
-	defer m.redisCli.TctRcLK.Unlock()
+func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID uint64) (uint64, error) {
+	var publishCha string
+	switch taskType {
+	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+		m.redisCli.ApRcLK.Lock()
+		defer m.redisCli.ApRcLK.Unlock()
+		publishCha = gr.PUBLISHCHANNELAP
+
+	case sealtasks.TTPreCommit1:
+		m.redisCli.P1RcLK.Lock()
+		defer m.redisCli.P1RcLK.Unlock()
+		publishCha = gr.PUBLISHCHANNELP1
+
+	case sealtasks.TTPreCommit2:
+		m.redisCli.P2RcLK.Lock()
+		defer m.redisCli.P2RcLK.Unlock()
+		publishCha = gr.PUBLISHCHANNELP2
+
+	case sealtasks.TTCommit1:
+		m.redisCli.C1RcLK.Lock()
+		defer m.redisCli.C1RcLK.Unlock()
+		publishCha = gr.PUBLISHCHANNELC1
+	}
 
 	//1.1 select worker
 SEACHAGAIN:
 	hostName, err := m.SelectWorker(sectorID, taskType)
 	if err != nil {
 		logrus.SchedLogger.Errorf("===== rd select worker failed, sid %+v taskType %+v select worker err: %+v", sectorID, taskType, err)
-		return err
+		return sealAPID, err
 	}
 	if hostName == "" {
 		switch taskType {
 		case sealtasks.TTAddPieceSe:
-			logrus.SchedLogger.Infof("===== rd no free worker, sub free worker, sectorID %+v taskType %+v", sectorID, taskType)
+			logrus.SchedLogger.Infof("===== rd sub free worker signal, sectorID %+v taskType %+v", sectorID, taskType)
 			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
 			if err != nil {
-				return err
-			}
-			hostName, err := m.SubscribeFreeWorker(subCha, taskType)
-			if err != nil {
-				return err
-			}
-			free, err := m.CanHandleTask(hostName, taskType)
-			if !free {
 				goto SEACHAGAIN
+				//return sealAPID, err
+			}
+			hostName, err = m.SubscribeFreeWorker(subCha, taskType)
+			if err != nil || hostName == "" {
+				goto SEACHAGAIN
+				//return sealAPID, err
 			}
 
 		case sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 			logrus.SchedLogger.Infof("===== rd no free worker, sectorID %+v taskType %+v", sectorID, taskType)
-			return errors.New("No free workers")
+			return sealAPID, errors.New("No free workers")
 		}
 	}
 
@@ -1392,28 +1436,28 @@ SEACHAGAIN:
 	//logrus.SchedLogger.Infof("===== rd backup params ")
 	err = m.redisCli.HSet(gr.PARAMS_NAME, pubField, params)
 	if err != nil {
-		return err
+		return sealAPID, err
 	}
 
 	//1.3 backup  pub
 	//logrus.SchedLogger.Infof("===== rd backup pub")
 	err = m.redisCli.HSet(gr.PUB_NAME, pubField, hostName)
 	if err != nil {
-		return errors.New("backup pub err:" + err.Error())
+		return sealAPID, errors.New("backup pub err:" + err.Error())
 	}
 
 	//1.4 publish task
 	//logrus.SchedLogger.Infof("===== rd start publish")
 	pubMsg := gr.SplicingPubMessage(sectorID, taskType, hostName, sealAPID)
-	_, err = m.redisCli.Publish(gr.PUBLISHCHANNEL, pubMsg)
-	logrus.SchedLogger.Infof("===== rd  publish  msg %+v, err %+v", pubMsg, err)
+	_, err = m.redisCli.Publish(publishCha, pubMsg)
+	logrus.SchedLogger.Infof("===== rd publish cha %s msg %+v, err %+v", publishCha, pubMsg, err)
 	if err != nil {
-		return err
+		return sealAPID, err
 	}
 
 	//if it si addpiece of seal >1,return directly  witnout updating taskCount
 	if sealAPID > 1 {
-		return nil
+		return sealAPID, nil
 	}
 
 	//1.5 update taskCount (need lock)
@@ -1421,9 +1465,9 @@ SEACHAGAIN:
 	count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), 1)
 	logrus.SchedLogger.Infof("===== rd add taskCount worker hostname %+v sectorID %+v taskType %+v count %+v", hostName, sectorID, taskType, count)
 	if err != nil {
-		return err
+		return sealAPID, err
 	}
-	return nil
+	return sealAPID, nil
 }
 
 func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskType) (hostName string, err error) {
@@ -1436,14 +1480,15 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			return "", err
 		}
 		if !exist {
-			logrus.SchedLogger.Info("===== rd  se search worker")
+			//logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
 			if err != nil {
 				return "", err
 			}
 			return hostName, nil
+
 		} else {
-			logrus.SchedLogger.Info("===== rd  se search worker")
+			//logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.BindWorker(sectorID, taskType, 1)
 			if err != nil {
 				return "", err
@@ -1452,19 +1497,29 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		}
 
 	case sealtasks.TTAddPiecePl:
-		logrus.SchedLogger.Info("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
+		//logrus.SchedLogger.Infof("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
 		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
 		if err != nil {
 			return "", err
 		}
+
+		if hostName == "" {
+			return hostName, errors.New("worker is full of tasks")
+		}
+
 		return hostName, nil
 
 	case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-		logrus.SchedLogger.Info("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
+		//logrus.SchedLogger.Infof("===== rd ppc select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
 		hostName, err := m.BindWorker(sectorID, taskType, 1)
 		if err != nil {
 			return "", err
 		}
+
+		if hostName == "" {
+			return hostName, errors.New("worker is full of tasks")
+		}
+
 		return hostName, nil
 	default:
 		return "", errors.New("Unkown task type")
@@ -1472,8 +1527,8 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 }
 
 func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err error) {
-	m.redisCli.TcfRcLK.Lock()
-	defer m.redisCli.TcfRcLK.Unlock()
+	//m.redisCli.TcfRcLK.Lock()
+	//defer m.redisCli.TcfRcLK.Unlock()
 
 	list1, err := m.redisCli.ClientMaster1.Keys(m.redisCli.Ctx, gr.WORKER_CONFIG.ToString()).Result()
 	list2, err := m.redisCli.ClientMaster2.Keys(m.redisCli.Ctx, gr.WORKER_CONFIG.ToString()).Result()
@@ -1484,7 +1539,7 @@ func (m *Manager) SeachWorker(taskType gr.RedisField) (hostName string, err erro
 	workerList = append(workerList, list2...)
 	workerList = append(workerList, list3...)
 	//workerList, _ := m.redisCli.Keys(gr.WORKER_CONFIG)
-	logrus.SchedLogger.Infof("===== rd SeachW  :%+v", workerList)
+	//logrus.SchedLogger.Infof("===== rd SeachW  :%+v", workerList)
 	for _, v := range workerList {
 		hostName = gr.RedisKey(v).TailoredWorker()
 		free, err := m.CanHandleTask(hostName, taskType.ToOfficalTaskType())
@@ -1514,8 +1569,9 @@ func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskT
 	}
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
-	logrus.SchedLogger.Infof("===== rd bindW worker %+v config :%+v, taskType %+v", hostName, sectorID, taskType)
-
+	if err != nil {
+		return "", err
+	}
 	//if it si addpiece of seal >1,return directly  witnout judging taskCount
 	if taskType == sealtasks.TTAddPieceSe {
 		return hostName, nil
@@ -1538,7 +1594,6 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 	ttk := gr.SplicingTaskCounntKey(hostname)
 
 	var cfTT sealtasks.TaskType
-	//var ctTT sealtasks.TaskType
 
 	//get config
 	var numberCf uint64
@@ -1548,7 +1603,7 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 		cfTT = taskType
 	}
 
-	logrus.SchedLogger.Infof("===== rd hget worker %+v taskType1 :%+v taskType2 %+v", tfk, gr.ToFieldTaskType(cfTT), taskType)
+	//logrus.SchedLogger.Infof("===== rd CanHandleTask, hget worker %+v taskType1 :%+v taskType2 %+v", tfk, gr.ToFieldTaskType(cfTT), taskType)
 	err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(cfTT), &numberCf)
 	if err != nil {
 		logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v config :%+v taskType %+v", err, hostname, numberCf, taskType)
@@ -1576,13 +1631,103 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType) (f
 		logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v count :%+v taskType %+v", err, hostname, numberCt, taskType)
 		return free, err
 	}
-	logrus.SchedLogger.Infof("===== rd compare11  nf:%d nt:%d", numberCf, numberCt)
+	logrus.SchedLogger.Infof("===== rd compare  config:%d count:%d", numberCf, numberCt)
 	//compare
 	if numberCf > numberCt {
 		free = true
 		return free, nil
 	} else {
 		return free, nil
+	}
+}
+
+func (m *Manager) FreeTaskCount(hostName string, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) error {
+	switch taskType {
+	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe, sealtasks.TTAddPiece:
+		if taskType == sealtasks.TTAddPieceSe && sealApId > 1 {
+			return nil
+		}
+		m.redisCli.ApRcLK.Lock()
+		defer m.redisCli.ApRcLK.Unlock()
+
+	case sealtasks.TTPreCommit1:
+		m.redisCli.P1RcLK.Lock()
+		defer m.redisCli.P1RcLK.Unlock()
+
+	case sealtasks.TTPreCommit2:
+		m.redisCli.P2RcLK.Lock()
+		defer m.redisCli.P2RcLK.Unlock()
+
+	case sealtasks.TTCommit1:
+		m.redisCli.C1RcLK.Lock()
+		defer m.redisCli.C1RcLK.Unlock()
+	}
+
+	ctk := gr.SplicingTaskCounntKey(hostName)
+	count, err := m.redisCli.Incr(ctk, gr.ToFieldTaskType(taskType), -1)
+	logrus.SchedLogger.Infof("===== rd free workerCount hostname %+v sectorID %+v taskType %+v count %+v", hostName, sectorID, taskType, count)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
+	logrus.SchedLogger.Infof("===== rd DeleteDataForSid, sectorID %+v", sectorID)
+	//1 backup params
+	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
+	tasklist := make([]sealtasks.TaskType, 0)
+
+	res, err := m.redisCli.Exist(sealKey)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+	if res > 0 {
+		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	} else {
+
+		list := []sealtasks.TaskType{sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	}
+
+	for _, v := range tasklist {
+		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
+		//1 backup  pub
+		m.redisCli.HDel(gr.PARAMS_NAME, f)
+		//2 backup params
+		m.redisCli.HDel(gr.PUB_NAME, f)
+		//3 backup res
+		m.redisCli.HDel(gr.PUB_RES_NAME, f)
+		//4 res params
+		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
+	}
+
+	if res == 0 {
+		return
+	}
+
+	var count int64
+	err = m.redisCli.Get(sealKey, &count)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+
+	m.redisCli.Del(sealKey)
+
+	var i int64 = 1
+	for i = 1; i <= count; i++ {
+		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
+		//2 backup  pub
+		m.redisCli.HDel(gr.PARAMS_NAME, f)
+		//3 backup res params
+		m.redisCli.HDel(gr.PUB_NAME, f)
+		//4 backup res
+		m.redisCli.HDel(gr.PUB_RES_NAME, f)
+		//5 seal_ap_%d
+		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
 	}
 }
 

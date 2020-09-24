@@ -128,17 +128,29 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 
 func (rw *RedisWorker) StartWorker(ctx context.Context, sw *sync.WaitGroup) (err error) {
 	//sub task
-	subCha, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNEL)
+	subChaAp, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNELAP)
+	if err != nil {
+		return err
+	}
+	subChaP1, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNELP1)
+	if err != nil {
+		return err
+	}
+	subChaP2, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNELP2)
+	if err != nil {
+		return err
+	}
+	subChaC1, err := rw.redisCli.Subscribe(gr.PUBLISHCHANNELC1)
 	if err != nil {
 		return err
 	}
 
-	go rw.SubscribeResult(ctx, subCha, sw)
+	go rw.SubscribeResult(ctx, subChaAp, subChaP1, subChaP2, subChaC1, sw)
 
 	return
 }
 
-func (rw *RedisWorker) SubscribeResult(ctx context.Context, subCha <-chan *redis.Message, sw *sync.WaitGroup) {
+func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, subChaP2, subChaC1 <-chan *redis.Message, sw *sync.WaitGroup) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("====== SubscribeResult err", err)
@@ -148,37 +160,84 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subCha <-chan *redis
 		}
 	}()
 
-	for msg := range subCha {
-		log.Infof("===== Cha %+v 接收到 msg %+v", msg.Channel, msg.Payload)
-		pl := gr.RedisField(msg.Payload)
-		sid, tt, hostName, sealApId, err := pl.TailoredSubMessage()
-		if err != nil {
-			log.Errorf("sub tailored err:", err)
-		}
-
-		if rw.hostName == hostName {
-			log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
-			//get params res
-			resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
-			pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
-
-			switch tt.ToOfficalTaskType() {
-			case sealtasks.TTAddPiecePl:
-				go rw.DealPledge(ctx, resField, pubMsg)
-			case sealtasks.TTAddPieceSe:
-				go rw.DealSeal(ctx, resField, pubMsg)
-			case sealtasks.TTPreCommit1:
-				go rw.DealP1(ctx, resField, pubMsg)
-			case sealtasks.TTPreCommit2:
-				go rw.DealP2(ctx, resField, pubMsg)
-			case sealtasks.TTCommit1:
-				go rw.DealC1(ctx, resField, pubMsg)
+	for {
+		select {
+		case msg := <-subChaAp:
+			log.Infof("===== Cha %+v 接收到 ap msg %+v", msg.Channel, msg.Payload)
+			pl := gr.RedisField(msg.Payload)
+			sid, tt, hostName, sealApId, err := pl.TailoredSubMessage()
+			if err != nil {
+				log.Errorf("sub tailored err:", err)
 			}
-		} else {
-			continue
+
+			if rw.hostName == hostName {
+				log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
+				//get params res
+				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
+				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+				switch tt.ToOfficalTaskType() {
+				case sealtasks.TTAddPiecePl:
+					go rw.DealPledge(ctx, resField, pubMsg)
+				case sealtasks.TTAddPieceSe:
+					go rw.DealSeal(ctx, resField, pubMsg)
+				}
+			} else {
+				continue
+			}
+		case msg := <-subChaP1:
+			log.Infof("===== Cha %+v 接收到 p1 msg %+v", msg.Channel, msg.Payload)
+			pl := gr.RedisField(msg.Payload)
+			sid, tt, hostName, sealApId, err := pl.TailoredSubMessage()
+			if err != nil {
+				log.Errorf("sub tailored err:", err)
+			}
+
+			if rw.hostName == hostName {
+				log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
+				//get params res
+				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
+				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+				go rw.DealP1(ctx, resField, pubMsg)
+			} else {
+				continue
+			}
+		case msg := <-subChaP2:
+			log.Infof("===== Cha %+v 接收到 p2 msg %+v", msg.Channel, msg.Payload)
+			pl := gr.RedisField(msg.Payload)
+			sid, tt, hostName, sealApId, err := pl.TailoredSubMessage()
+			if err != nil {
+				log.Errorf("sub tailored err:", err)
+			}
+
+			if rw.hostName == hostName {
+				log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
+				//get params res
+				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
+				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+				go rw.DealP2(ctx, resField, pubMsg)
+			} else {
+				continue
+			}
+
+		case msg := <-subChaC1:
+			log.Infof("===== Cha %+v 接收到 c1 msg %+v", msg.Channel, msg.Payload)
+			pl := gr.RedisField(msg.Payload)
+			sid, tt, hostName, sealApId, err := pl.TailoredSubMessage()
+			if err != nil {
+				log.Errorf("sub tailored err:", err)
+			}
+
+			if rw.hostName == hostName {
+				log.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sid, tt)
+				//get params res
+				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
+				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+				go rw.DealC1(ctx, resField, pubMsg)
+			} else {
+				continue
+			}
 		}
 	}
-	return
 }
 
 func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.RedisField) {
