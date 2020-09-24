@@ -503,7 +503,7 @@ var sealBenchCmd = &cli.Command{
 				return err
 			}
 			if !ok {
-				log.Error("post verification failed")
+				log.Error("window post verification failed")
 			}
 
 			verifyWindowpost1 := time.Now()
@@ -519,7 +519,7 @@ var sealBenchCmd = &cli.Command{
 				return err
 			}
 			if !ok {
-				log.Error("post verification failed")
+				log.Error("window post verification failed")
 			}
 
 			verifyWindowpost2 := time.Now()

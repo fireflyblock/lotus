@@ -3,15 +3,17 @@ package sealing
 import (
 	"context"
 	"errors"
+	"math"
+	"sync"
+	"time"
+
+	"github.com/filecoin-project/go-state-types/network"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
-	"math"
 	"runtime/debug"
-	"sync"
-	"time"
 
 	"github.com/filecoin-project/go-address"
 	padreader "github.com/filecoin-project/go-padreader"
@@ -19,13 +21,15 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/crypto"
 	statemachine "github.com/filecoin-project/go-statemachine"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 )
 
 const SectorStorePrefix = "/sectors"
+
+var ErrTooManySectorsSealing = xerrors.New("too many sectors sealing")
 
 var log = logging.Logger("sectors")
 
@@ -47,16 +51,18 @@ type SealingAPI interface {
 	StateSectorPartition(ctx context.Context, maddr address.Address, sectorNumber abi.SectorNumber, tok TipSetToken) (*SectorLocation, error)
 	StateMinerSectorSize(context.Context, address.Address, TipSetToken) (abi.SectorSize, error)
 	StateMinerWorkerAddress(ctx context.Context, maddr address.Address, tok TipSetToken) (address.Address, error)
-	StateMinerDeadlines(ctx context.Context, maddr address.Address, tok TipSetToken) ([]*miner.Deadline, error)
 	StateMinerPreCommitDepositForPower(context.Context, address.Address, miner.SectorPreCommitInfo, TipSetToken) (big.Int, error)
 	StateMinerInitialPledgeCollateral(context.Context, address.Address, miner.SectorPreCommitInfo, TipSetToken) (big.Int, error)
 	StateMarketStorageDeal(context.Context, abi.DealID, TipSetToken) (market.DealProposal, error)
+	StateNetworkVersion(ctx context.Context, tok TipSetToken) (network.Version, error)
 	SendMsg(ctx context.Context, from, to address.Address, method abi.MethodNum, value, maxFee abi.TokenAmount, params []byte) (cid.Cid, error)
 	ChainHead(ctx context.Context) (TipSetToken, abi.ChainEpoch, error)
 	ChainGetRandomnessFromBeacon(ctx context.Context, tok TipSetToken, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) (abi.Randomness, error)
 	ChainGetRandomnessFromTickets(ctx context.Context, tok TipSetToken, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) (abi.Randomness, error)
 	ChainReadObj(context.Context, cid.Cid) ([]byte, error)
 }
+
+type SectorStateNotifee func(before, after SectorInfo)
 
 type Sealing struct {
 	api    SealingAPI
@@ -76,11 +82,17 @@ type Sealing struct {
 	upgradeLk sync.Mutex
 	toUpgrade map[abi.SectorNumber]struct{}
 
+	notifee SectorStateNotifee
+
 	stats SectorStats
 
 	getConfig GetSealingConfigFunc
 
 	turnOnCh chan struct{}
+
+	// 记录丢失掉的sectorNumber重利用
+	recoverLk            sync.Mutex
+	recoverSectorNumbers map[abi.SectorNumber]struct{}
 }
 
 type FeeConfig struct {
@@ -100,7 +112,7 @@ type UnsealedSectorInfo struct {
 	pieceSizes []abi.UnpaddedPieceSize
 }
 
-func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds datastore.Batching, sealer sectorstorage.SectorManager, sc SectorIDCounter, verif ffiwrapper.Verifier, pcp PreCommitPolicy, gc GetSealingConfigFunc) *Sealing {
+func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds datastore.Batching, sealer sectorstorage.SectorManager, sc SectorIDCounter, verif ffiwrapper.Verifier, pcp PreCommitPolicy, gc GetSealingConfigFunc, notifee SectorStateNotifee) *Sealing {
 	s := &Sealing{
 		api:    api,
 		feeCfg: fc,
@@ -117,12 +129,16 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		},
 
 		toUpgrade: map[abi.SectorNumber]struct{}{},
+
+		notifee: notifee,
+
 		getConfig: gc,
 
 		stats: SectorStats{
 			bySector: map[abi.SectorID]statSectorState{},
 		},
-		turnOnCh: make(chan struct{}),
+		turnOnCh:             make(chan struct{}),
+		recoverSectorNumbers: map[abi.SectorNumber]struct{}{},
 	}
 
 	s.sectors = statemachine.New(namespace.Wrap(ds, datastore.NewKey(SectorStorePrefix)), s, SectorInfo{})
@@ -135,6 +151,9 @@ func (m *Sealing) Run(ctx context.Context) error {
 		log.Errorf("%+v", err)
 		return xerrors.Errorf("failed load sector states: %w", err)
 	}
+
+	// 筛选出未使用的sectornumber
+	m.initRecoverSectorNumber(ctx)
 
 	return nil
 }
@@ -202,9 +221,9 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 		return 0, 0, xerrors.Errorf("adding piece to sector: %w", err)
 	}
 
-	startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
+	//startPacking := m.unsealedInfoMap.infos[sid].numDeals >= getDealPerSectorLimit(m.sealer.SectorSize())
+	startPacking := m.unsealedInfoMap.infos[sid].numDeals >= 5
 
-	log.Infof("====== compare 1:%+v, 2:%+v", m.unsealedInfoMap.infos[sid].numDeals, getDealPerSectorLimit(m.sealer.SectorSize()))
 	m.unsealedInfoMap.lk.Unlock()
 
 	if startPacking {
@@ -306,13 +325,12 @@ func (m *Sealing) newDealSector() (abi.SectorNumber, error) {
 		return 0, xerrors.Errorf("getting config: %w", err)
 	}
 
-	log.Info("===== MaxSealingSectorsForDeals : %+v", cfg.MaxSealingSectorsForDeals)
 	if cfg.MaxSealingSectorsForDeals > 0 {
 		if m.stats.curSealing() > cfg.MaxSealingSectorsForDeals {
-			return 0, xerrors.Errorf("too many sectors sealing")
+			return 0, ErrTooManySectorsSealing
 		}
 	}
-	log.Info("===== MaxWaitDealsSectors : %+v", cfg.MaxWaitDealsSectors)
+
 	if cfg.MaxWaitDealsSectors > 0 {
 		// run in a loop because we have to drop the map lock here for a bit
 		tries := 0
