@@ -83,6 +83,7 @@ func (m *Sealing) PledgeSector() error {
 		var sid abi.SectorNumber
 		m.recoverLk.Lock()
 		recoverLen := len(m.recoverSectorNumbers)
+		log.Infof("===== PledgeSector need recoverSectorNumber length:%d\n", recoverLen)
 		if recoverLen > 0 {
 			for number := range m.recoverSectorNumbers {
 				sid = number
@@ -93,7 +94,7 @@ func (m *Sealing) PledgeSector() error {
 		}
 		m.recoverLk.Unlock()
 
-		if recoverLen > 0 {
+		if recoverLen <= 0 {
 			sid, err = m.sc.Next()
 			if err != nil {
 				log.Errorf("%+v", err)
