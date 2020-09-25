@@ -508,6 +508,8 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
 		time.Sleep(time.Hour * 3)
+	default:
+		tick = time.NewTicker(CHECK_RES_GAP)
 	}
 
 	for {
@@ -633,6 +635,9 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
 		time.Sleep(time.Minute * 20)
+
+	default:
+		tick = time.NewTicker(CHECK_RES_GAP)
 	}
 
 	for {
@@ -767,6 +772,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		tick = time.NewTicker(time.Minute)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+
+	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
 
@@ -1250,42 +1258,147 @@ func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
 	return tr
 }
 
-func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType) (hostName string, err error) {
-	tick := time.NewTicker(CHECK_RES_GAP)
+func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
+	tick := &time.Ticker{}
+	switch taskType {
+	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+		m.redisCli.ApRcLK.Unlock()
+
+	case sealtasks.TTPreCommit1:
+		m.redisCli.P1RcLK.Unlock()
+
+	case sealtasks.TTPreCommit2:
+		m.redisCli.P2RcLK.Unlock()
+
+	case sealtasks.TTCommit1:
+		m.redisCli.C1RcLK.Unlock()
+	}
+
+	logrus.SchedLogger.Infof("===== rd start subscribe free worker, sectorID %+v taskType %+v", sectorID, taskType)
+
+	switch m.scfg.SealProofType {
+	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+		tick = time.NewTicker(time.Minute)
+
+	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+		tick = time.NewTicker(CHECK_RES_GAP)
+
+	default:
+		tick = time.NewTicker(CHECK_RES_GAP)
+	}
+
 	for {
 		select {
 		case msg := <-subCha:
 			//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v", msg.Channel, msg.Payload)
 			pl := gr.RedisField(msg.Payload)
-			_, tt, hostName, _, err := pl.TailoredSubMessage()
+			sid, tt, hostName, _, err := pl.TailoredSubMessage()
 			if err != nil {
 				logrus.SchedLogger.Errorf("sub tailored err:", err)
 			}
 
-			if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
-				free, _ := m.CanHandleTask(hostName, taskType)
-				if free {
-					logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, taskType)
-					return hostName, nil
+			switch taskType {
+			case sealtasks.TTAddPieceSe:
+				if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
+					m.SelectLock(taskType)
+					free, _ := m.CanHandleTask(hostName, taskType)
+					if free {
+						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+						return hostName, nil
+					} else {
+						m.SelectUnLock(taskType)
+						continue
+					}
 				} else {
+					m.SelectUnLock(taskType)
 					continue
 				}
 
-			} else {
-				continue
+			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+				if tt.ToOfficalTaskType() == taskType && sid == sectorID {
+					m.SelectLock(taskType)
+					free, _ := m.CanHandleTask(hostName, taskType)
+					if free {
+						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+						return hostName, nil
+					} else {
+						m.SelectUnLock(taskType)
+						continue
+					}
+				} else {
+					m.SelectUnLock(taskType)
+					continue
+				}
 			}
 
 		case <-tick.C:
-			logrus.SchedLogger.Infof("===== rd ticker free worker, taskType %+v", taskType)
-			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
-			if err != nil {
-				continue
+			m.SelectLock(taskType)
+			logrus.SchedLogger.Infof("===== rd ticker free worker, sectorID %+v taskType %+v", sectorID, taskType)
+			switch taskType {
+			case sealtasks.TTAddPieceSe:
+				hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
+				if err != nil {
+					m.SelectUnLock(taskType)
+					continue
+				}
+				if hostName == "" {
+					m.SelectUnLock(taskType)
+					continue
+				}
+				return hostName, nil
+
+			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+				hostName, err = m.BindWorker(sectorID, taskType, 1)
+				if err != nil {
+					m.SelectUnLock(taskType)
+					continue
+				}
+				if hostName == "" {
+					m.SelectUnLock(taskType)
+					continue
+				}
+				return hostName, nil
 			}
-			if hostName == "" {
-				continue
-			}
-			return hostName, nil
 		}
+	}
+}
+
+func (m *Manager) SelectLock(taskType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd lock taskType %+v", taskType)
+
+	switch taskType {
+	case sealtasks.TTAddPieceSe:
+		m.redisCli.ApRcLK.Lock()
+
+	case sealtasks.TTPreCommit1:
+		m.redisCli.P1RcLK.Lock()
+
+	case sealtasks.TTPreCommit2:
+		m.redisCli.P2RcLK.Lock()
+
+	case sealtasks.TTCommit1:
+		m.redisCli.C1RcLK.Lock()
+	}
+}
+
+func (m *Manager) SelectUnLock(taskType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd unlock taskType %+v", taskType)
+
+	switch taskType {
+	case sealtasks.TTAddPieceSe:
+		m.redisCli.ApRcLK.Unlock()
+
+	case sealtasks.TTPreCommit1:
+		m.redisCli.P1RcLK.Unlock()
+
+	case sealtasks.TTPreCommit2:
+		m.redisCli.P2RcLK.Unlock()
+
+	case sealtasks.TTCommit1:
+		m.redisCli.C1RcLK.Unlock()
 	}
 }
 
@@ -1422,20 +1535,20 @@ SEACHAGAIN:
 	}
 	if hostName == "" {
 		switch taskType {
-		case sealtasks.TTAddPieceSe:
+		case sealtasks.TTAddPieceSe, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 			logrus.SchedLogger.Infof("===== rd sub free worker signal, sectorID %+v taskType %+v", sectorID, taskType)
 			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
 			if err != nil {
 				goto SEACHAGAIN
 				//return sealAPID, err
 			}
-			hostName, err = m.SubscribeFreeWorker(subCha, taskType)
+			hostName, err = m.SubscribeFreeWorker(subCha, taskType, sectorID)
 			if err != nil || hostName == "" {
 				goto SEACHAGAIN
 				//return sealAPID, err
 			}
 
-		case sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+		case sealtasks.TTAddPiecePl:
 			logrus.SchedLogger.Infof("===== rd no free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			return sealAPID, errors.New("No free workers")
 		}
@@ -1496,7 +1609,6 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			return "", err
 		}
 		if !exist {
-			//logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
 			if err != nil {
 				return "", err
@@ -1504,7 +1616,6 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 			return hostName, nil
 
 		} else {
-			//logrus.SchedLogger.Info("===== rd  se search worker")
 			hostName, err = m.BindWorker(sectorID, taskType, 1)
 			if err != nil {
 				return "", err
@@ -1513,7 +1624,6 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		}
 
 	case sealtasks.TTAddPiecePl:
-		//logrus.SchedLogger.Infof("===== rd pl select worker, sectorID%+v, taskType:%+v", sectorID, taskType)
 		hostName, err := m.SeachWorker(gr.ToFieldTaskType(taskType))
 		if err != nil {
 			return "", err
@@ -1530,10 +1640,6 @@ func (m *Manager) SelectWorker(sectorID abi.SectorNumber, taskType sealtasks.Tas
 		hostName, err := m.BindWorker(sectorID, taskType, 1)
 		if err != nil {
 			return "", err
-		}
-
-		if hostName == "" {
-			return hostName, errors.New("worker is full of tasks")
 		}
 
 		return hostName, nil
@@ -1579,9 +1685,9 @@ func (m *Manager) BindWorker(sectorID abi.SectorNumber, taskType sealtasks.TaskT
 	}
 	var pubFieldPl gr.RedisField
 	if !exist {
-		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, sealApId)
+		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, 0)
 	} else {
-		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, sealApId)
+		pubFieldPl = gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 1)
 	}
 
 	err = m.redisCli.HGet(gr.PUB_NAME, pubFieldPl, &hostName)
