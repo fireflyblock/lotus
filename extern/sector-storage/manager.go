@@ -1261,7 +1261,7 @@ func (m *Manager) getTaskRecord(sector abi.SectorID) interface{} {
 func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
 	tick := &time.Ticker{}
 	switch taskType {
-	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+	case sealtasks.TTAddPieceSe:
 		m.redisCli.ApRcLK.Unlock()
 
 	case sealtasks.TTPreCommit1:
@@ -1303,49 +1303,49 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 			switch taskType {
 			case sealtasks.TTAddPieceSe:
 				if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
-					m.SelectLock(taskType)
+					m.SelectLock(taskType, sectorID)
 					free, _ := m.CanHandleTask(hostName, taskType)
 					if free {
 						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
 						return hostName, nil
 					} else {
-						m.SelectUnLock(taskType)
+						m.SelectUnLock(taskType, sectorID)
 						continue
 					}
 				} else {
-					m.SelectUnLock(taskType)
+					//m.SelectUnLock(taskType,sectorID)
 					continue
 				}
 
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 				if tt.ToOfficalTaskType() == taskType && sid == sectorID {
-					m.SelectLock(taskType)
+					m.SelectLock(taskType, sectorID)
 					free, _ := m.CanHandleTask(hostName, taskType)
 					if free {
 						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
 						return hostName, nil
 					} else {
-						m.SelectUnLock(taskType)
+						m.SelectUnLock(taskType, sectorID)
 						continue
 					}
 				} else {
-					m.SelectUnLock(taskType)
+					//m.SelectUnLock(taskType,sectorID)
 					continue
 				}
 			}
 
 		case <-tick.C:
-			m.SelectLock(taskType)
+			m.SelectLock(taskType, sectorID)
 			logrus.SchedLogger.Infof("===== rd ticker free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			switch taskType {
 			case sealtasks.TTAddPieceSe:
 				hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType))
 				if err != nil {
-					m.SelectUnLock(taskType)
+					m.SelectUnLock(taskType, sectorID)
 					continue
 				}
 				if hostName == "" {
-					m.SelectUnLock(taskType)
+					m.SelectUnLock(taskType, sectorID)
 					continue
 				}
 				return hostName, nil
@@ -1353,11 +1353,11 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 				hostName, err = m.BindWorker(sectorID, taskType, 1)
 				if err != nil {
-					m.SelectUnLock(taskType)
+					m.SelectUnLock(taskType, sectorID)
 					continue
 				}
 				if hostName == "" {
-					m.SelectUnLock(taskType)
+					m.SelectUnLock(taskType, sectorID)
 					continue
 				}
 				return hostName, nil
@@ -1366,8 +1366,8 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 	}
 }
 
-func (m *Manager) SelectLock(taskType sealtasks.TaskType) {
-	logrus.SchedLogger.Infof("===== rd lock taskType %+v", taskType)
+func (m *Manager) SelectLock(taskType sealtasks.TaskType, sectorID abi.SectorNumber) {
+	logrus.SchedLogger.Infof("===== rd lock taskType %+v sectorID %+v", taskType, sectorID)
 
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
@@ -1384,8 +1384,8 @@ func (m *Manager) SelectLock(taskType sealtasks.TaskType) {
 	}
 }
 
-func (m *Manager) SelectUnLock(taskType sealtasks.TaskType) {
-	logrus.SchedLogger.Infof("===== rd unlock taskType %+v", taskType)
+func (m *Manager) SelectUnLock(taskType sealtasks.TaskType, sectorID abi.SectorNumber) {
+	logrus.SchedLogger.Infof("===== rd unlock taskType %+v sectorID %+v", taskType, sectorID)
 
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
