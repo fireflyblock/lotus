@@ -1535,7 +1535,7 @@ SEACHAGAIN:
 	}
 	if hostName == "" {
 		switch taskType {
-		case sealtasks.TTAddPieceSe, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+		case sealtasks.TTAddPieceSe, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
 			logrus.SchedLogger.Infof("===== rd sub free worker signal, sectorID %+v taskType %+v", sectorID, taskType)
 			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
 			if err != nil {
@@ -1548,7 +1548,7 @@ SEACHAGAIN:
 				//return sealAPID, err
 			}
 
-		case sealtasks.TTAddPiecePl:
+		case sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1:
 			logrus.SchedLogger.Infof("===== rd no free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			return sealAPID, errors.New("No free workers")
 		}
