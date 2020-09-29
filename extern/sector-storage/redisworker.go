@@ -444,27 +444,36 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 			goto RESRETURN
 		}
 
-		if exist {
-			// deal sector 传输unseal文件
-			for _, dest := range params.PathList {
-				err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, false)
-				if err != nil {
-					log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
-					continue
-				}
-				paramsRes.StoragePath = dest
+		isTransforSuccess := false
+		// TODO 不传输完成不罢休,
+		for {
+			if isTransforSuccess {
 				break
 			}
-		} else {
-			// not deal sector 不传输unseal文件
-			for _, dest := range params.PathList {
-				err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, true)
-				if err != nil {
-					log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
-					continue
+			if exist {
+				// deal sector 传输unseal文件
+				for _, dest := range params.PathList {
+					err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, false)
+					if err != nil {
+						log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
+						continue
+					}
+					paramsRes.StoragePath = dest
+					isTransforSuccess = true
+					break
 				}
-				paramsRes.StoragePath = dest
-				break
+			} else {
+				// not deal sector 不传输unseal文件
+				for _, dest := range params.PathList {
+					err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, true)
+					if err != nil {
+						log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
+						continue
+					}
+					paramsRes.StoragePath = dest
+					isTransforSuccess = true
+					break
+				}
 			}
 		}
 	}
@@ -505,8 +514,11 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 	src := stores.SectorName(sector)
 	sealedPath := filepath.Join(destPath, stores.FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
-	err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
+	code, err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
+		if code == 300 {
+			log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task", sector, srcSealedPath, src, ip, sealedPath)
+		}
 		return err
 	}
 
@@ -528,8 +540,11 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 		unsealPath := filepath.Join(destPath, stores.FTUnsealed.String()) + "/"
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
-		err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
+		code, err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
 		if err != nil {
+			if code == 300 {
+				log.Infow("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task????", sector, srcSealedPath, src, ip, sealedPath)
+			}
 			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
 			return err
 		}

@@ -539,7 +539,7 @@ func (st *Local) TransforDataToStorageServer(ctx context.Context, sector abi.Sec
 	src := SectorName(sector)
 	sealedPath := filepath.Join(destPath, FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
-	err = transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
+	_, err = transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
 		return err
 	}

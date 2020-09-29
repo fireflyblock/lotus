@@ -155,7 +155,7 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 // src 准备压缩的文件或目录
 // dstPath
 // ip 目标服务器 ip 地址
-func SendFile(srcPath, src, dstPath, ip string) error {
+func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 	r, w := io.Pipe()
 	m := multipart.NewWriter(w)
 
@@ -189,10 +189,10 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 	resp, err := http.Post(url, m.FormDataContentType(), r)
 	if err != nil {
 		log.Errorf("http post request err %s", err.Error())
-		return err
+		return -1, err
 	}
 	if resp.StatusCode != 200 {
-		return xerrors.Errorf("ConnectTest failed")
+		return resp.StatusCode, xerrors.Errorf("ConnectTest failed")
 	}
 
 	//err = os.Remove(srcPath + src)
@@ -200,7 +200,7 @@ func SendFile(srcPath, src, dstPath, ip string) error {
 	//	return err
 	//	//panic(err)
 	//}
-	return nil
+	return resp.StatusCode, nil
 }
 
 //func ConnectTest(path, ip string) error {
