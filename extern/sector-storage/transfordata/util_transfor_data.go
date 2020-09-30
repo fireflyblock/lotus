@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
@@ -24,7 +25,7 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 	spath := filepath.Base(storagePath)
 	ip = "172.16."
 	destPath = "/mnt/nfs"
-	//ip, destPath = GetStorageInfo()
+	ip, destPath = GetStorageInfo()
 	sp := strings.Split(spath, "-")
 	if len(sp) != 3 {
 		ip = ""
@@ -282,4 +283,62 @@ func Tar(src string, writers ...io.Writer) error {
 
 		return nil
 	})
+}
+
+type Config struct {
+	RecordUrl   string
+	RedisUrl    []string
+	PassWord    string
+	StorageIP   string
+	StoragePath string
+}
+
+func initRequestConfig(filePath string) (*Config, error) {
+	var confInfo = new(Config)
+	if !isFileExist(filePath) {
+		// default value
+		confInfo.StoragePath = "/mnt/nfs"
+		confInfo.StorageIP = "172.16."
+		fn, err := os.Create(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer fn.Close()
+		encoder := json.NewEncoder(fn)
+		err = encoder.Encode(confInfo)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	decoder := json.NewDecoder(f)
+	err = decoder.Decode(confInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return confInfo, nil
+}
+
+func GetStorageInfo() (string, string) {
+	conf, err := initRequestConfig("conf.json")
+	if err != nil {
+		log.Errorf("GetStorageInfo Error: %+v", err)
+		return "172.16.", "/mnt/nfs"
+	}
+	return conf.StorageIP, conf.StoragePath
+}
+
+func isFileExist(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/sector-storage/transfordata"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
+	"golang.org/x/xerrors"
 	"io"
 	"os"
 	"path/filepath"
@@ -503,6 +504,11 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 
 	// 尝试 开始发送 通过解析p.local来获取NFS ip
 	ip, destPath := transfordata.PareseDestFromePath(dest)
+	if ip == "" || destPath == "" {
+
+		log.Infof("===== try to send sector [%v], but ip(%s),destPath(%s) is empty", sector, ip, destPath)
+		return xerrors.Errorf("")
+	}
 
 	// 删除数据,完成传输文件
 	log.Infof("===== after finished SealCommit1 for sector [%v], delete local layer,tree-c,tree-d files...", sector)
