@@ -3,6 +3,8 @@ package sealing
 import (
 	"context"
 	"errors"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"math"
 	"sync"
 	"time"
@@ -89,6 +91,7 @@ type Sealing struct {
 	getConfig GetSealingConfigFunc
 
 	turnOnCh chan struct{}
+	rc       *gr.RedisClient
 
 	// 记录丢失掉的sectorNumber重利用
 	recoverLk            sync.Mutex
@@ -140,6 +143,33 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		turnOnCh:             make(chan struct{}),
 		recoverSectorNumbers: map[abi.SectorNumber]struct{}{},
 	}
+
+	//init redis data
+	ctx := context.Background()
+	var rurl string
+	var pw string
+	conf, err := sectorstorage.InitRequestConfig("conf.json")
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== read conf.json err:", err)
+	}
+
+	if conf.RecordUrl == "" {
+		rurl = sectorstorage.DefaultRedisURL
+	} else {
+		rurl = conf.RedisUrl
+	}
+
+	if conf.PassWord == "" {
+		pw = sectorstorage.DefaultRedisPassWord
+	} else {
+		pw = conf.PassWord
+	}
+
+	rc := gr.NewRedisClusterCLi(ctx, rurl, pw)
+	if rc == nil {
+		return nil
+	}
+	s.rc = rc
 
 	s.sectors = statemachine.New(namespace.Wrap(ds, datastore.NewKey(SectorStorePrefix)), s, SectorInfo{})
 

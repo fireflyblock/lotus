@@ -12,10 +12,14 @@ import (
 const (
 	PUB_NAME        RedisKey = "pub"
 	PARAMS_NAME     RedisKey = "params"
+	PUB_TIME        RedisKey = "pub_time"
 	PUB_RES_NAME    RedisKey = "pub_res"
 	PARAMS_RES_NAME RedisKey = "params_res"
+	RECOVER_NAME    RedisKey = "recover"
 	WORKER_COUNT    RedisKey = "worker_count*"
 	WORKER_CONFIG   RedisKey = "worker_config*"
+
+	SEALAPID = "seal_ap_"
 	//FIELDPLEDGEP    RedisField = "seal/v0/addpiece/pledge"
 	//FIELDSEAL       RedisField = "seal/v0/addpiece/seal"
 	//FIELDP1         RedisField = "seal/v0/precommit/1"
@@ -35,6 +39,7 @@ const (
 
 	SUBSCRIBECHANNEL = "sub_cha" //worker pub res
 
+	TASKRECORD = "task_*"
 )
 
 type RedisField string

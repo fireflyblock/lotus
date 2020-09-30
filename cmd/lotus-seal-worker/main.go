@@ -299,6 +299,12 @@ var runCmd = &cli.Command{
 			}
 			log.Info("===== register worker success ")
 
+			err = sb.RecoveryTask(ctx)
+			if err != nil {
+				return xerrors.Errorf("recovery task err: %w", err)
+			}
+			log.Info("===== recovery task success ")
+
 			sw := &sync.WaitGroup{}
 			sw.Add(1)
 			err = sb.StartWorker(ctx, sw)

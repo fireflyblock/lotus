@@ -21,7 +21,7 @@ type ParamsAp struct {
 
 type ParamsResAp struct {
 	PieceInfo abi.PieceInfo `json:"piece_info"`
-	Err       error         `json:"err"`
+	Err       string        `json:"err"`
 }
 
 type ParamsP1 struct {
@@ -34,18 +34,22 @@ type ParamsP1 struct {
 
 type ParamsResP1 struct {
 	Out storage.PreCommit1Out `json:"out"`
-	Err error                 `json:"err"`
+	Err string                `json:"err"`
+}
+
+type PreCommit1RD struct {
+	TicketValue abi.SealRandomness
+	TicketEpoch abi.ChainEpoch
 }
 
 type ParamsP2 struct {
-	//Ctx    context.Context
 	Sector abi.SectorID          `json:"sector"`
 	Pc1o   storage.PreCommit1Out `json:"pc_1_o"`
 }
 
 type ParamsResP2 struct {
 	Out storage.SectorCids `json:"out"`
-	Err error              `json:"err"`
+	Err string             `json:"err"`
 }
 
 type ParamsC1 struct {
@@ -61,7 +65,7 @@ type ParamsC1 struct {
 type ParamsResC1 struct {
 	Out         storage.Commit1Out `json:"out"`
 	StoragePath string             `json:"storage_path"`
-	Err         error              `json:"err"`
+	Err         string             `json:"err"`
 }
 
 type ParamsC2 struct {

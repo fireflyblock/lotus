@@ -3,6 +3,8 @@ package sealing
 import (
 	"bytes"
 	"context"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
+	"github.com/filecoin-project/sector-storage/sealtasks"
 
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
@@ -109,6 +111,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("getting ticket failed: %w", err)})
 	}
 
+	p1Field := gr.SplicingBackupPubAndParamsField(sector.SectorNumber, sealtasks.TTPreCommit1, 0)
 	// 如果ticketEpoch存在，或许曾经做个P1，
 	// 判断Epoch是否会超时，预计我们一轮Seal过程耗时720个Epoch
 	//height-(si.TicketEpoch+SealRandomnessLookback) > SealRandomnessLookbackLimit(si.SectorType)
@@ -121,15 +124,46 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 	//	log.Infof("sector(%+v) recovering do p1 use TicketEpoch %+v, TicketValue %+v", m.minerSector(sector.SectorNumber), sector.TicketEpoch, sector.TicketValue)
 	//}
 
-	pc1o, err := m.sealer.SealPreCommit1(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos(), recover)
+	p1RecoverDate := gr.PreCommit1RD{
+		TicketValue: ticketValue,
+		TicketEpoch: ticketEpoch,
+	}
+	var pc1o storage.PreCommit1Out
+
+	//backup params
+	exist, err := m.rc.HExist(gr.RECOVER_NAME, p1Field)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+	}
+	if exist {
+		newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
+		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos(), recover)
+		if err != nil {
+			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+		}
+
+		err = m.rc.HGet(gr.RECOVER_NAME, p1Field, &p1RecoverDate)
+		if err != nil {
+			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+		}
+	} else {
+		err = m.rc.HSet(gr.RECOVER_NAME, p1Field, p1RecoverDate)
+		if err != nil {
+			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+		}
+
+		newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
+		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos(), recover)
+		if err != nil {
+			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+		}
+
 	}
 
 	return ctx.Send(SectorPreCommit1{
 		PreCommit1Out: pc1o,
-		TicketValue:   ticketValue,
-		TicketEpoch:   ticketEpoch,
+		TicketValue:   p1RecoverDate.TicketValue,
+		TicketEpoch:   p1RecoverDate.TicketEpoch,
 	})
 }
 

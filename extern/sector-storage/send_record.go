@@ -159,7 +159,7 @@ func Load() ([]IncompleteTask, error) {
 
 type Config struct {
 	RecordUrl   string
-	RedisUrl    []string
+	RedisUrl    string
 	PassWord    string
 	StorageIP   string
 	StoragePath string

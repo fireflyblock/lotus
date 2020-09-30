@@ -2,6 +2,7 @@ package goredis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
 	logrus "github.com/filecoin-project/sector-storage/log"
@@ -169,5 +170,29 @@ func TestDelete(t *testing.T) {
 		//5 seal_ap_%d
 		cc.HDel(PUB_RES_NAME, f)
 	}
+
+}
+
+type ttt struct {
+	err error
+}
+
+func TestSerialize(t *testing.T) {
+	//pp1:=ttt{errors.New("try")}
+	pp1 := errors.New("try")
+
+	t.Log("pp1:", pp1)
+	res1, err := Serialization(pp1)
+	if err != nil {
+		t.Errorf("ser err %+v", err)
+	}
+	t.Log("res1:", res1)
+
+	var pp2 = errors.New("")
+	err = Deserialization(res1, &pp2)
+	if err != nil {
+		t.Errorf("des err %+v", err)
+	}
+	t.Log("pp2:", pp2)
 
 }

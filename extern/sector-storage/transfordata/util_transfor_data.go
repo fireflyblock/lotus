@@ -287,7 +287,7 @@ func Tar(src string, writers ...io.Writer) error {
 
 type Config struct {
 	RecordUrl   string
-	RedisUrl    []string
+	RedisUrl    string
 	PassWord    string
 	StorageIP   string
 	StoragePath string

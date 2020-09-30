@@ -146,7 +146,7 @@ func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
 		return
 	}
 	sectorsAll := set.New(set.ThreadSafe)
-	for i := abi.SectorNumber(0); i < sidMax; i++ {
+	for i := abi.SectorNumber(0); i <= sidMax; i++ {
 		sectorsAll.Add(i)
 	}
 
