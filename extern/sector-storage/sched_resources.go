@@ -32,20 +32,22 @@ func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResource
 
 func (a *activeResources) add(wr storiface.WorkerResources, r Resources) {
 	a.gpuUsed = r.CanGPU
-	if r.MultiThread() {
-		//a.cpuUse += wr.CPUs
-		a.cpuCount += wr.CPUs
-	} else {
-		//a.cpuUse += uint64(r.Threads)
-		a.cpuCount += uint64(r.Threads)
-	}
+	a.cpuUse += r.Threads(wr.CPUs)
+
+	//if r.MultiThread() {
+	//a.cpuUse += wr.CPUs
+	//	a.cpuCount += wr.CPUs
+	//} else {
+	//a.cpuUse += uint64(r.Threads)
+	//	a.cpuCount += uint64(r.Threads)
+	//	}
 
 	// 修改cpu计数
-	if a.cpuCount >= wr.CPUs {
-		a.cpuUse = wr.CPUs
-	} else {
-		a.cpuUse = a.cpuCount
-	}
+	//if a.cpuCount >= wr.CPUs {
+	//a.cpuUse = wr.CPUs
+	//} else {
+	//	a.cpuUse = a.cpuCount
+	//}
 
 	a.memUsedMin += r.MinMemory
 	a.memUsedMax += r.MaxMemory
@@ -55,20 +57,22 @@ func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
 	if r.CanGPU {
 		a.gpuUsed = false
 	}
-	if r.MultiThread() {
-		//a.cpuUse -= wr.CPUs
-		a.cpuCount -= wr.CPUs
-	} else {
-		//a.cpuUse -= uint64(r.Threads)
-		a.cpuCount -= uint64(r.Threads)
-	}
+
+	a.cpuUse -= r.Threads(wr.CPUs)
+	//if r.MultiThread() {
+	//a.cpuUse -= wr.CPUs
+	//a.cpuCount -= wr.CPUs
+	//} else {
+	//a.cpuUse -= uint64(r.Threads)
+	//	a.cpuCount -= uint64(r.Threads)
+	//}
 
 	// 修改cpu计数
-	if a.cpuCount >= wr.CPUs {
-		a.cpuUse = wr.CPUs
-	} else {
-		a.cpuUse = a.cpuCount
-	}
+	//if a.cpuCount >= wr.CPUs {
+	//a.cpuUse = wr.CPUs
+	//	} else {
+	//	a.cpuUse = a.cpuCount
+	//	}
 
 	a.memUsedMin -= r.MinMemory
 	a.memUsedMax -= r.MaxMemory

@@ -34,6 +34,7 @@ var pathTypes = []stores.SectorFileType{stores.FTUnsealed, stores.FTSealed, stor
 type WorkerConfig struct {
 	SealProof abi.RegisteredSealProof
 	TaskTypes []sealtasks.TaskType
+	NoSwap    bool
 }
 
 type LocalWorker struct {
@@ -41,6 +42,7 @@ type LocalWorker struct {
 	storage    stores.Store
 	localStore *stores.Local
 	sindex     stores.SectorIndex
+	noSwap     bool
 
 	acceptTasks map[sealtasks.TaskType]struct{}
 
@@ -67,6 +69,7 @@ func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, 
 		storage:    store,
 		localStore: local,
 		sindex:     sindex,
+		noSwap:     wcfg.NoSwap,
 
 		acceptTasks: acceptTasks,
 
@@ -95,7 +98,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 		return stores.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
 	}
 
-	logrus.SchedLogger.Debugf("===== acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
+	log.Debugf("acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
 		releaseStorage()
@@ -108,7 +111,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 			sid := stores.PathByType(storageIDs, fileType)
 
 			if err := l.w.sindex.StorageDeclareSector(ctx, stores.ID(sid), sector, fileType, l.op == stores.AcquireMove); err != nil {
-				logrus.SchedLogger.Errorf("===== declare sector error: %+v", err)
+				log.Errorf("declare sector error: %+v", err)
 			}
 		}
 	}, nil
@@ -342,7 +345,7 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 	if err != nil {
 		return err
 	}
-	logrus.SchedLogger.Debugf("===== trySched unseal1 sector:%+v,index:%+v, size:%+v, randomness:%+v, cid:%+v\n", sector, index, size, randomness, cid)
+
 	if err := sb.UnsealPiece(ctx, sector, index, size, randomness, cid); err != nil {
 		return xerrors.Errorf("unsealing sector: %w", err)
 	}
@@ -359,7 +362,6 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 }
 
 func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	logrus.SchedLogger.Debugf("===== LocalWorker.readpiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, index, size)
 	sb, err := l.sb()
 	if err != nil {
 		return false, err
@@ -384,7 +386,7 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 
 	gpus, err := ffi.GetGPUDevices()
 	if err != nil {
-		logrus.SchedLogger.Errorf("getting gpu devices failed: %+v", err)
+		log.Errorf("getting gpu devices failed: %+v", err)
 	}
 
 	h, err := sysinfo.Host()
@@ -397,11 +399,16 @@ func (l *LocalWorker) Info(context.Context) (storiface.WorkerInfo, error) {
 		return storiface.WorkerInfo{}, xerrors.Errorf("getting memory info: %w", err)
 	}
 
+	memSwap := mem.VirtualTotal
+	if l.noSwap {
+		memSwap = 0
+	}
+
 	return storiface.WorkerInfo{
 		Hostname: hostname,
 		Resources: storiface.WorkerResources{
 			MemPhysical: mem.Total,
-			MemSwap:     mem.VirtualTotal,
+			MemSwap:     memSwap,
 			// 物理内存使用情况,设置一个假内存
 			MemReserved: 2 << 30,
 			//MemReserved: mem.VirtualUsed + mem.Total - mem.Available, // TODO: sub this process

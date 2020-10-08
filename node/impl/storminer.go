@@ -9,18 +9,18 @@ import (
 	"strconv"
 	"time"
 
-	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/host"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	sectorstorage "github.com/filecoin-project/sector-storage"
@@ -56,6 +56,8 @@ type StorageMinerAPI struct {
 	*stores.Index
 	DataTransfer dtypes.ProviderDataTransfer
 	Host         host.Host
+
+	DS dtypes.MetadataDS
 
 	ConsiderOnlineStorageDealsConfigFunc       dtypes.ConsiderOnlineStorageDealsConfigFunc
 	SetConsiderOnlineStorageDealsConfigFunc    dtypes.SetConsiderOnlineStorageDealsConfigFunc
@@ -543,6 +545,10 @@ func (sm *StorageMinerAPI) PiecesGetCIDInfo(ctx context.Context, payloadCid cid.
 	}
 
 	return &ci, nil
+}
+
+func (sm *StorageMinerAPI) CreateBackup(ctx context.Context, fpath string) error {
+	return backup(sm.DS, fpath)
 }
 
 var _ api.StorageMiner = &StorageMinerAPI{}

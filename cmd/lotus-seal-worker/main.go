@@ -113,6 +113,11 @@ var runCmd = &cli.Command{
 			Usage: "don't use storageminer repo for sector storage",
 		},
 		&cli.BoolFlag{
+			Name:  "no-swap",
+			Usage: "don't use swap",
+			Value: false,
+		},
+		&cli.BoolFlag{
 			Name:  "addpiece",
 			Usage: "enable addpiece",
 			Value: true,
@@ -502,7 +507,7 @@ var runCmd = &cli.Command{
 				LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 					SealProof: spt,
 					TaskTypes: taskTypes,
-				}, remote, localStore, nodeApi),
+				    NoSwap:    cctx.Bool("no-swap"),}, remote, localStore, nodeApi),
 				localStore: localStore,
 				ls:         lr,
 			}
@@ -632,6 +637,7 @@ func watchMinerConn(ctx context.Context, cctx *cli.Context, nodeApi api.StorageM
 			"run",
 			fmt.Sprintf("--listen=%s", cctx.String("listen")),
 			fmt.Sprintf("--no-local-storage=%t", cctx.Bool("no-local-storage")),
+			fmt.Sprintf("--no-swap=%t", cctx.Bool("no-swap")),
 			fmt.Sprintf("--addpiece=%t", cctx.Bool("addpiece")),
 			fmt.Sprintf("--precommit1=%t", cctx.Bool("precommit1")),
 			fmt.Sprintf("--unseal=%t", cctx.Bool("unseal")),

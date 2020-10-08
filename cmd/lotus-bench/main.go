@@ -78,8 +78,6 @@ func main() {
 
 	log.Info("Starting lotus-bench")
 
-	policy.AddSupportedProofTypes(abi.RegisteredSealProof_StackedDrg2KiBV1)
-
 	app := &cli.App{
 		Name:    "lotus-bench",
 		Usage:   "Benchmark performance of lotus on your hardware",
@@ -264,6 +262,8 @@ var sealBenchCmd = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		policy.AddSupportedProofTypes(abi.RegisteredSealProof_StackedDrg2KiBV1)
+
 		if c.Bool("no-gpu") {
 			err := os.Setenv("BELLMAN_NO_GPU", "1")
 			if err != nil {

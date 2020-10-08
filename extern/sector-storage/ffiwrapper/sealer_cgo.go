@@ -97,7 +97,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 		if stagedFile != nil {
 			if err := stagedFile.Close(); err != nil {
-				logrus.SchedLogger.Errorf("closing staged file: %+v", err)
+				log.Errorf("closing staged file: %+v", err)
 			}
 		}
 	}()
@@ -400,7 +400,6 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 }
 
 func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	logrus.SchedLogger.Debugf("===== Sealer.ReadPiece  sector:%+v, writer:%+v, index:%+v, size:%+v\n", sector, writer, offset, size)
 	path, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
 	if err != nil {
 		return false, xerrors.Errorf("acquire unsealed sector path: %w", err)
@@ -469,7 +468,7 @@ func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	if err := os.Mkdir(paths.Cache, 0755); err != nil { // nolint
 		if os.IsExist(err) {
-			logrus.SchedLogger.Warnf("existing cache in %s; removing", paths.Cache)
+			log.Warnf("existing cache in %s; removing", paths.Cache)
 
 			if err := os.RemoveAll(paths.Cache); err != nil {
 				return nil, xerrors.Errorf("remove existing sector cache from %s (sector %d): %w", paths.Cache, sector, err)
