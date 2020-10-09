@@ -26,8 +26,8 @@ func NewRedisClusterCLi(ctx context.Context, addrs string, passWord string) *Red
 
 	// 连接redis集群
 	rc := redis.NewClient(&redis.Options{
-		Addr: addrs,
-		//Password:     passWord,        // 设置密码
+		Addr:         addrs,
+		Password:     passWord,        // 设置密码
 		DialTimeout:  1 * time.Second, // 设置连接超时
 		ReadTimeout:  1 * time.Second, // 设置读取超时
 		WriteTimeout: 1 * time.Second, // 设置写入超时

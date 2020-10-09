@@ -58,7 +58,7 @@ func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
 		log.Errorf("===== read conf.json err:", err)
 	}
 
-	if conf.RecordUrl == "" {
+	if conf.RedisUrl == "" {
 		rurl = DefaultRedisURL
 	} else {
 		rurl = conf.RedisUrl
@@ -387,7 +387,7 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 		//data := rw.pledgeReader(params.NewPieceSize)
 		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
 		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
-		log.Infof("===== rd pledge, pi %+v err %+v err", pi, err)
+		log.Infof("===== rd pledge, pi %+v err %+v", pi, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
 				PieceInfo: pi,

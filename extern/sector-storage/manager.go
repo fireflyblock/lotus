@@ -36,7 +36,7 @@ var (
 	//	"172.16.0.7:8001",
 	//	"172.16.0.7:8002",
 	//	"172.16.0.8:8001",
-	DefaultRedisPassWord = "rcQuwPzASm"
+	DefaultRedisPassWord = ""
 )
 
 const CHECK_RES_GAP = time.Minute * 10

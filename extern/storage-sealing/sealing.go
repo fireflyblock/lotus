@@ -153,7 +153,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		logrus.SchedLogger.Errorf("===== read conf.json err:", err)
 	}
 
-	if conf.RecordUrl == "" {
+	if conf.RedisUrl == "" {
 		rurl = sectorstorage.DefaultRedisURL
 	} else {
 		rurl = conf.RedisUrl
