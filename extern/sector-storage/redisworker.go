@@ -605,7 +605,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 	// 传输文件
 	{
 		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.Number, sealtasks.TTCommit1, 1))
+		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.Number, sealtasks.TTAddPieceSe, 1))
 		if err != nil {
 			log.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", params.Sector, err)
 			paramsRes.StoragePath = ""
