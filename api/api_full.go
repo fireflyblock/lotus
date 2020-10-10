@@ -367,6 +367,10 @@ type FullNode interface {
 	// StateWaitMsg looks back in the chain for a message. If not found, it blocks until the
 	// message arrives on chain, and gets to the indicated confidence depth.
 	StateWaitMsg(ctx context.Context, cid cid.Cid, confidence uint64) (*MsgLookup, error)
+	// StateWaitMsgLimited looks back up to limit epochs in the chain for a message.
+	// If not found, it blocks until the message arrives on chain, and gets to the
+	// indicated confidence depth.
+	StateWaitMsgLimited(ctx context.Context, cid cid.Cid, confidence uint64, limit abi.ChainEpoch) (*MsgLookup, error)
 	// StateListMiners returns the addresses of every miner that has claimed power in the Power Actor
 	StateListMiners(context.Context, types.TipSetKey) ([]address.Address, error)
 	// StateListActors returns the addresses of every actor in the state
@@ -418,6 +422,8 @@ type FullNode interface {
 
 	// MsigGetAvailableBalance returns the portion of a multisig's balance that can be withdrawn or spent
 	MsigGetAvailableBalance(context.Context, address.Address, types.TipSetKey) (types.BigInt, error)
+	// MsigGetVestingSchedule returns the vesting details of a given multisig.
+	MsigGetVestingSchedule(context.Context, address.Address, types.TipSetKey) (MsigVesting, error)
 	// MsigGetVested returns the amount of FIL that vested in a multisig in a certain period.
 	// It takes the following params: <multisig address>, <start epoch>, <end epoch>
 	MsigGetVested(context.Context, address.Address, types.TipSetKey, types.TipSetKey) (types.BigInt, error)
@@ -870,4 +876,16 @@ type Partition struct {
 type Fault struct {
 	Miner address.Address
 	Epoch abi.ChainEpoch
+}
+
+var EmptyVesting = MsigVesting{
+	InitialBalance: types.EmptyInt,
+	StartEpoch:     -1,
+	UnlockDuration: -1,
+}
+
+type MsigVesting struct {
+	InitialBalance abi.TokenAmount
+	StartEpoch     abi.ChainEpoch
+	UnlockDuration abi.ChainEpoch
 }

@@ -87,6 +87,7 @@
   * [MsigCreate](#MsigCreate)
   * [MsigGetAvailableBalance](#MsigGetAvailableBalance)
   * [MsigGetVested](#MsigGetVested)
+  * [MsigGetVestingSchedule](#MsigGetVestingSchedule)
   * [MsigPropose](#MsigPropose)
   * [MsigSwapApprove](#MsigSwapApprove)
   * [MsigSwapCancel](#MsigSwapCancel)
@@ -166,6 +167,7 @@
   * [StateVerifiedRegistryRootKey](#StateVerifiedRegistryRootKey)
   * [StateVerifierStatus](#StateVerifierStatus)
   * [StateWaitMsg](#StateWaitMsg)
+  * [StateWaitMsgLimited](#StateWaitMsgLimited)
 * [Sync](#Sync)
   * [SyncCheckBad](#SyncCheckBad)
   * [SyncCheckpoint](#SyncCheckpoint)
@@ -2142,6 +2144,36 @@ Inputs:
 ```
 
 Response: `"0"`
+
+### MsigGetVestingSchedule
+MsigGetVestingSchedule returns the vesting details of a given multisig.
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ]
+]
+```
+
+Response:
+```json
+{
+  "InitialBalance": "0",
+  "StartEpoch": 10101,
+  "UnlockDuration": 10101
+}
+```
 
 ### MsigPropose
 MsigPropose proposes a multisig message
@@ -4263,6 +4295,49 @@ Inputs:
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   42
+]
+```
+
+Response:
+```json
+{
+  "Message": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "Receipt": {
+    "ExitCode": 0,
+    "Return": "Ynl0ZSBhcnJheQ==",
+    "GasUsed": 9
+  },
+  "ReturnDec": {},
+  "TipSet": [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  "Height": 10101
+}
+```
+
+### StateWaitMsgLimited
+StateWaitMsgLimited looks back up to limit epochs in the chain for a message.
+If not found, it blocks until the message arrives on chain, and gets to the
+indicated confidence depth.
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  42,
+  10101
 ]
 ```
 
