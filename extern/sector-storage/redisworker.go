@@ -93,8 +93,6 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 	tc := rw.InitWorkerConfig(path)
 
 	tcfKey := gr.SplicingTaskConfigKey(rw.hostName)
-	tctKey := gr.SplicingTaskCounntKey(rw.hostName)
-
 	err = rw.redisCli.HSet(tcfKey, gr.FIELDPAP, uint64(tc.AddPieceSize))
 	if err != nil {
 		return
@@ -112,25 +110,12 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 		return
 	}
 
-	count, err := rw.redisCli.Exist(tctKey)
-	if count == 0 {
-		rw.redisCli.HSet(tctKey, gr.FIELDPLEDGEP, 0)
-
-		rw.redisCli.HSet(tctKey, gr.FIELDSEAL, 0)
-
-		rw.redisCli.HSet(tctKey, gr.FIELDP1, 0)
-
-		rw.redisCli.HSet(tctKey, gr.FIELDP2, 0)
-
-		rw.redisCli.HSet(tctKey, gr.FIELDC1, 0)
-	}
-
 	return nil
 }
 
 func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 	//range
-	keys, err := rw.redisCli.HKeys(gr.RedisField(rw.hostName))
+	keys, err := rw.redisCli.HKeys(gr.RedisKey(rw.hostName))
 	if err != nil {
 		log.Errorf("===== rd RecoveryTask, hkeys err:", err)
 		return err

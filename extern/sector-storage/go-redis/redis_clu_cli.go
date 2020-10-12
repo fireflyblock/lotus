@@ -197,9 +197,17 @@ func (rc *RedisClient) DecrSealAPID(sectorID abi.SectorNumber) (int64, error) {
 	return temp, nil
 }
 
-func (rc *RedisClient) Incr(key RedisKey, field RedisField, incr int64) (int64, error) {
+func (rc *RedisClient) HIncr(key RedisKey, field RedisField, incr int64) (int64, error) {
+	//count, err := rc.RediClient.HGet(rc.Ctx, string(key), string(field)).Int64()
+	//if err != nil {
+	//	return 0, err
+	//}
+	//
+	//if count == 0 {
+	//	return 0, errors.New("the count has returned to zero")
+	//}
+
 	return rc.RediClient.HIncrBy(rc.Ctx, string(key), string(field), incr).Result()
-	//return rc.RediClient.Incr(rc.Ctx, string(field)).Result()
 }
 
 func (rc *RedisClient) Exist(key RedisKey) (int64, error) {
@@ -218,7 +226,7 @@ func (rc *RedisClient) Del(key RedisKey) (int64, error) {
 	return rc.RediClient.Del(rc.Ctx, string(key)).Result()
 }
 
-func (rc *RedisClient) HKeys(key RedisField) ([]RedisField, error) {
+func (rc *RedisClient) HKeys(key RedisKey) ([]RedisField, error) {
 	newSlice := make([]RedisField, 0)
 	res, err := rc.RediClient.HKeys(rc.Ctx, string(key)).Result()
 	if err != nil {

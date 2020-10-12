@@ -17,7 +17,9 @@ const (
 	PARAMS_RES_NAME RedisKey = "params_res"
 	RECOVER_NAME    RedisKey = "recover"
 	WORKER_COUNT    RedisKey = "worker_count*"
+	W_C_T           RedisKey = "worker_count_"
 	WORKER_CONFIG   RedisKey = "worker_config*"
+	W_C_F           RedisKey = "worker_config_"
 
 	SEALAPID = "seal_ap_"
 	//FIELDPLEDGEP    RedisField = "seal/v0/addpiece/pledge"
@@ -187,7 +189,7 @@ type RedisKey string
 
 //拼接worker配置的key
 func SplicingTaskCounntKey(hostName string) RedisKey {
-	str := fmt.Sprintf("worker_count_%s", hostName)
+	str := fmt.Sprintf("%s%s", W_C_T, hostName)
 	return RedisKey(str)
 }
 
@@ -206,7 +208,7 @@ func (rk RedisKey) ToString() string {
 
 //拼接worker计数的key
 func SplicingTaskConfigKey(hostName string) RedisKey {
-	str := fmt.Sprintf("worker_config_%s", hostName)
+	str := fmt.Sprintf("%s%s", W_C_F, hostName)
 	return RedisKey(str)
 }
 
