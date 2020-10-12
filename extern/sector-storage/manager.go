@@ -543,6 +543,8 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 				case <-tm.C:
 					continue
 				}
+			} else {
+				return nil
 			}
 		}
 	}
@@ -766,6 +768,8 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 				case <-tm.C:
 					continue
 				}
+			} else {
+				return nil
 			}
 		}
 	}
@@ -965,6 +969,8 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 				case <-tm.C:
 					continue
 				}
+			} else {
+				return nil
 			}
 		}
 	}
@@ -1240,6 +1246,8 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 				case <-tm.C:
 					continue
 				}
+			} else {
+				return nil
 			}
 		}
 	}
