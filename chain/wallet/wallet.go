@@ -26,8 +26,6 @@ const (
 	KNamePrefix  = "wallet-"
 	KTrashPrefix = "trash-"
 	KDefault     = "default"
-	KTBLS        = "bls"
-	KTSecp256k1  = "secp256k1"
 )
 
 type LocalWallet struct {
@@ -141,6 +139,9 @@ func (w *LocalWallet) WalletExport(ctx context.Context, addr address.Address) (*
 	if err != nil {
 		return nil, xerrors.Errorf("failed to find key to export: %w", err)
 	}
+	if k == nil {
+		return nil, xerrors.Errorf("key not found")
+	}
 
 	return &k.KeyInfo, nil
 }
@@ -233,7 +234,7 @@ func (w *LocalWallet) SetDefault(a address.Address) error {
 	return nil
 }
 
-func (w *LocalWallet) WalletNew(ctx context.Context, typ crypto.SigType) (address.Address, error) {
+func (w *LocalWallet) WalletNew(ctx context.Context, typ types.KeyType) (address.Address, error) {
 	w.lk.Lock()
 	defer w.lk.Unlock()
 
@@ -274,6 +275,9 @@ func (w *LocalWallet) WalletDelete(ctx context.Context, addr address.Address) er
 	if err != nil {
 		return xerrors.Errorf("failed to delete key %s : %w", addr, err)
 	}
+	if k == nil {
+		return nil // already not there
+	}
 
 	if err := w.keystore.Put(KTrashPrefix+k.Address.String(), k.KeyInfo); err != nil {
 		return xerrors.Errorf("failed to mark key %s as trashed: %w", addr, err)
@@ -294,6 +298,14 @@ func (w *LocalWallet) WalletDelete(ctx context.Context, addr address.Address) er
 	return nil
 }
 
+func (w *LocalWallet) Get() api.WalletAPI {
+	if w == nil {
+		return nil
+	}
+
+	return w
+}
+
 var _ api.WalletAPI = &LocalWallet{}
 
 func swapMainnetForTestnetPrefix(addr string) (string, error) {
@@ -306,3 +318,16 @@ func swapMainnetForTestnetPrefix(addr string) (string, error) {
 	aChars[0] = prefixRunes[0]
 	return string(aChars), nil
 }
+
+type nilDefault struct{}
+
+func (n nilDefault) GetDefault() (address.Address, error) {
+	return address.Undef, nil
+}
+
+func (n nilDefault) SetDefault(a address.Address) error {
+	return xerrors.Errorf("not supported; local wallet disabled")
+}
+
+var NilDefault nilDefault
+var _ Default = NilDefault

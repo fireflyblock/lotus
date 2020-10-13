@@ -1726,7 +1726,7 @@ func VerifyElectionPoStVRF(ctx context.Context, worker address.Address, rand []b
 	return gen.VerifyVRF(ctx, worker, rand, evrf)
 }
 
-func (syncer *Syncer) State() []SyncerState {
+func (syncer *Syncer) State() []SyncerStateSnapshot {
 	return syncer.syncmgr.State()
 }
 
@@ -1738,6 +1738,10 @@ func (syncer *Syncer) MarkBad(blk cid.Cid) {
 // UnmarkBad manually adds a block to the "bad blocks" cache.
 func (syncer *Syncer) UnmarkBad(blk cid.Cid) {
 	syncer.bad.Remove(blk)
+}
+
+func (syncer *Syncer) UnmarkAllBad() {
+	syncer.bad.Purge()
 }
 
 func (syncer *Syncer) CheckBadBlockCache(blk cid.Cid) (string, bool) {

@@ -21,16 +21,15 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/sector-storage/zerocomm"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
-	"github.com/filecoin-project/lotus/genesis"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/ffiwrapper/basicfs"
 	"github.com/filecoin-project/sector-storage/stores"
+	"github.com/filecoin-project/lotus/genesis"
 )
 
 var log = logging.Logger("preseal")
@@ -93,7 +92,7 @@ func PreSeal(maddr address.Address, spt abi.RegisteredSealProof, offset abi.Sect
 			return nil, nil, err
 		}
 	} else {
-		minerAddr, err = wallet.GenerateKey(crypto.SigTypeBLS)
+		minerAddr, err = wallet.GenerateKey(types.KTBLS)
 		if err != nil {
 			return nil, nil, err
 		}

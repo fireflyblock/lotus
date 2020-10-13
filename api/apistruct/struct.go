@@ -112,6 +112,7 @@ type FullNodeStruct struct {
 		SyncCheckpoint     func(ctx context.Context, key types.TipSetKey) error         `perm:"admin"`
 		SyncMarkBad        func(ctx context.Context, bcid cid.Cid) error                `perm:"admin"`
 		SyncUnmarkBad      func(ctx context.Context, bcid cid.Cid) error                `perm:"admin"`
+		SyncUnmarkAllBad   func(ctx context.Context) error                              `perm:"admin"`
 		SyncCheckBad       func(ctx context.Context, bcid cid.Cid) (string, error)      `perm:"read"`
 		SyncValidateTipset func(ctx context.Context, tsk types.TipSetKey) (bool, error) `perm:"read"`
 
@@ -133,7 +134,7 @@ type FullNodeStruct struct {
 		MinerGetBaseInfo func(context.Context, address.Address, abi.ChainEpoch, types.TipSetKey) (*api.MiningBaseInfo, error) `perm:"read"`
 		MinerCreateBlock func(context.Context, *api.BlockTemplate) (*types.BlockMsg, error)                                   `perm:"write"`
 
-		WalletNew             func(context.Context, crypto.SigType) (address.Address, error)                       `perm:"write"`
+		WalletNew             func(context.Context, types.KeyType) (address.Address, error)                        `perm:"write"`
 		WalletHas             func(context.Context, address.Address) (bool, error)                                 `perm:"write"`
 		WalletList            func(context.Context) ([]address.Address, error)                                     `perm:"write"`
 		WalletBalance         func(context.Context, address.Address) (types.BigInt, error)                         `perm:"read"`
@@ -210,7 +211,8 @@ type FullNodeStruct struct {
 		StateVerifiedClientStatus          func(context.Context, address.Address, types.TipSetKey) (*abi.StoragePower, error)                                  `perm:"read"`
 		StateVerifiedRegistryRootKey       func(ctx context.Context, tsk types.TipSetKey) (address.Address, error)                                             `perm:"read"`
 		StateDealProviderCollateralBounds  func(context.Context, abi.PaddedPieceSize, bool, types.TipSetKey) (api.DealCollateralBounds, error)                 `perm:"read"`
-		StateCirculatingSupply             func(context.Context, types.TipSetKey) (api.CirculatingSupply, error)                                               `perm:"read"`
+		StateCirculatingSupply             func(context.Context, types.TipSetKey) (abi.TokenAmount, error)                                                     `perm:"read"`
+		StateVMCirculatingSupplyInternal   func(context.Context, types.TipSetKey) (api.CirculatingSupply, error)                                               `perm:"read"`
 		StateNetworkVersion                func(context.Context, types.TipSetKey) (stnetwork.Version, error)                                                   `perm:"read"`
 
 		MsigGetAvailableBalance func(context.Context, address.Address, types.TipSetKey) (types.BigInt, error)                                                                    `perm:"read"`
@@ -218,7 +220,8 @@ type FullNodeStruct struct {
 		MsigGetVested           func(context.Context, address.Address, types.TipSetKey, types.TipSetKey) (types.BigInt, error)                                                   `perm:"read"`
 		MsigCreate              func(context.Context, uint64, []address.Address, abi.ChainEpoch, types.BigInt, address.Address, types.BigInt) (cid.Cid, error)                   `perm:"sign"`
 		MsigPropose             func(context.Context, address.Address, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error)                          `perm:"sign"`
-		MsigApprove             func(context.Context, address.Address, uint64, address.Address, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error) `perm:"sign"`
+		MsigApprove             func(context.Context, address.Address, uint64, address.Address) (cid.Cid, error)                                                                 `perm:"sign"`
+		MsigApproveTxnHash      func(context.Context, address.Address, uint64, address.Address, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error) `perm:"sign"`
 		MsigCancel              func(context.Context, address.Address, uint64, address.Address, types.BigInt, address.Address, uint64, []byte) (cid.Cid, error)                  `perm:"sign"`
 		MsigAddPropose          func(context.Context, address.Address, address.Address, address.Address, bool) (cid.Cid, error)                                                  `perm:"sign"`
 		MsigAddApprove          func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address, bool) (cid.Cid, error)                         `perm:"sign"`
@@ -226,6 +229,7 @@ type FullNodeStruct struct {
 		MsigSwapPropose         func(context.Context, address.Address, address.Address, address.Address, address.Address) (cid.Cid, error)                                       `perm:"sign"`
 		MsigSwapApprove         func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address, address.Address) (cid.Cid, error)              `perm:"sign"`
 		MsigSwapCancel          func(context.Context, address.Address, address.Address, uint64, address.Address, address.Address) (cid.Cid, error)                               `perm:"sign"`
+		MsigRemoveSigner        func(ctx context.Context, msig address.Address, proposer address.Address, toRemove address.Address, decrease bool) (cid.Cid, error)              `perm:"sign"`
 
 		MarketEnsureAvailable func(context.Context, address.Address, address.Address, types.BigInt) (cid.Cid, error) `perm:"sign"`
 
@@ -392,7 +396,7 @@ type GatewayStruct struct {
 
 type WalletStruct struct {
 	Internal struct {
-		WalletNew    func(context.Context, crypto.SigType) (address.Address, error)                         `perm:"write"`
+		WalletNew    func(context.Context, types.KeyType) (address.Address, error)                          `perm:"write"`
 		WalletHas    func(context.Context, address.Address) (bool, error)                                   `perm:"write"`
 		WalletList   func(context.Context) ([]address.Address, error)                                       `perm:"write"`
 		WalletSign   func(context.Context, address.Address, []byte, api.MsgMeta) (*crypto.Signature, error) `perm:"sign"`
@@ -639,7 +643,7 @@ func (c *FullNodeStruct) ChainGetTipSetByHeight(ctx context.Context, h abi.Chain
 	return c.Internal.ChainGetTipSetByHeight(ctx, h, tsk)
 }
 
-func (c *FullNodeStruct) WalletNew(ctx context.Context, typ crypto.SigType) (address.Address, error) {
+func (c *FullNodeStruct) WalletNew(ctx context.Context, typ types.KeyType) (address.Address, error) {
 	return c.Internal.WalletNew(ctx, typ)
 }
 
@@ -789,6 +793,10 @@ func (c *FullNodeStruct) SyncMarkBad(ctx context.Context, bcid cid.Cid) error {
 
 func (c *FullNodeStruct) SyncUnmarkBad(ctx context.Context, bcid cid.Cid) error {
 	return c.Internal.SyncUnmarkBad(ctx, bcid)
+}
+
+func (c *FullNodeStruct) SyncUnmarkAllBad(ctx context.Context) error {
+	return c.Internal.SyncUnmarkAllBad(ctx)
 }
 
 func (c *FullNodeStruct) SyncCheckBad(ctx context.Context, bcid cid.Cid) (string, error) {
@@ -967,8 +975,12 @@ func (c *FullNodeStruct) StateDealProviderCollateralBounds(ctx context.Context, 
 	return c.Internal.StateDealProviderCollateralBounds(ctx, size, verified, tsk)
 }
 
-func (c *FullNodeStruct) StateCirculatingSupply(ctx context.Context, tsk types.TipSetKey) (api.CirculatingSupply, error) {
+func (c *FullNodeStruct) StateCirculatingSupply(ctx context.Context, tsk types.TipSetKey) (abi.TokenAmount, error) {
 	return c.Internal.StateCirculatingSupply(ctx, tsk)
+}
+
+func (c *FullNodeStruct) StateVMCirculatingSupplyInternal(ctx context.Context, tsk types.TipSetKey) (api.CirculatingSupply, error) {
+	return c.Internal.StateVMCirculatingSupplyInternal(ctx, tsk)
 }
 
 func (c *FullNodeStruct) StateNetworkVersion(ctx context.Context, tsk types.TipSetKey) (stnetwork.Version, error) {
@@ -995,8 +1007,12 @@ func (c *FullNodeStruct) MsigPropose(ctx context.Context, msig address.Address, 
 	return c.Internal.MsigPropose(ctx, msig, to, amt, src, method, params)
 }
 
-func (c *FullNodeStruct) MsigApprove(ctx context.Context, msig address.Address, txID uint64, proposer address.Address, to address.Address, amt types.BigInt, src address.Address, method uint64, params []byte) (cid.Cid, error) {
-	return c.Internal.MsigApprove(ctx, msig, txID, proposer, to, amt, src, method, params)
+func (c *FullNodeStruct) MsigApprove(ctx context.Context, msig address.Address, txID uint64, signer address.Address) (cid.Cid, error) {
+	return c.Internal.MsigApprove(ctx, msig, txID, signer)
+}
+
+func (c *FullNodeStruct) MsigApproveTxnHash(ctx context.Context, msig address.Address, txID uint64, proposer address.Address, to address.Address, amt types.BigInt, src address.Address, method uint64, params []byte) (cid.Cid, error) {
+	return c.Internal.MsigApproveTxnHash(ctx, msig, txID, proposer, to, amt, src, method, params)
 }
 
 func (c *FullNodeStruct) MsigCancel(ctx context.Context, msig address.Address, txID uint64, to address.Address, amt types.BigInt, src address.Address, method uint64, params []byte) (cid.Cid, error) {
@@ -1025,6 +1041,10 @@ func (c *FullNodeStruct) MsigSwapApprove(ctx context.Context, msig address.Addre
 
 func (c *FullNodeStruct) MsigSwapCancel(ctx context.Context, msig address.Address, src address.Address, txID uint64, oldAdd address.Address, newAdd address.Address) (cid.Cid, error) {
 	return c.Internal.MsigSwapCancel(ctx, msig, src, txID, oldAdd, newAdd)
+}
+
+func (c *FullNodeStruct) MsigRemoveSigner(ctx context.Context, msig address.Address, proposer address.Address, toRemove address.Address, decrease bool) (cid.Cid, error) {
+	return c.Internal.MsigRemoveSigner(ctx, msig, proposer, toRemove, decrease)
 }
 
 func (c *FullNodeStruct) MarketEnsureAvailable(ctx context.Context, addr, wallet address.Address, amt types.BigInt) (cid.Cid, error) {
@@ -1498,7 +1518,7 @@ func (g GatewayStruct) StateWaitMsg(ctx context.Context, msg cid.Cid, confidence
 	return g.Internal.StateWaitMsg(ctx, msg, confidence)
 }
 
-func (c *WalletStruct) WalletNew(ctx context.Context, typ crypto.SigType) (address.Address, error) {
+func (c *WalletStruct) WalletNew(ctx context.Context, typ types.KeyType) (address.Address, error) {
 	return c.Internal.WalletNew(ctx, typ)
 }
 
