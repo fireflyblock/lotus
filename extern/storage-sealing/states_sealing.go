@@ -151,7 +151,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
 
-		newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
+		newCtx := sector.sealingCtx(ctx.Context())
 		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), ticketValue, sector.pieceInfos(), recover)
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
