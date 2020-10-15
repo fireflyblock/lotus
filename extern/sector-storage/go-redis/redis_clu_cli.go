@@ -117,40 +117,25 @@ func (rc *RedisClient) Publish(channel string, message RedisField) (int64, error
 //订阅消息  params：通道
 func (rc *RedisClient) Subscribe(channel string) (<-chan *redis.Message, error) {
 	sub := rc.RediClient.Subscribe(rc.Ctx, channel)
-	iface, err := sub.Receive(rc.Ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	//for {
-	//	switch v := iface.(type) {
-	//	case redis.Subscription:
-	//		fmt.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
-	//		//return v.Count, nil
-	//	case redis.Message:
-	//		fmt.Printf("%s: message: %s pattern:%+v PayloadSlice:%+v \n", v.Channel, v.Payload, v.Pattern,v.PayloadSlice)
-	//		//return v.Payload, nil
-	//	case redis.Pong:
-	//		fmt.Printf("%s\n", v.Payload)
-	//	case error:
-	//		return nil, v
-	//	}
+	//iface, err := sub.Receive(rc.Ctx)
+	//if err != nil {
+	//	return nil, err
 	//}
 
-	switch v := iface.(type) {
-	case redis.Subscription:
-		// subscribe succeeded
-		fmt.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
-	case redis.Message:
-		// received first message
-		fmt.Printf("%s: message: %s pattern:%+v PayloadSlice:%+v \n", v.Channel, v.Payload, v.Pattern, v.PayloadSlice)
-	case redis.Pong:
-		// pong received
-		fmt.Printf("%s\n", v.Payload)
-	case error:
-		// handle error
-		return nil, v
-	}
+	//switch v := iface.(type) {
+	//case redis.Subscription:
+	//	// subscribe succeeded
+	//	fmt.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
+	//case redis.Message:
+	//	// received first message
+	//	fmt.Printf("%s: message: %s pattern:%+v PayloadSlice:%+v \n", v.Channel, v.Payload, v.Pattern, v.PayloadSlice)
+	//case redis.Pong:
+	//	// pong received
+	//	fmt.Printf("%s\n", v.Payload)
+	//case error:
+	//	// handle error
+	//	return nil, v
+	//}
 
 	return sub.Channel(), nil
 
