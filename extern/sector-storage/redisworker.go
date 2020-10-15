@@ -628,6 +628,8 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 					break
 				}
 			}
+			// 遍历一轮还没有传输成功，则sleep 5 min
+			time.Sleep(time.Minute * 5)
 		}
 	}
 
