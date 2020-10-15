@@ -672,6 +672,8 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 				logrus.SchedLogger.Errorf("===== hget p1 res err:%+v", err)
 				continue
 			}
+
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTPreCommit1, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResP1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
@@ -887,6 +889,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 				logrus.SchedLogger.Errorf("===== hget p2 res err:%+v", err)
 				continue
 			}
+
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTPreCommit2, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResP2{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
@@ -1134,6 +1138,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 				logrus.SchedLogger.Errorf("===== hget c1 res err:%+v", err)
 				continue
 			}
+
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTCommit1, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
@@ -1802,6 +1808,8 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 				logrus.SchedLogger.Errorf("===== hget ap res err:%+v", err)
 				continue
 			}
+
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sectorID, taskType, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResAp{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
@@ -2108,9 +2116,15 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType, se
 			c1Count++
 		}
 	}
-	logrus.SchedLogger.Infof("===== rd canHT worker %+v : pledge %d seal %d p1 %d p2 %d c1 %d", hostname, plCount, len(seCount), p1Count, p2Count, c1Count)
+	logrus.SchedLogger.Infof("===== rd canHT worker %+v sectorID %+v taskType %+v : "+
+		"[ pledge %d seal %d p1 %d p2 %d c1 %d ]", hostname, sectorID, taskType,
+		plCount, len(seCount), p1Count, p2Count, c1Count)
 
-	logrus.SchedLogger.Infof("===== rd compare  config:%d count:%d", numberCf, numberCt)
+	//logrus.SchedLogger.Infof("===== rd compare config:%d count:%d , worker %+v sectorID %+v taskType %+v, ", numberCf, numberCt, hostname, sectorID, taskType)
+	//compare
+	if numberCt > numberCf {
+		logrus.SchedLogger.Errorf("===== rd compare err, config:%d count:%d , worker %+v sectorID %+v taskType %+v, ", numberCf, numberCt, hostname, sectorID, taskType)
+	}
 	//compare
 	if numberCf > numberCt {
 		return true, nil
