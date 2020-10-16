@@ -219,6 +219,7 @@ var runCmd = &cli.Command{
 			}
 
 			sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
+			log.Info("===== input sectorSizeInt:", sectorSizeInt)
 			if err != nil {
 				return err
 			}
@@ -507,7 +508,7 @@ var runCmd = &cli.Command{
 				LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 					SealProof: spt,
 					TaskTypes: taskTypes,
-				    NoSwap:    cctx.Bool("no-swap"),}, remote, localStore, nodeApi),
+					NoSwap:    cctx.Bool("no-swap")}, remote, localStore, nodeApi),
 				localStore: localStore,
 				ls:         lr,
 			}

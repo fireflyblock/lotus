@@ -2076,6 +2076,9 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType, se
 		logrus.SchedLogger.Infof("===== rd canHT err %+v worker %+v config :%+v taskType %+v", err, hostname, numberCf, taskType)
 		return free, err
 	}
+	if numberCf == 0 {
+		return free, err
+	}
 
 	//get count (need lock)
 	count, err := m.redisCli.Exist(ttk)

@@ -387,10 +387,10 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 	log.Info("===== 检测sector并重试版本。。。。。")
 	for _, sector := range trackedSectors {
 		// TODO 重启矿工过滤掉非Proving的sector，这样是否有问题 待验证
-		//if sector.State != Proving {
-		//	log.Warnf("===== restart miner --->>> sector(%+v) sate ---->>>> %+v, ignore!!!!!", sector.SectorNumber, sector.State)
-		//	continue
-		//}
+		if sector.State != Proving {
+			log.Warnf("===== restart miner --->>> sector(%+v) sate ---->>>> %+v, ignore!!!!!", sector.SectorNumber, sector.State)
+			continue
+		}
 		if err := m.sectors.Send(uint64(sector.SectorNumber), SectorRestart{}); err != nil {
 			log.Errorf("restarting sector %d: %+v", sector.SectorNumber, err)
 		}
