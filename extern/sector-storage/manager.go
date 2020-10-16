@@ -467,6 +467,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 				logrus.SchedLogger.Infof("===== rd recovery miner ok, hostName %d, taskType %+v", sector.Number, tt)
 				return res.PieceInfo, nil
 			}
+			m.DeleteParamsRes(sector.Number, tt)
 			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, tt)
 		}
 
@@ -583,6 +584,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v", rd)
 		}
+		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit1)
 	}
 
 	//1.publish
@@ -799,6 +801,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		if res.Err == "" {
 			return res.Out, nil
 		}
+		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit2)
 		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTPreCommit2)
 	}
 
@@ -1014,6 +1017,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		if res.Err == "" {
 			return res.Out, nil
 		}
+		//delete res
+		m.DeleteParamsRes(sector.Number, sealtasks.TTCommit1)
 		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTCommit1)
 	}
 
@@ -2243,6 +2248,16 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 		//5 pub time
 		m.redisCli.HDel(gr.PUB_TIME, f)
 	}
+}
+
+func (m *Manager) DeleteParamsRes(sectorID abi.SectorNumber, tashType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd DeleteParamsRes, sectorID %+v", sectorID)
+	f := gr.SplicingBackupPubAndParamsField(sectorID, tashType, 0)
+
+	m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
+
+	m.redisCli.HDel(gr.PUB_RES_NAME, f)
+
 }
 
 func (m *Manager) UpdateStatus(sectorID abi.SectorNumber, taskType sealtasks.TaskType, hostName string) error {
