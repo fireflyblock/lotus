@@ -404,6 +404,10 @@ func (s *WindowPoStScheduler) runPost(ctx context.Context, di dline.Info, ts *ty
 	ctx, span := trace.StartSpan(ctx, "storage.runPost")
 	defer span.End()
 
+	log.Infow("running window post",
+		"deadline", di,
+		"height", ts.Height())
+
 	go func() {
 		// TODO: extract from runPost, run on fault cutoff boundaries
 
