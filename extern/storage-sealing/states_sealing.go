@@ -3,6 +3,7 @@ package sealing
 import (
 	"bytes"
 	"context"
+	"fmt"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 
@@ -519,4 +520,69 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector SectorInf
 	// TODO: Auto-extend if set
 
 	return nil
+}
+
+func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
+	log.Infof("===== rd restart DeleteDataForSid, sectorID %+v", sectorID)
+	//1 backup params
+	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
+	tasklist := make([]sealtasks.TaskType, 0)
+
+	res, err := m.rc.Exist(sealKey)
+	if err != nil {
+		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+	if res > 0 {
+		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	} else {
+
+		list := []sealtasks.TaskType{sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
+		tasklist = append(tasklist, list...)
+	}
+
+	for _, v := range tasklist {
+		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
+		//1 backup  pub
+		m.rc.HDel(gr.PARAMS_NAME, f)
+		//2 backup params
+		m.rc.HDel(gr.PUB_NAME, f)
+		//3 backup res
+		m.rc.HDel(gr.PUB_RES_NAME, f)
+		//4 res params
+		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		//5 pub time
+		m.rc.HDel(gr.PUB_TIME, f)
+		//
+
+	}
+
+	if res == 0 {
+		return
+	}
+
+	var count int64
+	err = m.rc.Get(sealKey, &count)
+	if err != nil {
+		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
+		return
+	}
+
+	m.rc.Del(sealKey)
+
+	var i int64 = 1
+	for i = 1; i <= count; i++ {
+		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
+		//2 backup  pub
+		m.rc.HDel(gr.PARAMS_NAME, f)
+		//3 backup res params
+		m.rc.HDel(gr.PUB_NAME, f)
+		//4 backup res
+		m.rc.HDel(gr.PUB_RES_NAME, f)
+		//5 res params
+		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		//5 pub time
+		m.rc.HDel(gr.PUB_TIME, f)
+	}
 }

@@ -122,6 +122,11 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 	}
 	log.Infof("===== rd recovery worker, get all keys hostName %s, keys %+v", rw.hostName, keys)
 	for _, key := range keys {
+		//check task
+		err := rw.CheckRecovery()
+		if err != nil {
+
+		}
 		var res gr.RedisField
 		err = rw.redisCli.HGet(gr.RedisKey(rw.hostName), key, &res)
 		if err != nil {
@@ -151,7 +156,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 				continue
 			}
 
-			log.Infof("===== rd recovery worker, check seal hostName %s, sid %s, taskType %s, sealField %s, exist %+v", rw.hostName, key, res, sealField, exist)
+			log.Infof("===== rd recovery worker, check seal hostName %s, sectorID %s, taskType %s, sealField %s, exist %+v", rw.hostName, key, res, sealField, exist)
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealSeal(ctx, sealField, pubMsg)
 
@@ -166,7 +171,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 				continue
 			}
 
-			log.Infof("===== rd recovery worker, check pledge hostName %s, sid %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
+			log.Infof("===== rd recovery worker, check pledge hostName %s, sectorID %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealPledge(ctx, pledgeField, pubMsg)
 
@@ -180,7 +185,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 				continue
 			}
 
-			log.Infof("===== rd recovery worker, check p1 hostName %s, sid %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
+			log.Infof("===== rd recovery worker, check p1 hostName %s, sectorID %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealP1(ctx, p1Field, pubMsg)
 
@@ -194,7 +199,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 				continue
 			}
 
-			log.Infof("===== rd recovery worker, check p2 hostName %s, sid %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
+			log.Infof("===== rd recovery worker, check p2 hostName %s, sectorID %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealP2(ctx, p2Field, pubMsg)
 
@@ -208,9 +213,55 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 				continue
 			}
 
-			log.Infof("===== rd recovery worker, check c1 hostName %s, sid %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
+			log.Infof("===== rd recovery worker, check c1 hostName %s, sectorID %s, taskType %s, exist %+v", rw.hostName, key, res, exist)
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealC1(ctx, c1Field, pubMsg)
+		}
+	}
+	return nil
+}
+
+func (rw *RedisWorker) CheckRecovery() error {
+	//range
+	keys, err := rw.redisCli.HKeys(gr.RedisKey(rw.hostName))
+	if err != nil {
+		log.Errorf("===== rd RecoveryTask, hkeys err:", err)
+		return err
+	}
+	log.Infof("===== rd check recovery worker, get all keys hostName %s, keys %+v", rw.hostName, keys)
+	for _, key := range keys {
+		//check task
+		var taskType gr.RedisField
+		err = rw.redisCli.HGet(gr.RedisKey(rw.hostName), key, &taskType)
+		if err != nil {
+			log.Errorf("===== rd RecoveryTask, hget err:", err)
+			return err
+		}
+
+		sid, err := strconv.Atoi(string(key))
+		if err != nil {
+			log.Error(err)
+		}
+
+		var id int64
+		if taskType == gr.FIELDSEAL {
+			name := fmt.Sprintf("%s%d", gr.SEALAPID, sid)
+			err = rw.redisCli.Get(gr.RedisKey(name), &id)
+			if err != nil {
+				log.Errorf("===== rd RecoveryTask, get err:", err)
+			}
+		}
+
+		field := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), taskType.ToOfficalTaskType(), uint64(id))
+		exist, err := rw.redisCli.HExist(gr.PUB_NAME, field)
+		if err != nil {
+			log.Errorf("===== rd RecoveryTask, hexist err:", err)
+			return err
+		}
+
+		if !exist {
+			rw.redisCli.HDel(gr.RedisKey(rw.hostName), field)
+			return nil
 		}
 	}
 	return nil

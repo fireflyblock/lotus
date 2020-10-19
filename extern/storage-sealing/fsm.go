@@ -395,6 +395,10 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 			log.Errorf("restarting sector %d: %+v", sector.SectorNumber, err)
 		}
 
+		if sector.State == Faulty {
+			m.DeleteDataForSid(sector.SectorNumber)
+		}
+
 		if sector.State == WaitDeals {
 
 			// put the sector in the unsealedInfoMap
