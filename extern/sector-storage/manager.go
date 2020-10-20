@@ -1869,7 +1869,7 @@ func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.Task
 SEACHAGAIN:
 	hostName, err := m.SelectWorker(sectorID, taskType)
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd select worker failed, sid %+v taskType %+v select worker err: %+v", sectorID, taskType, err)
+		logrus.SchedLogger.Errorf("===== rd select worker failed, sectorID %+v taskType %+v select worker err: %+v", sectorID, taskType, err)
 		return sealAPID, err
 	}
 	if hostName == "" {
