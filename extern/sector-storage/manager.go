@@ -614,6 +614,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer tick.Stop()
 
 	for {
 		select {
@@ -813,6 +814,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	}
 	//2.Subscribe res
 	subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+
 	if err != nil {
 		return out, err
 	}
@@ -832,6 +834,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer tick.Stop()
 
 	for {
 		select {
@@ -1049,6 +1052,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer tick.Stop()
 
 	for {
 		select {
@@ -1626,6 +1630,7 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer tick.Stop()
 
 	for {
 		select {
@@ -1751,6 +1756,7 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer tick.Stop()
 
 	for {
 		select {
