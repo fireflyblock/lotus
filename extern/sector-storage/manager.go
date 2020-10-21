@@ -491,7 +491,7 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 		hostName := ""
 		err := m.redisCli.HGet(gr.PUB_NAME, pledgeField, &hostName)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hget pledge pub res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hget pledge pub res err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
 			return
 		}
 
@@ -504,7 +504,7 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 	//check pub res
 	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, pledgeField)
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist pledge params err:%+v", err)
+		logrus.SchedLogger.Errorf("===== rd hexist pledge params err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
 		return nil
 	}
 
@@ -516,7 +516,7 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 		//check params res exist
 		resExist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, pledgeField)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hexist pledge params res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hexist pledge params res err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
 			return nil
 		}
 
@@ -524,7 +524,7 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 			pledgeRes := gr.ParamsResAp{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, pledgeField, &pledgeRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd hget pledge params res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== rd hget pledge params res err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
 				return nil
 			}
 			logrus.SchedLogger.Infof("===== rd recovery miner, check pledge hostName %d, pledgeRes %+v", sectorID, pledgeRes)
@@ -582,7 +582,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		}
 		err = m.redisCli.HSet(gr.RECOVER_NAME, p1Field, rd)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v", rd)
+			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v  sectorID %+v, p1Field %+v\n", rd, sector.Number, p1Field)
 		}
 		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit1)
 	}
@@ -632,7 +632,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 				paramsRes := &gr.ParamsResP1{}
 				err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== get p1 res err:%+v", err)
+					logrus.SchedLogger.Errorf("===== get p1 res err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
 					return nil, err
 				}
 
@@ -660,7 +660,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist p1 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== HExist p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
 				continue
 			}
 
@@ -671,7 +671,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			//get res
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p1 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget p1 res err %+v sectorID %+v, p1Field %+v\n", err, sector, p1Field)
 				continue
 			}
 
@@ -680,7 +680,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			paramsRes := &gr.ParamsResP1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p1 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
 				continue
 			}
 
@@ -720,7 +720,7 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 	//check pub res
 	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p1Field)
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist p1 params err:%+v", err)
+		logrus.SchedLogger.Errorf("===== rd hexist p1 params err %+v sectorID %+v, p1Field %+v\n", err, sectorID, p1Field)
 		return nil
 	}
 
@@ -732,7 +732,7 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 		//check params res exist
 		resExist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, p1Field)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hexist p1 params res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hexist p1 params res err %+v sectorID %+v, p1Field %+v\n", err, sectorID, p1Field)
 		}
 		if resExist {
 			p1Res := gr.ParamsResP1{}
@@ -746,16 +746,16 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 				p1RD := gr.PreCommit1RD{}
 				err = m.redisCli.HGet(gr.RECOVER_NAME, p1Field, &p1RD)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== rd hget p1 recovery data err:%+v", err)
+					logrus.SchedLogger.Errorf("===== rd hget p1 recovery data err %+v sectorID %+v, p1Field %+v\n", err)
 					return nil
 				}
 
-				if ticketEpoch-p1RD.TicketEpoch < 9000 {
-					logrus.SchedLogger.Infof("===== rd recovery data ok")
+				if ticketEpoch-p1RD.TicketEpoch < 750 {
+					logrus.SchedLogger.Infof("===== rd recovery data ok, sectorID %+v, p1Field %+v\n", sectorID, p1Field)
 					return &p1Res
 				}
 			}
-			logrus.SchedLogger.Errorf("===== rd recovery p1 params res err:%s", p1Res.Err)
+			logrus.SchedLogger.Errorf("===== rd recovery p1 params res err %s sectorID %+v, p1Field %+v\n", p1Res.Err, sectorID, p1Field)
 			return nil
 
 		} else {
@@ -840,7 +840,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			pl := gr.RedisField(msg.Payload)
 			sid, tt, hostName, _, err := pl.TailoredSubMessage()
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== sub tailored err:", err)
+				logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
 			}
 
 			if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit2 {
@@ -850,7 +850,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 				paramsRes := &gr.ParamsResP2{}
 				err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== get p2 res err:%+v", err)
+					logrus.SchedLogger.Errorf("===== get p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
 					return out, err
 				}
 
@@ -878,7 +878,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist p2 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== HExist p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
 				continue
 			}
 
@@ -889,7 +889,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			//get res
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p2 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
 				continue
 			}
 
@@ -898,7 +898,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			paramsRes := &gr.ParamsResP2{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p2 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
 				continue
 			}
 
@@ -926,7 +926,7 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 		hostName := ""
 		err := m.redisCli.HGet(gr.PUB_NAME, p2Field, &hostName)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hget p2 pub res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hget p2 pub res err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
 			return
 		}
 
@@ -939,7 +939,7 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 	//check pub res
 	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p2Field)
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist p2 params err:%+v", err)
+		logrus.SchedLogger.Errorf("===== rd hexist p2 params err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
 		return nil
 	}
 
@@ -951,14 +951,14 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 		//check params res exist
 		resExist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, p2Field)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hexist p2 params res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hexist p2 params res err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
 			return nil
 		}
 		if resExist {
 			p2Res := gr.ParamsResP2{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, p2Field, &p2Res)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd hget p2 params res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== rd hget p2 params res err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
 				return nil
 			}
 
@@ -1057,7 +1057,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			pl := gr.RedisField(msg.Payload)
 			sid, tt, hostName, _, err := pl.TailoredSubMessage()
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== sub tailored err:", err)
+				logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
 			}
 
 			if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTCommit1 {
@@ -1067,7 +1067,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 				paramsRes := &gr.ParamsResC1{}
 				err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector(%+v) c1 res err:%+v", sector, err)
+					logrus.SchedLogger.Errorf("===== sector(%+v) c1 res err %+v sectorID %+v, c1Field %+v\n", sector, err, sector.Number, c1Field)
 					return out, err
 				}
 
@@ -1129,7 +1129,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist c1 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== HExist c1 res params err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
 				continue
 			}
 
@@ -1140,7 +1140,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			//get res
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget c1 res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget c1 res err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
 				continue
 			}
 
@@ -1149,7 +1149,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			paramsRes := &gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget c1 res params err:%+v", err)
+				logrus.SchedLogger.Errorf("===== hget c1 res params err %+vsectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
 				continue
 			}
 
@@ -1211,7 +1211,7 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 		hostName := ""
 		err := m.redisCli.HGet(gr.PUB_NAME, c1Field, &hostName)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hget c1 pub res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hget c1 pub res err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 			return
 		}
 
@@ -1224,7 +1224,7 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 	//check pub res
 	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, c1Field)
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist c1 params err:%+v", err)
+		logrus.SchedLogger.Errorf("===== rd hexist c1 params err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 		return nil
 	}
 
@@ -1236,14 +1236,14 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 		//check params res exist
 		resExist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, c1Field)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd hexist c1 params res err:%+v", err)
+			logrus.SchedLogger.Errorf("===== rd hexist c1 params res err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 			return nil
 		}
 		if resExist {
 			c1Res := gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, c1Field, &c1Res)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd hget c1 params res err:%+v", err)
+				logrus.SchedLogger.Errorf("===== rd hget c1 params res err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 				return nil
 			}
 
