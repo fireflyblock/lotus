@@ -423,7 +423,7 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 		//data := rw.pledgeReader(params.NewPieceSize)
 		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
 		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
-		log.Infof("===== rd pledge, pi %+v err %+v", pi, err)
+		log.Infof("===== rd pledge, sectorID %+v err %+v", params.Sector.Number, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
 				PieceInfo: pi,
@@ -475,6 +475,7 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 		//todo addpiece seal transfer file (io.reader)
 		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.PieceData, params.ApType)
 		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
+		log.Infof("===== rd seal, sectorID %+v err %+v", params.Sector.Number, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
 				PieceInfo: pi,
@@ -524,7 +525,7 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 
 	{
 		out, err := rw.sealer.SealPreCommit1(ctx, params.Sector, params.Ticket, params.Pieces, params.Recover)
-		log.Infof("===== rd p1, out %+v err %+v err", out, err)
+		log.Infof("===== rd p1, sectorID %+v err %+v", params.Sector.Number, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResP1{
 				Out: out,
@@ -574,7 +575,7 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 
 	{
 		out, err := rw.sealer.SealPreCommit2(ctx, params.Sector, params.Pc1o)
-		log.Infof("===== rd p2, out %+v err %+v err", out, err)
+		log.Infof("===== rd p2, sectorID %+v err %+v", params.Sector.Number, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResP2{
 				Out: out,
@@ -624,7 +625,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 
 	{
 		out, err := rw.sealer.SealCommit1(ctx, params.Sector, params.Ticket, params.Seed, params.Pieces, params.Cids)
-		log.Infof("===== rd c1, out %+v err %+v err", out, err)
+		log.Infof("===== rd c1, sectorID %+v err %+v", params.Sector.Number, err)
 		if err != nil {
 			paramsRes = &gr.ParamsResC1{
 				Out: out,
