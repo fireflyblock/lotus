@@ -341,17 +341,18 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 }
 
 func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
-	tick := &time.Ticker{}
+	ticker := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		tick = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Minute)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		tick = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Minute)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
-		tick = time.NewTicker(CHECK_RES_GAP)
+		ticker = time.NewTicker(CHECK_RES_GAP)
 	}
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -394,7 +395,7 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 				continue
 			}
 
-		case <-tick.C:
+		case <-ticker.C:
 			hostName := ""
 			//check params
 			resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
@@ -562,7 +563,7 @@ SEACHAGAIN:
 }
 
 func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
-	tick := &time.Ticker{}
+	ticker := &time.Ticker{}
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
 		m.redisCli.ApRcLK.Unlock()
@@ -576,21 +577,22 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 	case sealtasks.TTCommit1:
 		m.redisCli.C1RcLK.Unlock()
 	}
+	defer ticker.Stop()
 
 	logrus.SchedLogger.Infof("===== rd start subscribe free worker, sectorID %+v taskType %+v", sectorID, taskType)
 
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		tick = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Minute)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		tick = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Minute)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
-		tick = time.NewTicker(CHECK_RES_GAP)
+		ticker = time.NewTicker(CHECK_RES_GAP)
 
 	default:
-		tick = time.NewTicker(CHECK_RES_GAP)
+		ticker = time.NewTicker(CHECK_RES_GAP)
 	}
 
 	for {
@@ -637,7 +639,7 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 				}
 			}
 
-		case <-tick.C:
+		case <-ticker.C:
 			m.SelectLock(taskType, sectorID)
 			logrus.SchedLogger.Infof("===== rd ticker free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			switch taskType {
