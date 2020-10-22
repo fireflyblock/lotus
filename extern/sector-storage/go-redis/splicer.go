@@ -16,6 +16,7 @@ const (
 	PUB_RES_NAME    RedisKey = "pub_res"
 	PARAMS_RES_NAME RedisKey = "params_res"
 	RECOVER_NAME    RedisKey = "recover"
+	COUNTER_P1      RedisKey = "counter_p1_"
 	WORKER_COUNT    RedisKey = "worker_count*"
 	W_C_T           RedisKey = "worker_count_"
 	WORKER_CONFIG   RedisKey = "worker_config*"
@@ -190,6 +191,12 @@ type RedisKey string
 //拼接worker配置的key
 func SplicingTaskCounntKey(hostName string) RedisKey {
 	str := fmt.Sprintf("%s%s", W_C_T, hostName)
+	return RedisKey(str)
+}
+
+//拼接counter_p1配置的key
+func SplicingCounterP1Key(hostName string) RedisKey {
+	str := fmt.Sprintf("%s%s", COUNTER_P1, hostName)
 	return RedisKey(str)
 }
 

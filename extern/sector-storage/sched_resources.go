@@ -407,7 +407,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
 	tc.AddPieceSize = uint8(apNum)
-	tc.Pre1CommitSize = uint8(p1Num - 1)
+	tc.Pre1CommitSize = uint8(p1Num - 2)
 	tc.Pre2CommitSize = uint8(p2Num)
 	tc.Commit1 = uint8(c1Num)
 	tc.Commit2 = c2Num
