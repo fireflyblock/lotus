@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/go-redis/redis/v8"
-	"log"
+	logging "github.com/ipfs/go-log/v2"
 	"sync"
 	"time"
 )
+
+var log = logging.Logger("redis")
 
 type RedisClient struct {
 	RedisClient *redis.Client
@@ -21,7 +23,6 @@ type RedisClient struct {
 }
 
 func NewRedisClusterCLi(ctx context.Context, addrs string, passWord string) *RedisClient {
-	log.SetFlags(log.Llongfile | log.Lshortfile)
 
 	// 连接redis集群
 	rc := redis.NewClient(&redis.Options{
@@ -36,7 +37,7 @@ func NewRedisClusterCLi(ctx context.Context, addrs string, passWord string) *Red
 	pong, err := rc.Ping(ctx).Result()
 	fmt.Printf("ping addr %s %s:", addrs, pong)
 	if err != nil {
-		log.Println("ping redis err:", err)
+		log.Error("ping redis err:", err)
 		panic(err)
 	}
 
@@ -102,6 +103,43 @@ func (rc *RedisClient) HGet(key RedisKey, field RedisField, v interface{}) error
 		return err
 	}
 	return nil
+}
+
+//　 Stream
+//   Values examples
+//   Values = []interface{}{"key1", "value1", "key2", "value2"}
+//   Values = []string("key1", "value1", "key2", "value2")
+//   Values = map[string]interface{}{"key1": "value1", "key2": "value2"}
+func (rc *RedisClient) Add(stream string, values interface{}) {
+	args := redis.XAddArgs{
+		Stream: stream,
+		MaxLen: 10,
+		Values: values,
+	}
+	rc.RedisClient.XAdd(context.TODO(), &args)
+}
+
+//Stream read
+func (rc *RedisClient) Read(stream string) {
+	id := "0"
+
+	for {
+		xStreams, err := rc.RedisClient.XReadStreams(context.TODO(), []string{stream, id}...).Result()
+		if err != nil {
+			log.Error("xRead err: ", err.Error())
+			continue
+		}
+		for _, xStream := range xStreams {
+			for _, xMessage := range xStream.Messages {
+				for key, value := range xMessage.Values {
+					fmt.Println(key)
+					fmt.Println(value)
+				}
+
+				id = xMessage.ID
+			}
+		}
+	}
 }
 
 //发布消息到指定通道  params：通道，消息  return:订阅的消费者数量 error
