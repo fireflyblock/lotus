@@ -488,10 +488,22 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
 	defer func() {
 		//update taskCount
+		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, pledgeField)
+		if err != nil || !pubExist {
+			return
+		}
+
 		hostName := ""
-		err := m.redisCli.HGet(gr.PUB_NAME, pledgeField, &hostName)
+		err = m.redisCli.HGet(gr.PUB_NAME, pledgeField, &hostName)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd hget pledge pub res err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
+			return
+		}
+
+		ctk := gr.SplicingTaskCounntKey(hostName)
+		field := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, 0)
+		ctkExist, err := m.redisCli.HExist(ctk, field)
+		if err != nil || !ctkExist {
 			return
 		}
 
@@ -705,10 +717,22 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, ticketEpoch abi.ChainEpoch) *gr.ParamsResP1 {
 	defer func() {
 		//update taskCount
+		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, p1Field)
+		if err != nil || !pubExist {
+			return
+		}
+
 		hostName := ""
-		err := m.redisCli.HGet(gr.PUB_NAME, p1Field, &hostName)
+		err = m.redisCli.HGet(gr.PUB_NAME, p1Field, &hostName)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd hget p1 pub res err:%+v", err)
+		}
+
+		ctk := gr.SplicingTaskCounntKey(hostName)
+		field := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTPreCommit1, 0)
+		exist, err := m.redisCli.HExist(ctk, field)
+		if err != nil || !exist {
+			return
 		}
 
 		err = m.FreeTaskCount(hostName, sectorID, sealtasks.TTPreCommit1, 0)
@@ -923,10 +947,22 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *gr.ParamsResP2 {
 	defer func() {
 		//update taskCount
+		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, p2Field)
+		if err != nil || !pubExist {
+			return
+		}
+
 		hostName := ""
-		err := m.redisCli.HGet(gr.PUB_NAME, p2Field, &hostName)
+		err = m.redisCli.HGet(gr.PUB_NAME, p2Field, &hostName)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd hget p2 pub res err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
+			return
+		}
+
+		ctk := gr.SplicingTaskCounntKey(hostName)
+		field := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTPreCommit2, 0)
+		exist, err := m.redisCli.HExist(ctk, field)
+		if err != nil || !exist {
 			return
 		}
 
@@ -1208,10 +1244,22 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *gr.ParamsResC1 {
 	defer func() {
 		//update taskCount
+		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, c1Field)
+		if err != nil || !pubExist {
+			return
+		}
+
 		hostName := ""
-		err := m.redisCli.HGet(gr.PUB_NAME, c1Field, &hostName)
+		err = m.redisCli.HGet(gr.PUB_NAME, c1Field, &hostName)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd hget c1 pub res err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
+			return
+		}
+
+		ctk := gr.SplicingTaskCounntKey(hostName)
+		field := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTCommit1, 0)
+		exist, err := m.redisCli.HExist(ctk, field)
+		if err != nil || !exist {
 			return
 		}
 
