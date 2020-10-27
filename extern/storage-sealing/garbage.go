@@ -167,10 +167,22 @@ func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
 		sectorsList.Add(sinfo.SectorNumber)
 	}
 
+	tok, _, err := m.api.ChainHead(ctx)
+	if err != nil {
+		log.Errorf("===initRecoverSectorNumber-- handlePreCommit1: api error, not proceeding: %+v", err)
+		return
+	}
+
 	// 属于sectorAll 但是不属于 sectorList的编号
 	recover := set.Difference(sectorsAll, sectorsList)
 	m.recoverLk.Lock()
 	for _, sid := range recover.List() {
+		// 过滤sectorNumber是否在链上存在
+		_, err := m.api.StateSectorPreCommitInfo(ctx, m.maddr, sid.(abi.SectorNumber), tok)
+		if err != nil {
+			log.Warnf("check precommit info: %w ,skip %+v", err, sid.(abi.SectorNumber))
+			continue
+		}
 		m.recoverSectorNumbers[sid.(abi.SectorNumber)] = struct{}{}
 	}
 	log.Infof("==== recover sector number size %d,cost time %s\n", len(m.recoverSectorNumbers), time.Now().Sub(start))

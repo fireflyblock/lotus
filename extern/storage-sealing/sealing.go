@@ -177,13 +177,13 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 }
 
 func (m *Sealing) Run(ctx context.Context) error {
+	// 筛选出未使用的sectornumber
+	m.initRecoverSectorNumber(ctx)
+
 	if err := m.restartSectors(ctx); err != nil {
 		log.Errorf("%+v", err)
 		return xerrors.Errorf("failed load sector states: %w", err)
 	}
-
-	// 筛选出未使用的sectornumber
-	m.initRecoverSectorNumber(ctx)
 
 	return nil
 }
