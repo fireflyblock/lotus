@@ -86,10 +86,6 @@ func (m *Sealing) getTicket(ctx statemachine.Context, sector SectorInfo) (abi.Se
 }
 
 func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) error {
-	go func() {
-		log.Infof("====== send turnOnCh p1")
-		m.turnOnCh <- struct{}{}
-	}()
 	if err := checkPieces(ctx.Context(), m.maddr, sector, m.api); err != nil { // Sanity check state
 		switch err.(type) {
 		case *ErrApi:
@@ -168,10 +164,6 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 }
 
 func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector SectorInfo) error {
-	go func() {
-		log.Infof("====== send turnOnCh p2")
-		m.turnOnCh <- struct{}{}
-	}()
 	cids, err := m.sealer.SealPreCommit2(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), sector.PreCommit1Out)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit2Failed{xerrors.Errorf("seal pre commit(2) failed: %w", err)})
@@ -399,6 +391,11 @@ func (m *Sealing) handleCommitting(ctx statemachine.Context, sector SectorInfo) 
 	if err != nil {
 		return ctx.Send(SectorComputeProofFailed{xerrors.Errorf("computing seal proof failed(1): %w", err)})
 	}
+
+	go func() {
+		log.Infof("====== send turnOnCh c1, sectorID %+V", sector.SectorNumber)
+		m.turnOnCh <- gr.SplicingBackupPubAndParamsField(sector.SectorNumber, sealtasks.TTCommit1, 0)
+	}()
 
 	proof, err := m.sealer.SealCommit2(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), c2in)
 	if err != nil {

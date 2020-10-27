@@ -3,6 +3,8 @@ package sealing
 import (
 	"context"
 	"github.com/filecoin-project/go-state-types/abi"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
+	"github.com/filecoin-project/sector-storage/sealtasks"
 	"golang.org/x/xerrors"
 	"gopkg.in/fatih/set.v0"
 	"time"
@@ -58,6 +60,11 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 			out[i] = ppi
 		}
 	}
+
+	go func() {
+		log.Infof("====== send turnOnCh pledge, sectorID %+V", sectorID.Number)
+		m.turnOnCh <- gr.SplicingBackupPubAndParamsField(sectorID.Number, sealtasks.TTAddPiecePl, 0)
+	}()
 
 	return out, nil
 }

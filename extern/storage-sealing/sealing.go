@@ -90,7 +90,7 @@ type Sealing struct {
 
 	getConfig GetSealingConfigFunc
 
-	turnOnCh chan struct{}
+	turnOnCh chan gr.RedisField
 	rc       *gr.RedisClient
 
 	// 记录丢失掉的sectorNumber重利用
@@ -140,7 +140,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		stats: SectorStats{
 			bySector: map[abi.SectorID]statSectorState{},
 		},
-		turnOnCh:             make(chan struct{}),
+		turnOnCh:             make(chan gr.RedisField),
 		recoverSectorNumbers: map[abi.SectorNumber]struct{}{},
 	}
 
@@ -202,12 +202,12 @@ func (m *Sealing) PledgeWatch(ctx context.Context) {
 	}()
 	for {
 		select {
-		case <-m.turnOnCh:
-			log.Infof("====== turnOnCh comming")
-			//err := m.PledgeSector()
-			//if err != nil {
-			//	log.Errorf("====== turnOnCh PledgeSector err:", err)
-			//}
+		case sector := <-m.turnOnCh:
+			log.Infof("====== turnOnCh comming, sector %+v ", sector)
+			err := m.PledgeSector()
+			if err != nil {
+				log.Errorf("====== turnOnCh PledgeSector err:", err)
+			}
 		}
 	}
 }

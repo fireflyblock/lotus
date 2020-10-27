@@ -112,12 +112,12 @@ var sectorsSwitchStatusCmd = &cli.Command{
 			res += fmt.Sprintf("master-Switch : OFF\n")
 		}
 
-		switch status[1] {
-		case true:
-			res += fmt.Sprintf("vice-Switch : ON\n")
-		case false:
-			res += fmt.Sprintf("vice-Switch : OFF\n")
-		}
+		//switch status[1] {
+		//case true:
+		//	res += fmt.Sprintf("vice-Switch : ON\n")
+		//case false:
+		//	res += fmt.Sprintf("vice-Switch : OFF\n")
+		//}
 
 		fmt.Println(res)
 		return nil
