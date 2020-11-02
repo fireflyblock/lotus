@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/go-units"
+	"github.com/filecoin-project/go-state-types/abi"
 	"sync"
 
 	"io/ioutil"
@@ -484,7 +485,8 @@ var runCmd = &cli.Command{
 				}
 			}
 
-			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"})
+			sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
+			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"}, abi.SectorSize(sectorSizeInt))
 			if err != nil {
 				return err
 			}

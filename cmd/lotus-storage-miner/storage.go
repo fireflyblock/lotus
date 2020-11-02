@@ -409,7 +409,6 @@ var storageFindCmd = &cli.Command{
 	},
 }
 
-
 var storageCheckProvCmd = &cli.Command{
 	Name:      "check",
 	Usage:     "check sector proving status, call StorageTryLock()",
@@ -446,9 +445,9 @@ var storageCheckProvCmd = &cli.Command{
 			Number: abi.SectorNumber(snum),
 		}
 
-		locked, err := nodeApi.StorageTryLock(ctx, sid,  stores.FTSealed|stores.FTCache, stores.FTNone)
+		locked, err := nodeApi.StorageTryLock(ctx, sid, stores.FTSealed|stores.FTCache, stores.FTNone)
 		if err != nil {
-			log.Error(xerrors.Errorf("acquiring sector lock: %w", err))l
+			log.Error(xerrors.Errorf("acquiring sector lock: %w", err))
 			return xerrors.Errorf("acquiring sector lock: %w", err)
 		}
 		if !locked {
