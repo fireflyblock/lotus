@@ -2,7 +2,6 @@ package sectorstorage
 
 import (
 	"errors"
-	"strings"
 	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
@@ -10,22 +9,23 @@ import (
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/go-redis/redis/v8"
 	"strconv"
+	"strings"
 	"time"
 )
 
-const CHECK_RES_GAP = time.Minute * 10
+const CHECK_RES_GAP = time.Minute * 1
 
 var (
 	//DefaultRedisURL = "192.168.20.178:6379"
 	//	"172.16.0.7:8001",
 	//	"172.16.0.7:8002",
 	//	"172.16.0.8:8001",
-	DefaultRedisURL = ""
+	DefaultRedisURL      = ""
 	DefaultRedisPassWord = ""
-	APWaitTime           = time.Minute * 25
-	P1WaitTime           = time.Minute * 280
-	P2WaitTime           = time.Minute * 100
-	C1WaitTime           = time.Minute * 120
+	APWaitTime           = time.Second * 2 //5
+	P1WaitTime           = time.Second * 2 //80
+	P2WaitTime           = time.Second * 1 //00
+	C1WaitTime           = time.Second * 1 //20
 )
 
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
@@ -91,9 +91,8 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 			m.redisCli.HGet(gr.PUB_TIME, pledgeField, &pubTime)
 			usedTime := time.Now().Sub(pubTime)
 			if usedTime < APWaitTime {
-				tm := time.NewTimer(APWaitTime - usedTime)
 				select {
-				case <-tm.C:
+				case <-time.After(APWaitTime - usedTime):
 					continue
 				}
 			}
@@ -178,9 +177,8 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 			logrus.SchedLogger.Infof("===== rd recovery miner, check p1 sectorID %d, p1Field %s, pubTime %+v, Now %+v, P1WaitTime %+v",
 				sectorID, p1Field, pubTime, time.Now(), P1WaitTime)
 			if usedTime < P1WaitTime {
-				tm := time.NewTimer(P1WaitTime - usedTime)
 				select {
-				case <-tm.C:
+				case <-time.After(P1WaitTime - usedTime):
 					continue
 				}
 			}
@@ -255,9 +253,8 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 			logrus.SchedLogger.Infof("===== rd recovery miner, check p2 sectorID %d, p2Field %s, pubTime %+v, Now %+v, P2WaitTime %+v",
 				sectorID, p2Field, pubTime, time.Now(), P2WaitTime)
 			if usedTime < P2WaitTime {
-				tm := time.NewTimer(P2WaitTime - usedTime)
 				select {
-				case <-tm.C:
+				case <-time.After(P2WaitTime - usedTime):
 					continue
 				}
 			}
@@ -316,7 +313,7 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 			c1Res := gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, c1Field, &c1Res)
 			if err != nil {
-				if m.CheckTimeout(err.Error()){
+				if m.CheckTimeout(err.Error()) {
 					logrus.SchedLogger.Errorf("===== rd hget c1 params res timeout %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 					continue
 				}
@@ -335,9 +332,8 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 			if usedTime < C1WaitTime {
 				logrus.SchedLogger.Infof("===== rd recovery miner, check c1 sectorID %d, c1Field %s, pubTime %+v, Now %+v, C1WaitTime %+v",
 					sectorID, c1Field, pubTime, time.Now(), C1WaitTime)
-				tm := time.NewTimer(C1WaitTime - usedTime)
 				select {
-				case <-tm.C:
+				case <-time.After(C1WaitTime - usedTime):
 					continue
 				}
 			}
@@ -362,44 +358,44 @@ func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.Sec
 
 	for {
 		select {
-		case msg := <-subCha:
-			//check sub
-			//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v, sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
-			pl := gr.RedisField(msg.Payload)
-			sid, tt, hostName, sealID, err := pl.TailoredSubMessage()
-			if err != nil {
-				logrus.SchedLogger.Errorf("sub tailored err:", err)
-			}
-
-			if sid == sectorID && tt.ToOfficalTaskType() == taskType && sealID == sealApId {
-				logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
-				//get params res
-				resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealID)
-
-				paramsRes := &gr.ParamsResAp{}
-				err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
-				if err != nil {
-					logrus.SchedLogger.Errorf("===== hget ap res err:%+v", err)
-					return out, err
-				}
-
-				if paramsRes.Err != "" {
-					logrus.SchedLogger.Errorf("===== sector(%+v) ap computing err:%+v", sectorID, paramsRes.Err)
-					return out, errors.New(fmt.Sprintf("%d ap res err: %s", sectorID, paramsRes.Err))
-				}
-
-				//update taskCount (need lock)
-				defer func() {
-					err = m.FreeTaskCount(hostName, sectorID, taskType, sealApId)
-					if err != nil {
-						logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
-					}
-				}()
-
-				return paramsRes.PieceInfo, nil
-			} else {
-				continue
-			}
+		//case msg := <-subCha:
+		//	//check sub
+		//	//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v, sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+		//	pl := gr.RedisField(msg.Payload)
+		//	sid, tt, hostName, sealID, err := pl.TailoredSubMessage()
+		//	if err != nil {
+		//		logrus.SchedLogger.Errorf("sub tailored err:", err)
+		//	}
+		//
+		//	if sid == sectorID && tt.ToOfficalTaskType() == taskType && sealID == sealApId {
+		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+		//		//get params res
+		//		resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealID)
+		//
+		//		paramsRes := &gr.ParamsResAp{}
+		//		err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
+		//		if err != nil {
+		//			logrus.SchedLogger.Errorf("===== hget ap res err:%+v", err)
+		//			return out, err
+		//		}
+		//
+		//		if paramsRes.Err != "" {
+		//			logrus.SchedLogger.Errorf("===== sector(%+v) ap computing err:%+v", sectorID, paramsRes.Err)
+		//			return out, errors.New(fmt.Sprintf("%d ap res err: %s", sectorID, paramsRes.Err))
+		//		}
+		//
+		//		//update taskCount (need lock)
+		//		defer func() {
+		//			err = m.FreeTaskCount(hostName, sectorID, taskType, sealApId)
+		//			if err != nil {
+		//				logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
+		//			}
+		//		}()
+		//
+		//		return paramsRes.PieceInfo, nil
+		//	} else {
+		//		continue
+		//	}
 
 		case <-ticker.C:
 			hostName := ""
@@ -487,11 +483,11 @@ SEACHAGAIN:
 				m.isExistSealTask = false
 			}
 			logrus.SchedLogger.Infof("===== rd sub free worker signal, sectorID %+v taskType %+v isExistSealTask %+v", sectorID, taskType, m.isExistSealTask)
-			subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
-			if err != nil {
-				goto SEACHAGAIN
-			}
-			hostName, err = m.SubscribeFreeWorker(subCha, taskType, sectorID)
+			//subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
+			//if err != nil {
+			//	goto SEACHAGAIN
+			//}
+			hostName, err = m.SubscribeFreeWorker(taskType, sectorID)
 			if err != nil || hostName == "" {
 				goto SEACHAGAIN
 			}
@@ -568,7 +564,7 @@ SEACHAGAIN:
 	return sealAPID, nil
 }
 
-func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
+func (m *Manager) SubscribeFreeWorker(taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
 	ticker := &time.Ticker{}
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
@@ -603,47 +599,47 @@ func (m *Manager) SubscribeFreeWorker(subCha <-chan *redis.Message, taskType sea
 
 	for {
 		select {
-		case msg := <-subCha:
-			//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v", msg.Channel, msg.Payload)
-			pl := gr.RedisField(msg.Payload)
-			sid, tt, hostName, _, err := pl.TailoredSubMessage()
-			if err != nil {
-				logrus.SchedLogger.Errorf("sub tailored err:", err)
-			}
-
-			switch taskType {
-			case sealtasks.TTAddPieceSe:
-				if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
-					m.SelectLock(taskType, sectorID)
-					free, _ := m.CanHandleTask(hostName, taskType, sectorID)
-					if free {
-						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
-						return hostName, nil
-					} else {
-						m.SelectUnLock(taskType, sectorID)
-						continue
-					}
-				} else {
-					//m.SelectUnLock(taskType,sectorID)
-					continue
-				}
-
-			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-				if tt.ToOfficalTaskType() == taskType && sid == sectorID {
-					m.SelectLock(taskType, sectorID)
-					free, _ := m.CanHandleTask(hostName, taskType, sectorID)
-					if free {
-						logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
-						return hostName, nil
-					} else {
-						m.SelectUnLock(taskType, sectorID)
-						continue
-					}
-				} else {
-					//m.SelectUnLock(taskType,sectorID)
-					continue
-				}
-			}
+		//case msg := <-subCha:
+		//	//logrus.SchedLogger.Infof("===== Cha %+v receive msg %+v", msg.Channel, msg.Payload)
+		//	pl := gr.RedisField(msg.Payload)
+		//	sid, tt, hostName, _, err := pl.TailoredSubMessage()
+		//	if err != nil {
+		//		logrus.SchedLogger.Errorf("sub tailored err:", err)
+		//	}
+		//
+		//	switch taskType {
+		//	case sealtasks.TTAddPieceSe:
+		//		if tt.ToOfficalTaskType() == taskType || tt.ToOfficalTaskType() == sealtasks.TTAddPiecePl {
+		//			m.SelectLock(taskType, sectorID)
+		//			free, _ := m.CanHandleTask(hostName, taskType, sectorID)
+		//			if free {
+		//				logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+		//				return hostName, nil
+		//			} else {
+		//				m.SelectUnLock(taskType, sectorID)
+		//				continue
+		//			}
+		//		} else {
+		//			//m.SelectUnLock(taskType,sectorID)
+		//			continue
+		//		}
+		//
+		//	case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
+		//		if tt.ToOfficalTaskType() == taskType && sid == sectorID {
+		//			m.SelectLock(taskType, sectorID)
+		//			free, _ := m.CanHandleTask(hostName, taskType, sectorID)
+		//			if free {
+		//				logrus.SchedLogger.Infof("===== rd subscribe free worker, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sectorID, taskType)
+		//				return hostName, nil
+		//			} else {
+		//				m.SelectUnLock(taskType, sectorID)
+		//				continue
+		//			}
+		//		} else {
+		//			//m.SelectUnLock(taskType,sectorID)
+		//			continue
+		//		}
+		//	}
 
 		case <-ticker.C:
 			m.SelectLock(taskType, sectorID)
@@ -1135,4 +1131,3 @@ func (m *Manager) CheckTimeout(err string) bool {
 	}
 	return false
 }
-
