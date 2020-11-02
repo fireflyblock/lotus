@@ -39,6 +39,7 @@ stored while moving through the sealing pipeline (references as 'seal').`,
 		storageAttachCmd,
 		storageListCmd,
 		storageFindCmd,
+		storageCheckProvCmd,
 	},
 }
 
@@ -402,6 +403,57 @@ var storageFindCmd = &cli.Command{
 			for _, l := range info.store.URLs {
 				fmt.Printf("\tURL: %s\n", l)
 			}
+		}
+
+		return nil
+	},
+}
+
+
+var storageCheckProvCmd = &cli.Command{
+	Name:      "check",
+	Usage:     "check sector proving status, call StorageTryLock()",
+	ArgsUsage: "[sector number]",
+	Action: func(cctx *cli.Context) error {
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		ma, err := nodeApi.ActorAddress(ctx)
+		if err != nil {
+			return err
+		}
+
+		mid, err := address.IDFromAddress(ma)
+		if err != nil {
+			return err
+		}
+
+		if !cctx.Args().Present() {
+			return xerrors.New("Usage: lotus-miner storage find [sector number]")
+		}
+
+		snum, err := strconv.ParseUint(cctx.Args().First(), 10, 64)
+		if err != nil {
+			return err
+		}
+
+		sid := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: abi.SectorNumber(snum),
+		}
+
+		locked, err := nodeApi.StorageTryLock(ctx, sid,  stores.FTSealed|stores.FTCache, stores.FTNone)
+		if err != nil {
+			log.Error(xerrors.Errorf("acquiring sector lock: %w", err))l
+			return xerrors.Errorf("acquiring sector lock: %w", err)
+		}
+		if !locked {
+			log.Warnw("CheckProvable Sector FAULT: can't acquire read lock", "sector", sid, "sealed")
+			return nil
 		}
 
 		return nil

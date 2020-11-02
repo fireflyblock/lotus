@@ -113,7 +113,8 @@ type StorageAuth http.Header
 
 func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg *ffiwrapper.Config, sc SealerConfig, urls URLs, sa StorageAuth) (*Manager, error) {
 	logrus.Init()
-	lstor, err := stores.NewLocal(ctx, ls, si, urls)
+	sectorSize, _ := cfg.SealProofType.SectorSize()
+	lstor, err := stores.NewLocal(ctx, ls, si, urls, sectorSize)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,17 @@ import (
 	"github.com/filecoin-project/sector-storage/fsutil"
 )
 
+type ByteSize int64
+
+const (
+	B  ByteSize = 1 << (10 * iota) // 1<<(10*0)
+	KB                             // 1<<(10*1)
+	MB                             // 1<<(10*2)
+	GB                             // 1<<(10*3)
+	TB                             // 1<<(10*4)
+	PB                             //  1<<(10*5)
+)
+
 type StoragePath struct {
 	ID     ID
 	Weight uint64
@@ -74,6 +85,7 @@ type Local struct {
 	urls         []string
 
 	paths map[ID]*path
+	size  abi.SectorSize
 
 	localLk sync.RWMutex
 }
@@ -136,13 +148,15 @@ func (p *path) sectorPath(sid abi.SectorID, fileType SectorFileType) string {
 	return filepath.Join(p.local, fileType.String(), SectorName(sid))
 }
 
-func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []string) (*Local, error) {
+func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []string, size abi.SectorSize) (*Local, error) {
 	l := &Local{
 		localStorage: ls,
 		index:        index,
 		urls:         urls,
 
 		paths: map[ID]*path{},
+
+		size: size,
 	}
 	return l, l.open(ctx)
 }
@@ -200,6 +214,17 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 		}
 
 		for _, ent := range ents {
+
+			// 只处理存储机器上面的数据，
+			if meta.CanStore && !meta.CanSeal {
+				// 清理不完整的sector数据，暂时之考虑chache目录和sealed目录
+				if t == FTSealed || t == FTCache {
+					if !st.checkSectorFine(ent, p, t) {
+						//continue
+					}
+				}
+			}
+
 			if ent.Name() == FetchTempSubdir {
 				continue
 			}
@@ -214,12 +239,92 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 			if err := st.index.StorageDeclareSector(ctx, meta.ID, sid, t, meta.CanStore); err != nil {
 				return xerrors.Errorf("declare sector %d(t:%d) -> %s: %w", sid, t, meta.ID, err)
 			}
+
 		}
 	}
 
 	st.paths[meta.ID] = out
 
 	return nil
+}
+
+// 解决bug（192.168.20.201/filecoin-project/teamwork/-/issues/109)
+// 问题描述参考bug描述
+// 办法：
+// 1 在检测sealed文件的时候，判断sealed文件是否为32GB，是则认为sector正确，否则认为错误，并且删除
+// 2 在检测cache文件的时候，判断是否存在8个tree_r_last以及两个aux文件，如果存在则认为正确，否则认为不正确，并且删除掉
+func (st *Local) checkSectorFine(ent os.FileInfo, p string, t SectorFileType) bool {
+	//  32  << 30  --> 32  GB
+	//  512 << 20  --> 512 MB
+	//  2   << 10  --> 2   KB
+	//log.Info("original size ------- ", st.size)
+	sectorSize := int64(st.size)
+	//log.Infof("try to check %s, size %d",p+t.String(),ent.Size())
+
+	// check sealed
+	if t == FTSealed {
+		if ent.Size() == sectorSize {
+			return st.checkCacheFiles(ent, p, t)
+		} else {
+			//
+			p := filepath.Join(p, FTSealed.String(), ent.Name())
+			log.Errorf("try to delete error sector %s, size %d", p+t.String(), ent.Size())
+			//err := os.Remove(p)
+			//if err != nil {
+			//	log.Errorf("delete %s error :%+v", p+FTSealed.String()+ent.Name(), err)
+			//}
+			return false
+		}
+	}
+
+	// check cache
+	if t == FTCache {
+		return st.checkCacheFiles(ent, p, t)
+	}
+
+	return false
+}
+
+func (st *Local) checkCacheFiles(ent os.FileInfo, p string, t SectorFileType) bool {
+	// 判断文件数量
+	var fileNums int
+	switch st.size {
+	case 2 << 10:
+		fileNums = 3
+	case 512 << 20:
+		fileNums = 3
+	case 32 << 30:
+		fileNums = 10
+	}
+
+	// check cache
+	path := filepath.Join(p, FTCache.String(), ent.Name())
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Errorf("read file %s error, err: %s", p+FTCache.String()+ent.Name(), err.Error())
+		return false
+	}
+
+	if len(files) != fileNums {
+		// 删除对应的cache和sealed文件
+		log.Errorf("check sectorSize %d file %s cache files count %d should be %d, remove cache dir and sealed file!!!!!", st.size, p+FTCache.String()+ent.Name(), len(files), fileNums)
+		//err = os.RemoveAll(path)
+		//if err != nil {
+		//	log.Errorf("remove %s failed, %s", path, err.Error())
+		//} else {
+		//	log.Warnf("Remove %s  success", path)
+		//}
+
+		_ = filepath.Join(p, FTSealed.String(), ent.Name())
+		//err := os.Remove(sealPath)
+		//if err != nil {
+		//	log.Errorf("remove %s failed, %s", sealPath, err.Error())
+		//} else {
+		//	log.Warnf("Remove sealed file %s success", ent.Name())
+		//}
+		return false
+	}
+	return true
 }
 
 func (st *Local) open(ctx context.Context) error {
