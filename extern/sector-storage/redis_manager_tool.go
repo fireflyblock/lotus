@@ -22,10 +22,10 @@ var (
 	//	"172.16.0.8:8001",
 	DefaultRedisURL      = ""
 	DefaultRedisPassWord = ""
-	APWaitTime           = time.Second * 2 //5
-	P1WaitTime           = time.Second * 2 //80
-	P2WaitTime           = time.Second * 1 //00
-	C1WaitTime           = time.Second * 1 //20
+	APWaitTime           = time.Minute * 25
+	P1WaitTime           = time.Minute * 280
+	P2WaitTime           = time.Minute * 100
+	C1WaitTime           = time.Minute * 120
 )
 
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
