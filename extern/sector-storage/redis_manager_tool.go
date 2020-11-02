@@ -850,7 +850,7 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType, se
 	}
 
 	//check p1 counter
-	if taskType == sealtasks.TTAddPiecePl || taskType == sealtasks.TTAddPieceSe {
+	if taskType == sealtasks.TTAddPiecePl || taskType == sealtasks.TTAddPieceSe || taskType == sealtasks.TTPreCommit1 {
 		cp1Exiit := m.CheckP1Counter(hostname)
 		if !cp1Exiit {
 			return free, nil
