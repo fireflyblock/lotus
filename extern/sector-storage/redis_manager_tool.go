@@ -2,6 +2,7 @@ package sectorstorage
 
 import (
 	"errors"
+	"strings"
 	"fmt"
 	"github.com/filecoin-project/go-state-types/abi"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
@@ -15,10 +16,11 @@ import (
 const CHECK_RES_GAP = time.Minute * 10
 
 var (
-	DefaultRedisURL = "192.168.20.178:6379"
+	//DefaultRedisURL = "192.168.20.178:6379"
 	//	"172.16.0.7:8001",
 	//	"172.16.0.7:8002",
 	//	"172.16.0.8:8001",
+	DefaultRedisURL = ""
 	DefaultRedisPassWord = ""
 	APWaitTime           = time.Minute * 25
 	P1WaitTime           = time.Minute * 280
@@ -314,11 +316,15 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 			c1Res := gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, c1Field, &c1Res)
 			if err != nil {
+				if m.CheckTimeout(err.Error()){
+					logrus.SchedLogger.Errorf("===== rd hget c1 params res timeout %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
+					continue
+				}
 				logrus.SchedLogger.Errorf("===== rd hget c1 params res err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
 				return nil
 			}
 
-			logrus.SchedLogger.Infof("===== rd recovery miner, check c1 sectorID %d, c1Res %+v", sectorID, c1Res)
+			logrus.SchedLogger.Infof("===== rd recovery miner, check c1 sectorID %d, c1Res %+v", sectorID, c1Res.Err)
 			return &c1Res
 
 		} else {
@@ -1010,6 +1016,27 @@ func (m *Manager) FreeP1Count(hostName string, sectorID abi.SectorNumber, taskTy
 		defer m.redisCli.C1RcLK.Unlock()
 	}
 
+	//switch taskType {
+	//case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe, sealtasks.TTAddPiece:
+	//	if taskType == sealtasks.TTAddPieceSe && sealApId > 1 {
+	//		return nil
+	//	}
+	//	m.redisCli.ApRcLK.Lock()
+	//	defer m.redisCli.ApRcLK.Unlock()
+
+	//case sealtasks.TTPreCommit1:
+	//	m.redisCli.P1RcLK.Lock()
+	//	defer m.redisCli.P1RcLK.Unlock()
+
+	//case sealtasks.TTPreCommit2:
+	//	m.redisCli.P2RcLK.Lock()
+	//	defer m.redisCli.P2RcLK.Unlock()
+
+	//case sealtasks.TTCommit1:
+	//	m.redisCli.C1RcLK.Lock()
+	//	defer m.redisCli.C1RcLK.Unlock()
+	//}
+
 	cp1 := gr.SplicingCounterP1Key(hostName)
 	field := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
 	_, err := m.redisCli.HDel(cp1, field)
@@ -1098,3 +1125,14 @@ func (m *Manager) DeleteParamsRes(sectorID abi.SectorNumber, tashType sealtasks.
 func (m *Manager) UpdateStatus(sectorID abi.SectorNumber, taskType sealtasks.TaskType, hostName string) error {
 	return m.redisCli.HSet(gr.RedisKey(hostName), gr.RedisField(strconv.Itoa(int(sectorID))), gr.ToFieldTaskType(taskType))
 }
+
+func (m *Manager) CheckTimeout(err string) bool {
+	count1 := strings.Count(err, "read tcp")
+	count2 := strings.Count(err, "timeout")
+
+	if count1 > 0 && count2 > 0 {
+		return true
+	}
+	return false
+}
+

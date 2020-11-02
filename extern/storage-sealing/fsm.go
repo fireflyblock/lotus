@@ -395,7 +395,7 @@ func (m *Sealing) restartSectors(ctx context.Context) error {
 			log.Errorf("restarting sector %d: %+v", sector.SectorNumber, err)
 		}
 
-		if sector.State == Faulty {
+		if sector.State == Faulty || sector.State == Proving {
 			m.DeleteDataForSid(sector.SectorNumber)
 		}
 

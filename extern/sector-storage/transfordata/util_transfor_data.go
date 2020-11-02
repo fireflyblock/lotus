@@ -156,9 +156,14 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 // src 准备压缩的文件或目录
 // dstPath
 // ip 目标服务器 ip 地址
+// return 999 mean file not exist
 func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 	r, w := io.Pipe()
 	m := multipart.NewWriter(w)
+
+	if !isFileExist(srcPath + src) {
+		return 999,xerrors.Errorf("file %s not exit ",srcPath+src)
+	}
 
 	go func() {
 		defer w.Close()

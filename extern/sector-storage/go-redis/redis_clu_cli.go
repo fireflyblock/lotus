@@ -28,9 +28,9 @@ func NewRedisClusterCLi(ctx context.Context, addrs string, passWord string) *Red
 	rc := redis.NewClient(&redis.Options{
 		Addr:         addrs,
 		Password:     passWord,        // 设置密码
-		DialTimeout:  1 * time.Second, // 设置连接超时
-		ReadTimeout:  1 * time.Second, // 设置读取超时
-		WriteTimeout: 1 * time.Second, // 设置写入超时
+		DialTimeout:  100 * time.Second, // 设置连接超时
+		ReadTimeout:  100 * time.Second, // 设置读取超时
+		WriteTimeout: 100 * time.Second, // 设置写入超时
 	})
 
 	// 发送一个ping命令,测试是否通
