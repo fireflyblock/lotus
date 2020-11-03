@@ -3,6 +3,8 @@ package stores
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/filecoin-project/go-state-types/abi"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -82,7 +84,7 @@ func TestLocalStorage(t *testing.T) {
 
 	index := NewIndex()
 
-	st, err := NewLocal(ctx, tstor, index, nil)
+	st, err := NewLocal(ctx, tstor, index, nil, abi.SectorSize(32<<30))
 	require.NoError(t, err)
 
 	p1 := "1"
@@ -92,4 +94,24 @@ func TestLocalStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	// TODO: put more things here
+}
+
+func TestCacheFiles(t *testing.T) {
+	ctx := context.TODO()
+
+	root, err := ioutil.TempDir("", "sector-storage-teststorage-")
+	require.NoError(t, err)
+
+	tstor := &TestingLocalStorage{
+		root: root,
+	}
+
+	index := NewIndex()
+
+	st, err := NewLocal(ctx, tstor, index, nil, abi.SectorSize(32<<30))
+	require.NoError(t, err)
+
+	p := "/tmp/lotussotrage"
+	ent, _ := os.Stat(filepath.Join(p, FTSealed.String(), "s-t021704-11468"))
+	fmt.Println(st.checkSectorFine(ent, p, FTSealed))
 }
