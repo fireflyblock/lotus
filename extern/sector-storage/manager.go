@@ -796,7 +796,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	c1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
 	res := m.RecoveryC1(sector.Number, c1Field)
 	if res != nil {
-		logrus.SchedLogger.Infof("===== rd recovery miner succeed, sectroID %d, taskType %+v", sector.Number, sealtasks.TTCommit1)
+		logrus.SchedLogger.Infof("===== rd recovery miner succeed, sectorID %d, taskType %+v", sector.Number, sealtasks.TTCommit1)
 		if res.Err == "" {
 			hostName := ""
 			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
@@ -985,7 +985,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 			// declareSector  申明新的存储路径
 			// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-			exist, err = m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 1))
+			exist, err = m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTAddPieceSe, 1))
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", sector, err)
 				return out, err
