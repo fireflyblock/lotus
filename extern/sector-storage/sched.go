@@ -282,7 +282,7 @@ func (sh *scheduler) runSched() {
 			}
 
 			sh.schedQueue.Push(req)
-			go sh.StartStore(req.sector.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
+			//go sh.StartStore(req.sector.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
 			sh.trySched()
 
 			if sh.testSync != nil {
