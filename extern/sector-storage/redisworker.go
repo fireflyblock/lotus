@@ -621,6 +621,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 				Out: out,
 				Err: err.Error(),
 			}
+			goto RESRETURN
 		} else {
 			paramsRes = &gr.ParamsResC1{
 				Out: out,
