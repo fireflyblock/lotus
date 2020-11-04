@@ -216,14 +216,14 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 		for _, ent := range ents {
 
 			// 只处理存储机器上面的数据，
-			if meta.CanStore && !meta.CanSeal {
-				// 清理不完整的sector数据，暂时之考虑chache目录和sealed目录
-				if t == FTSealed || t == FTCache {
-					if !st.checkSectorFine(ent, p, t) {
-						//continue
-					}
-				}
-			}
+			//if meta.CanStore && !meta.CanSeal {
+			//	// 清理不完整的sector数据，暂时之考虑chache目录和sealed目录
+			//	if t == FTSealed || t == FTCache {
+			//		if !st.checkSectorFine(ent, p, t) {
+			//			continue
+			//		}
+			//	}
+			//}
 
 			if ent.Name() == FetchTempSubdir {
 				continue
@@ -268,7 +268,7 @@ func (st *Local) checkSectorFine(ent os.FileInfo, p string, t SectorFileType) bo
 		} else {
 			//
 			p := filepath.Join(p, FTSealed.String(), ent.Name())
-			log.Errorf("try to delete error sector %s, size %d", p+t.String(), ent.Size())
+			log.Errorf("try to delete error sector %s, file size %d,need size %d", filepath.Join(p, t.String(), ent.Name()), ent.Size(), sectorSize)
 			//err := os.Remove(p)
 			//if err != nil {
 			//	log.Errorf("delete %s error :%+v", p+FTSealed.String()+ent.Name(), err)
@@ -301,13 +301,13 @@ func (st *Local) checkCacheFiles(ent os.FileInfo, p string, t SectorFileType) bo
 	path := filepath.Join(p, FTCache.String(), ent.Name())
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		log.Errorf("read file %s error, err: %s", p+FTCache.String()+ent.Name(), err.Error())
+		log.Errorf("read file %s error, err: %s", path, err.Error())
 		return false
 	}
 
 	if len(files) != fileNums {
 		// 删除对应的cache和sealed文件
-		log.Errorf("check sectorSize %d file %s cache files count %d should be %d, remove cache dir and sealed file!!!!!", st.size, p+FTCache.String()+ent.Name(), len(files), fileNums)
+		log.Errorf("check sectorSize %d file %s cache files count %d should be %d, remove cache dir and sealed file!!!!!", st.size, path, len(files), fileNums)
 		//err = os.RemoveAll(path)
 		//if err != nil {
 		//	log.Errorf("remove %s failed, %s", path, err.Error())
