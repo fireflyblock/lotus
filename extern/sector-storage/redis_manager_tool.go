@@ -1075,8 +1075,10 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
 		//5 pub time
 		m.redisCli.HDel(gr.PUB_TIME, f)
-		//
-
+		if v == sealtasks.TTPreCommit1 {
+			//6 recovery
+			m.redisCli.HDel(gr.RECOVER_NAME, f)
+		}
 	}
 
 	if res == 0 {

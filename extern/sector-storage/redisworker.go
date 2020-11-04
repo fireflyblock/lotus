@@ -262,8 +262,8 @@ func (rw *RedisWorker) CheckRecovery() error {
 		}
 
 		if !exist {
-			log.Infof("===== rd check recovery worker, del field %+v", field)
-			rw.redisCli.HDel(gr.RedisKey(rw.hostName), field)
+			log.Infof("===== rd check recovery worker, del key %+v", key)
+			rw.redisCli.HDel(gr.RedisKey(rw.hostName), key)
 			return nil
 		}
 	}

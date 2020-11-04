@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	gr "github.com/filecoin-project/sector-storage/go-redis"
-	"github.com/filecoin-project/sector-storage/sealtasks"
-
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/policy"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
+	"github.com/filecoin-project/sector-storage/sealtasks"
+	"strconv"
 
 	"golang.org/x/xerrors"
 
@@ -534,13 +534,13 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
 		tasklist = append(tasklist, list...)
 	} else {
-
 		list := []sealtasks.TaskType{sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
 		tasklist = append(tasklist, list...)
 	}
 
 	for _, v := range tasklist {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
+		m.DeleteWorkerCountAndTaskStatus(f)
 		//1 backup  pub
 		m.rc.HDel(gr.PARAMS_NAME, f)
 		//2 backup params
@@ -551,8 +551,10 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		m.rc.HDel(gr.PARAMS_RES_NAME, f)
 		//5 pub time
 		m.rc.HDel(gr.PUB_TIME, f)
-		//
-
+		if v == sealtasks.TTPreCommit1 {
+			//6 recovery
+			m.rc.HDel(gr.RECOVER_NAME, f)
+		}
 	}
 
 	if res == 0 {
@@ -581,5 +583,31 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		m.rc.HDel(gr.PARAMS_RES_NAME, f)
 		//5 pub time
 		m.rc.HDel(gr.PUB_TIME, f)
+	}
+}
+
+func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField) {
+	hostname := ""
+	sid, tt, _, _ := field.TailoredPubAndParamsfield()
+	err := m.rc.HGet(gr.PUB_NAME, field, &hostname)
+	if err != nil {
+		log.Errorf("===== rd get hostname for DeleteWorkerCountForTask, sectorID %+v taskType %s err %+v", sid, tt, err)
+		return
+	}
+
+	wCKeyList, err := m.rc.HKeys(gr.SplicingTaskCounntKey(hostname))
+	for _, v := range wCKeyList {
+		if field == v {
+			log.Infof("===== rd del workerCount for hostname %s sectorID %+v taskType %s ", hostname, sid, tt)
+			m.rc.HDel(gr.RedisKey(hostname), v)
+		}
+	}
+
+	tSKeyList, err := m.rc.HKeys(gr.RedisKey(hostname))
+	for _, key := range tSKeyList {
+		if key.ToString() == strconv.Itoa(int(sid)) {
+			log.Infof("===== rd del task status, key %+v", key)
+			m.rc.HDel(gr.RedisKey(hostname), key)
+		}
 	}
 }
