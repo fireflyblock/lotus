@@ -152,8 +152,15 @@ func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
 		log.Errorf("===initRecoverSectorNumber get m.sc.Next() sid failed,error:%+v", err)
 		return
 	}
+
+	sidStart := abi.SectorNumber(0)
+	if m.maddr.String() == "f02420" {
+		// 因为我们的sectornumber太大了
+		log.Infof("miner %s start recoverySectorNumber from 1500000", m.maddr.String())
+		sidStart = abi.SectorNumber(1500000)
+	}
 	sectorsAll := set.New(set.ThreadSafe)
-	for i := abi.SectorNumber(0); i <= sidMax; i++ {
+	for i := sidStart; i <= sidMax; i++ {
 		sectorsAll.Add(i)
 	}
 
