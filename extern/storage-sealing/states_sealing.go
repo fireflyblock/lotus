@@ -521,7 +521,6 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector SectorInf
 
 func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	log.Infof("===== rd restart DeleteDataForSid, sectorID %+v", sectorID)
-	//1 backup params
 	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
 	tasklist := make([]sealtasks.TaskType, 0)
 
@@ -541,11 +540,11 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	for _, v := range tasklist {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
 		m.DeleteWorkerCountAndTaskStatus(f)
-		//1 backup  pub
+		//1 pub
 		m.rc.HDel(gr.PARAMS_NAME, f)
-		//2 backup params
+		//2 params
 		m.rc.HDel(gr.PUB_NAME, f)
-		//3 backup res
+		//3 res
 		m.rc.HDel(gr.PUB_RES_NAME, f)
 		//4 res params
 		m.rc.HDel(gr.PARAMS_RES_NAME, f)
@@ -555,6 +554,8 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			//6 recovery
 			m.rc.HDel(gr.RECOVER_NAME, f)
 		}
+		//7 retry count
+		m.FreeRetryCount(f)
 	}
 
 	if res == 0 {
@@ -573,17 +574,36 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	var i int64 = 1
 	for i = 1; i <= count; i++ {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
-		//2 backup  pub
+		//2 pub
 		m.rc.HDel(gr.PARAMS_NAME, f)
-		//3 backup res params
+		//3 res params
 		m.rc.HDel(gr.PUB_NAME, f)
-		//4 backup res
+		//4 res
 		m.rc.HDel(gr.PUB_RES_NAME, f)
 		//5 res params
 		m.rc.HDel(gr.PARAMS_RES_NAME, f)
-		//5 pub time
+		//6 pub time
 		m.rc.HDel(gr.PUB_TIME, f)
+		//7 retry count
+		m.FreeRetryCount(f)
 	}
+}
+
+func (m *Sealing) FreeRetryCount(retryField gr.RedisField) error {
+	sid, tt, _, _ := retryField.TailoredPubAndParamsfield()
+	hostname := ""
+	err := m.rc.HGet(gr.PUB_NAME, retryField, &hostname)
+	if err != nil {
+		log.Errorf("===== rd free retry count hget pledge pub err %+v sectorID %+v, pledgeField %+v\n", err, sid, retryField)
+	}
+
+	_, err = m.rc.HDel(gr.RETRY, retryField)
+	log.Infof("===== rd free retry count hostname %+v sectorID %+v taskType %+v field %+v", hostname, sid, tt, retryField)
+	if err != nil {
+		log.Errorf("===== rd free retry count field %+v err %+v", retryField, err)
+		return err
+	}
+	return nil
 }
 
 func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField) {

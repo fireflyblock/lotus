@@ -110,10 +110,19 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 		return
 	}
 
+	err = rw.redisCli.HSet(tcfKey, gr.REGISTER_TIME, time.Now())
+	if err != nil {
+		return
+	}
+
 	return nil
 }
 
 func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
+	_, err := rw.redisCli.Del(gr.SplicingCurrentTasks(rw.hostName))
+	if err != nil {
+		log.Errorf("===== rd del current task, err %+v\n", err)
+	}
 	//range
 	keys, err := rw.redisCli.HKeys(gr.RedisKey(rw.hostName))
 	if err != nil {
@@ -323,6 +332,13 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 				//get params res
 				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
 				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+
+				//check task
+				if rw.CheckCurrentTask(resField) {
+					log.Warnf("===== rd check current task, sectorID %+v taskType %+v", sid, tt)
+					return
+				}
+
 				switch tt.ToOfficalTaskType() {
 				case sealtasks.TTAddPiecePl:
 					err = rw.UpdateStatus(sid, tt.ToOfficalTaskType())
@@ -353,6 +369,13 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 				//get params res
 				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
 				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+
+				//check task
+				if rw.CheckCurrentTask(resField) {
+					log.Warnf("===== rd check current task, sectorID %+v taskType %+v", sid, tt)
+					return
+				}
+
 				err = rw.UpdateStatus(sid, tt.ToOfficalTaskType())
 				if err != nil {
 					log.Errorf("===== rd update status err", err)
@@ -374,6 +397,13 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 				//get params res
 				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
 				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+
+				//check task
+				if rw.CheckCurrentTask(resField) {
+					log.Warnf("===== rd check current task, sectorID %+v taskType %+v", sid, tt)
+					return
+				}
+
 				err = rw.UpdateStatus(sid, tt.ToOfficalTaskType())
 				if err != nil {
 					log.Errorf("===== rd update status err", err)
@@ -396,6 +426,13 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 				//get params res
 				resField := gr.SplicingBackupPubAndParamsField(sid, tt.ToOfficalTaskType(), sealApId)
 				pubMsg := gr.SplicingPubMessage(sid, tt.ToOfficalTaskType(), hostName, sealApId)
+
+				//check task
+				if rw.CheckCurrentTask(resField) {
+					log.Warnf("===== rd check current task, sectorID %+v taskType %+v", sid, tt)
+					return
+				}
+
 				err = rw.UpdateStatus(sid, tt.ToOfficalTaskType())
 				if err != nil {
 					log.Errorf("===== rd update status err", err)
@@ -409,6 +446,9 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 }
 
 func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.RedisField) {
+	rw.AddCurrentTask(pubField)
+	defer rw.FreeCurrentTask(pubField)
+
 	paramsRes := &gr.ParamsResAp{}
 	params := &gr.ParamsAp{}
 	//get params
@@ -430,6 +470,9 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 		//log.Infof("===== rd pledge, sectorID %+v err %+v", params.Sector.Number, err)
 		log.Infof("===== rd pledge finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
+		if params.Sector.Number != 0 {
+			err = errors.New("test err .............")
+		}
 
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
@@ -460,6 +503,9 @@ RESRETURN:
 }
 
 func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.RedisField) {
+	rw.AddCurrentTask(pubField)
+	defer rw.FreeCurrentTask(pubField)
+
 	paramsRes := &gr.ParamsResAp{}
 	params := &gr.ParamsAp{}
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
@@ -507,6 +553,9 @@ RESRETURN:
 }
 
 func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.RedisField) {
+	rw.AddCurrentTask(pubField)
+	defer rw.FreeCurrentTask(pubField)
+
 	paramsRes := &gr.ParamsResP1{}
 	params := &gr.ParamsP1{}
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
@@ -553,6 +602,9 @@ RESRETURN:
 }
 
 func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.RedisField) {
+	rw.AddCurrentTask(pubField)
+	defer rw.FreeCurrentTask(pubField)
+
 	paramsRes := &gr.ParamsResP2{}
 	params := &gr.ParamsP2{}
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
@@ -599,6 +651,9 @@ RESRETURN:
 }
 
 func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.RedisField) {
+	rw.AddCurrentTask(pubField)
+	defer rw.FreeCurrentTask(pubField)
+
 	paramsRes := &gr.ParamsResC1{}
 	params := &gr.ParamsC1{}
 	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
@@ -855,6 +910,36 @@ func (rw *RedisWorker) InitWorkerConfig(path string) (tc *TaskConfig) {
 		return
 	}
 	return CalculateResources(info.Resources, diskSize)
+}
+
+func (rw *RedisWorker) AddCurrentTask(pubField gr.RedisField) {
+	log.Infof("===== rd add current task, field %+v\n", pubField)
+	_, err := rw.redisCli.HIncr(gr.SplicingCurrentTasks(rw.hostName), pubField, 1)
+	if err != nil {
+		log.Errorf("===== rd add current task, field %+v err %+v\n", pubField, err)
+	}
+}
+
+func (rw *RedisWorker) FreeCurrentTask(pubField gr.RedisField) {
+	log.Infof("===== rd free current task, field %+v\n", pubField)
+	_, err := rw.redisCli.HDel(gr.SplicingCurrentTasks(rw.hostName), pubField)
+	if err != nil {
+		log.Errorf("===== rd free current task, field %+v err %+v\n", pubField, err)
+	}
+}
+
+func (rw *RedisWorker) CheckCurrentTask(pubField gr.RedisField) bool {
+	exist, err := rw.redisCli.HExist(gr.SplicingCurrentTasks(rw.hostName), pubField)
+	if err != nil {
+		log.Errorf("===== rd check current task, field %+v err %+v\n", pubField, err)
+	}
+
+	log.Infof("===== rd check current task, field %+v exist %+v\n", pubField, exist)
+	if exist {
+		return true
+	}
+
+	return false
 }
 
 type Reader struct{}

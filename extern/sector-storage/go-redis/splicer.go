@@ -10,17 +10,20 @@ import (
 )
 
 const (
-	PUB_NAME        RedisKey = "pub"
-	PARAMS_NAME     RedisKey = "params"
-	PUB_TIME        RedisKey = "pub_time"
-	PUB_RES_NAME    RedisKey = "pub_res"
-	PARAMS_RES_NAME RedisKey = "params_res"
-	RECOVER_NAME    RedisKey = "recover"
-	COUNTER_P1      RedisKey = "counter_p1_"
-	WORKER_COUNT    RedisKey = "worker_count*"
-	W_C_T           RedisKey = "worker_count_"
-	WORKER_CONFIG   RedisKey = "worker_config*"
-	W_C_F           RedisKey = "worker_config_"
+	PUB_NAME           RedisKey = "pub"
+	PARAMS_NAME        RedisKey = "params"
+	PUB_TIME           RedisKey = "pub_time"
+	PUB_RES_NAME       RedisKey = "pub_res"
+	PARAMS_RES_NAME    RedisKey = "params_res"
+	RECOVER_NAME       RedisKey = "recover"
+	RETRY              RedisKey = "retry"
+	RECOVERY_WAIT_TIME RedisKey = "recovery_wait_time"
+	COUNTER_P1         RedisKey = "counter_p1_"
+	CURRENT_TASKS      RedisKey = "current_tasks_"
+	WORKER_COUNT       RedisKey = "worker_count*"
+	W_C_T              RedisKey = "worker_count_"
+	WORKER_CONFIG      RedisKey = "worker_config*"
+	W_C_F              RedisKey = "worker_config_"
 
 	SEALAPID = "seal_ap_"
 	//FIELDPLEDGEP    RedisField = "seal/v0/addpiece/pledge"
@@ -28,12 +31,13 @@ const (
 	//FIELDP1         RedisField = "seal/v0/precommit/1"
 	//FIELDP2         RedisField = "seal/v0/precommit/2"
 	//FIELDC1         RedisField = "seal/v0/commit/1"
-	FIELDPAP     RedisField = "ap"
-	FIELDPLEDGEP RedisField = "pledge"
-	FIELDSEAL    RedisField = "seal"
-	FIELDP1      RedisField = "p1"
-	FIELDP2      RedisField = "p2"
-	FIELDC1      RedisField = "c1"
+	FIELDPAP      RedisField = "ap"
+	FIELDPLEDGEP  RedisField = "pledge"
+	FIELDSEAL     RedisField = "seal"
+	FIELDP1       RedisField = "p1"
+	FIELDP2       RedisField = "p2"
+	FIELDC1       RedisField = "c1"
+	REGISTER_TIME RedisField = "register"
 
 	PUBLISHCHANNELAP = "pub_cha_ap" //miner pub task
 	PUBLISHCHANNELP1 = "pub_cha_p1" //miner pub task
@@ -197,6 +201,12 @@ func SplicingTaskCounntKey(hostName string) RedisKey {
 //拼接counter_p1配置的key
 func SplicingCounterP1Key(hostName string) RedisKey {
 	str := fmt.Sprintf("%s%s", COUNTER_P1, hostName)
+	return RedisKey(str)
+}
+
+//拼接counter_p1配置的key
+func SplicingCurrentTasks(hostName string) RedisKey {
+	str := fmt.Sprintf("%s%s", CURRENT_TASKS, hostName)
 	return RedisKey(str)
 }
 
