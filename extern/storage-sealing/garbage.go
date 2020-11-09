@@ -5,6 +5,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
+	"github.com/gogo/protobuf/sortkeys"
 	"golang.org/x/xerrors"
 	"gopkg.in/fatih/set.v0"
 	"time"
@@ -81,6 +82,9 @@ func (m *Sealing) PledgeSector() error {
 		}
 	}
 
+	// 有机会就去尝试消化积压的sector
+	m.RecoverPledgeSector()
+
 	go func() {
 		ctx := context.TODO() // we can't use the context from command which invokes
 		// this, as we run everything here async, and it's cancelled when the
@@ -94,11 +98,19 @@ func (m *Sealing) PledgeSector() error {
 		recoverLen := len(m.recoverSectorNumbers)
 		log.Infof("===== PledgeSector need recoverSectorNumber length:%d\n", recoverLen)
 		if recoverLen > 0 {
-			for number := range m.recoverSectorNumbers {
-				sid = number
-				delete(m.recoverSectorNumbers, number)
-				break
+			// 按sectornumber排序,释放sector
+			var keys []uint64
+			for key, _ := range m.recoverSectorNumbers {
+				keys = append(keys, uint64(key))
 			}
+			sortkeys.Uint64s(keys)
+			sid = abi.SectorNumber(keys[0])
+			delete(m.recoverSectorNumbers, abi.SectorNumber(keys[0]))
+
+			//for number := range m.recoverSectorNumbers {
+			//	delete(m.recoverSectorNumbers, number)
+			//	break
+			//}
 			log.Infof("===== PledgeSector use recoverSectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
 		}
 		m.recoverLk.Unlock()
@@ -142,6 +154,73 @@ func (m *Sealing) PledgeSector() error {
 			return
 		}
 	}()
+	return nil
+}
+
+// 优先恢复recover 从reids中收集到的sector
+func (m *Sealing) RecoverPledgeSector() error {
+	cfg, err := m.getConfig()
+	if err != nil {
+		return xerrors.Errorf("getting config: %w", err)
+	}
+
+	if cfg.MaxSealingSectors > 0 {
+		if m.stats.curSealing() > cfg.MaxSealingSectors {
+			return xerrors.Errorf("too many sectors sealing (curSealing: %d, max: %d)", m.stats.curSealing(), cfg.MaxSealingSectors)
+		}
+	}
+
+	m.recoverPledgeLK.Lock()
+	recoverLen := len(m.recoverPledgeSectors)
+	m.recoverPledgeLK.Unlock()
+
+	log.Infof("===== RecoverPledgeSector need recoverPledgeSectorNumber length:%d\n", recoverLen)
+	if recoverLen > 0 {
+		// 循环发送，前期应该会造成不少浪费，但是目的是抓紧消化完所有的这种存量sector
+		m.recoverPledgeLK.Lock()
+		var keys []abi.SectorNumber
+		for key, _ := range m.recoverPledgeSectors {
+			keys = append(keys, key)
+		}
+		m.recoverPledgeLK.Unlock()
+
+		for _, sid := range keys {
+			// 循环发送
+			go func() {
+				ctx := context.TODO() // we can't use the context from command which invokes
+				// this, as we run everything here async, and it's cancelled when the
+				// command exits
+				size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
+
+				pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
+				if err != nil {
+					log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
+					log.Warnf("%+v", err)
+					return
+				}
+
+				ps := make([]Piece, len(pieces))
+				for idx := range ps {
+					ps[idx] = Piece{
+						Piece:    pieces[idx],
+						DealInfo: nil,
+					}
+				}
+
+				// 释放数量
+				m.recoverPledgeLK.Lock()
+				delete(m.recoverPledgeSectors, sid)
+				m.recoverPledgeLK.Unlock()
+
+				if err := m.newSectorCC(sid, ps); err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+			}()
+			log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
+		}
+	}
+
 	return nil
 }
 

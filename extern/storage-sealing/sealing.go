@@ -96,6 +96,10 @@ type Sealing struct {
 	// 记录丢失掉的sectorNumber重利用
 	recoverLk            sync.Mutex
 	recoverSectorNumbers map[abi.SectorNumber]struct{}
+
+	// 存储pledge 需要重发的sector,需要miner重启之后从redis里面读出来
+	recoverPledgeLK      sync.Mutex
+	recoverPledgeSectors map[abi.SectorNumber]struct{}
 }
 
 type FeeConfig struct {
@@ -142,6 +146,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 		},
 		turnOnCh:             make(chan gr.RedisField),
 		recoverSectorNumbers: map[abi.SectorNumber]struct{}{},
+		recoverPledgeSectors: map[abi.SectorNumber]struct{}{},
 	}
 
 	//init redis data
@@ -150,7 +155,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 	var pw string
 	conf, err := sectorstorage.InitRequestConfig("conf.json")
 	if err != nil {
-		logrus.SchedLogger.Errorf("===== read conf.json err:", err)
+		logrus.SchedLogger.Errorf("===== read conf.json err:%+v", err)
 	}
 
 	if conf.RedisUrl == "" {
