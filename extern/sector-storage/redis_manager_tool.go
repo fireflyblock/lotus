@@ -7,7 +7,6 @@ import (
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/sector-storage/sealtasks"
-	"github.com/go-redis/redis/v8"
 	"strconv"
 	"strings"
 	"time"
@@ -342,7 +341,7 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 	}
 }
 
-func (m *Manager) SubscribeResult(subCha <-chan *redis.Message, sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
+func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
 	ticker := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:

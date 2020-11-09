@@ -434,12 +434,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		if err != nil {
 			return out, err
 		}
-		//2.Subscribe res
-		subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
-		if err != nil {
-			return out, err
-		}
-		return m.SubscribeResult(subCha, sector.Number, tt, currentSealApId)
+		return m.SubscribeResult(sector.Number, tt, currentSealApId)
 
 	case "_pledgeSector":
 		tt = sealtasks.TTAddPiecePl
@@ -460,12 +455,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		if err != nil {
 			return out, err
 		}
-		//2.Subscribe res
-		subCha, err := m.redisCli.Subscribe(gr.SUBSCRIBECHANNEL)
-		if err != nil {
-			return out, err
-		}
-		return m.SubscribeResult(subCha, sector.Number, tt, 0)
+		return m.SubscribeResult(sector.Number, tt, 0)
 	}
 }
 
