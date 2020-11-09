@@ -470,9 +470,6 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 		//log.Infof("===== rd pledge, sectorID %+v err %+v", params.Sector.Number, err)
 		log.Infof("===== rd pledge finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
-		if params.Sector.Number != 0 {
-			err = errors.New("test err .............")
-		}
 
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
