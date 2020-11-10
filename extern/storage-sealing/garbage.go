@@ -306,46 +306,49 @@ func (m *Sealing) SearchRecoveryPledge() map[abi.SectorNumber]struct{} {
 			i++
 		}
 	}
+	pledgeKeys = pledgeKeys[:i]
 
-	i = 0
-	for j := 0; j < len(pledgeKeys); j++ {
-		hostName := ""
-		err := m.rc.HGet(gr.PUB_NAME, pledgeKeys[j], &hostName)
-		if err != nil {
-			log.Errorf("rd search recovery pledge, filter2 err:%+v", err)
-		}
-		ex, _ := m.rc.HExist(gr.SplicingTaskCounntKey(hostName), pledgeKeys[j])
+	//i = 0
+	//for j := 0; j < len(pledgeKeys); j++ {
+	//	hostName := ""
+	//	err := m.rc.HGet(gr.PUB_NAME, pledgeKeys[j], &hostName)
+	//	if err != nil {
+	//		log.Errorf("rd search recovery pledge, filter2 err:%+v", err)
+	//	}
+	//	ex, _ := m.rc.HExist(gr.SplicingTaskCounntKey(hostName), pledgeKeys[j])
+	//
+	//	if !ex {
+	//		pledgeKeys[i] = pledgeKeys[j]
+	//		i++
+	//	}
+	//}
+	//pledgeKeys = pledgeKeys[:i]
 
-		if !ex {
-			pledgeKeys[i] = pledgeKeys[j]
-			i++
-		}
-	}
-
-	i = 0
-	for j := 0; j < len(pledgeKeys); j++ {
-		pledgeRes := &gr.ParamsResAp{}
-		ex, err := m.rc.HExist(gr.PARAMS_RES_NAME, pledgeKeys[j])
-		if err != nil {
-			log.Errorf("rd search recovery pledge, filter3 err:%+v", err)
-		}
-
-		if !ex {
-			pledgeKeys[i] = pledgeKeys[j]
-			i++
-			continue
-		}
-
-		err = m.rc.HGet(gr.PARAMS_RES_NAME, pledgeKeys[j], pledgeRes)
-		if err != nil {
-			log.Errorf("rd search recovery pledge, filter4 err:%+v", err)
-		}
-
-		if pledgeRes.Err != "" {
-			pledgeKeys[i] = pledgeKeys[j]
-			i++
-		}
-	}
+	//i = 0
+	//for j := 0; j < len(pledgeKeys); j++ {
+	//	pledgeRes := &gr.ParamsResAp{}
+	//	ex, err := m.rc.HExist(gr.PARAMS_RES_NAME, pledgeKeys[j])
+	//	if err != nil {
+	//		log.Errorf("rd search recovery pledge, filter3 err:%+v", err)
+	//	}
+	//
+	//	if !ex {
+	//		pledgeKeys[i] = pledgeKeys[j]
+	//		i++
+	//		continue
+	//	}
+	//
+	//	err = m.rc.HGet(gr.PARAMS_RES_NAME, pledgeKeys[j], pledgeRes)
+	//	if err != nil {
+	//		log.Errorf("rd search recovery pledge, filter4 err:%+v", err)
+	//	}
+	//
+	//	if pledgeRes.Err != "" {
+	//		pledgeKeys[i] = pledgeKeys[j]
+	//		i++
+	//	}
+	//}
+	//pledgeKeys = pledgeKeys[:i]
 
 	log.Infof("===== rd search recovery pledge, len %d pledgeKeys :%+v", len(pledgeKeys), pledgeKeys)
 
