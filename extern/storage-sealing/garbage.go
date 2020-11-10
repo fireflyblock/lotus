@@ -8,6 +8,7 @@ import (
 	"github.com/gogo/protobuf/sortkeys"
 	"golang.org/x/xerrors"
 	"gopkg.in/fatih/set.v0"
+	"strings"
 	"time"
 )
 
@@ -275,4 +276,84 @@ func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
 	log.Infof("==== recover sector number : %+v\n", m.recoverSectorNumbers)
 	m.recoverLk.Unlock()
 
+}
+
+func (m *Sealing) SearchRecoveryPledge() map[abi.SectorNumber]struct{} {
+	pledgeKeys := make([]gr.RedisField, 0)
+	//sealKeys := make([]gr.RedisField, 0)
+
+	allKeyList, _ := m.rc.HKeys(gr.PUB_NAME)
+	for _, key := range allKeyList {
+		res := strings.Split(string(key), "_")
+		switch res[1] {
+		case "pledge":
+			pledgeKeys = append(pledgeKeys, key)
+			//case "seal":
+			//	sealKeys = append(sealKeys, key)
+		}
+	}
+
+	i := 0
+	for j := 0; j < len(pledgeKeys); j++ {
+		p1k := gr.TypeToType(pledgeKeys[j], gr.FIELDP1)
+		p1Exist, err := m.rc.HExist(gr.PUB_NAME, p1k)
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter1 err:%+v", err)
+		}
+
+		if !p1Exist {
+			pledgeKeys[i] = pledgeKeys[j]
+			i++
+		}
+	}
+
+	i = 0
+	for j := 0; j < len(pledgeKeys); j++ {
+		hostName := ""
+		err := m.rc.HGet(gr.PUB_NAME, pledgeKeys[j], &hostName)
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter2 err:%+v", err)
+		}
+		ex, _ := m.rc.HExist(gr.SplicingTaskCounntKey(hostName), pledgeKeys[j])
+
+		if !ex {
+			pledgeKeys[i] = pledgeKeys[j]
+			i++
+		}
+	}
+
+	i = 0
+	for j := 0; j < len(pledgeKeys); j++ {
+		pledgeRes := &gr.ParamsResAp{}
+		ex, err := m.rc.HExist(gr.PARAMS_RES_NAME, pledgeKeys[j])
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter3 err:%+v", err)
+		}
+
+		if !ex {
+			pledgeKeys[i] = pledgeKeys[j]
+			i++
+			continue
+		}
+
+		err = m.rc.HGet(gr.PARAMS_RES_NAME, pledgeKeys[j], pledgeRes)
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter4 err:%+v", err)
+		}
+
+		if pledgeRes.Err != "" {
+			pledgeKeys[i] = pledgeKeys[j]
+			i++
+		}
+	}
+
+	log.Infof("===== rd search recovery pledge, len %d pledgeKeys :%+v", len(pledgeKeys), pledgeKeys)
+
+	sectorList := make(map[abi.SectorNumber]struct{}, 0)
+	for _, key := range pledgeKeys {
+		sid, _, _, _ := key.TailoredPubAndParamsfield()
+		sectorList[sid] = struct{}{}
+	}
+
+	return sectorList
 }

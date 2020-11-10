@@ -233,3 +233,27 @@ func SplicingChannel(hostName string) string {
 	str := fmt.Sprintf("cha_%s", hostName)
 	return str
 }
+
+func TypeToType(keys, type2 RedisField) RedisField {
+	list1 := strings.Split(string(keys), "_")
+
+	switch type2 {
+	case FIELDPLEDGEP:
+		res := fmt.Sprintf("%s_%s", list1[0], "pledge")
+		return RedisField(res)
+	case FIELDSEAL:
+		res := fmt.Sprintf("%s_%s", list1[0], "seal")
+		return RedisField(res)
+	case FIELDP1:
+		res := fmt.Sprintf("%s_%s", list1[0], "p1")
+		return RedisField(res)
+	case FIELDP2:
+		res := fmt.Sprintf("%s_%s", list1[0], "p2")
+		return RedisField(res)
+	case FIELDC1:
+		res := fmt.Sprintf("%s_%s", list1[0], "c1")
+		return RedisField(res)
+	default:
+		return ""
+	}
+}
