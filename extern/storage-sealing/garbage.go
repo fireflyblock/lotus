@@ -64,7 +64,7 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 	}
 
 	go func() {
-		log.Infof("====== send turnOnCh pledge, sectorID %+V", sectorID.Number)
+		log.Infof("====== send turnOnCh pledge, sectorID %+v", sectorID.Number)
 		m.turnOnCh <- gr.SplicingBackupPubAndParamsField(sectorID.Number, sealtasks.TTAddPiecePl, 0)
 	}()
 

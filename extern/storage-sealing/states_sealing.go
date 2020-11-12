@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
+	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"strconv"
 
@@ -522,7 +523,8 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector SectorInf
 func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	log.Infof("===== rd restart DeleteDataForSid, sectorID %+v", sectorID)
 	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
-	tasklist := make([]sealtasks.TaskType, 0)
+	taskList := make([]sealtasks.TaskType, 0)
+	hostname := ""
 
 	res, err := m.rc.Exist(sealKey)
 	if err != nil {
@@ -531,13 +533,13 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	}
 	if res > 0 {
 		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
-		tasklist = append(tasklist, list...)
+		taskList = append(taskList, list...)
 	} else {
 		list := []sealtasks.TaskType{sealtasks.TTAddPiecePl, sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
-		tasklist = append(tasklist, list...)
+		taskList = append(taskList, list...)
 	}
 
-	for _, v := range tasklist {
+	for _, v := range taskList {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
 		m.DeleteWorkerCountAndTaskStatus(f)
 		//1 pub
@@ -554,8 +556,16 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			//6 recovery
 			m.rc.HDel(gr.RECOVER_NAME, f)
 		}
-		//7 retry count
+		//7 wait time
+		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		//8 retry count
 		m.FreeRetryCount(f)
+		//9 task status
+		err := m.rc.HGet(gr.PUB_NAME, f, &hostname)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+		}
+		m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
 	}
 
 	if res == 0 {
@@ -586,6 +596,8 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		m.rc.HDel(gr.PUB_TIME, f)
 		//7 retry count
 		m.FreeRetryCount(f)
+		//8 wait time
+		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
 	}
 }
 

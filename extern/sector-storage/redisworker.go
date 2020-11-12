@@ -335,7 +335,7 @@ func (rw *RedisWorker) SubscribeResult(ctx context.Context, subChaAp, subChaP1, 
 
 				//check task
 				if rw.CheckCurrentTask(resField) {
-					log.Warnf("===== rd check current task, sectorID %+v taskType %+v", sid, tt)
+					log.Warnf("===== rd working on sectorID %+v taskType %+v, refuse to repeat scheduling", sid, tt)
 					return
 				}
 

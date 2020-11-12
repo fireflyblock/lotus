@@ -190,6 +190,22 @@ func (rf RedisField) ToString() string {
 	return string(rf)
 }
 
+func (rf RedisField) ToTnt() int {
+	res, err := strconv.Atoi(string(rf))
+	if err != nil {
+		log.Infof("===== ToTnt err %+v", err)
+	}
+	return res
+}
+
+func (rf RedisField) ToSectorNumber() abi.SectorNumber {
+	res, err := strconv.Atoi(string(rf))
+	if err != nil {
+		log.Infof("===== ToTnt err %+v", err)
+	}
+	return abi.SectorNumber(res)
+}
+
 type RedisKey string
 
 //拼接worker配置的key

@@ -23,15 +23,26 @@ var (
 	DefaultRedisURL      = ""
 	DefaultRedisPassWord = ""
 	APWaitTime           = time.Minute * 30
-	P1WaitTime           = time.Minute * 100
-	P2WaitTime           = time.Minute * 30
-	C1WaitTime           = time.Minute * 20
+	P1WaitTime           = time.Minute * 210
+	P2WaitTime           = time.Minute * 60
+	C1WaitTime           = time.Minute * 30
 )
 
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
+	//check pub res
+	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, pledgeField)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd hexist pledge params err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
+		return nil
+	}
+
+	if !pubExist {
+		return nil
+	}
+
 	defer func() {
 		//update taskCount
-		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, pledgeField)
+		//pubExist, err := m.redisCli.HExist(gr.PUB_NAME, pledgeField)
 		if err != nil || !pubExist {
 			return
 		}
@@ -56,17 +67,6 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 		}
 	}()
 
-	//check pub res
-	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, pledgeField)
-	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist pledge params err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
-		return nil
-	}
-
-	if !pubExist {
-		return nil
-	}
-
 	//retry count ++
 	err = m.AddRetryCount(pledgeField)
 	if err != nil {
@@ -88,11 +88,11 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 				logrus.SchedLogger.Errorf("===== rd hget pledge params res err %+v sectorID %+v, pledgeField %+v\n", err, sectorID, pledgeField)
 				return nil
 			}
-			logrus.SchedLogger.Infof("===== rd recovery miner, check pledge sector %d, pledgeRes %+v", sectorID, pledgeRes)
+			logrus.SchedLogger.Infof("===== rd recovery miner, find sector %d pledgeRes %+v\n", sectorID, pledgeRes)
 			return &pledgeRes
 
 		} else {
-			logrus.SchedLogger.Infof("===== rd ticker test sectorID %d time %+v", sectorID, time.Now())
+			logrus.SchedLogger.Infof("===== rd ticker check sectorID %d time %+v", sectorID, time.Now())
 			//get time and wait
 			var pubTime time.Time
 			m.redisCli.HGet(gr.PUB_TIME, pledgeField, &pubTime)
@@ -117,9 +117,19 @@ func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.Redis
 }
 
 func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, ticketEpoch abi.ChainEpoch) *gr.ParamsResP1 {
+	//check pub res
+	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p1Field)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd hexist p1 params err %+v sectorID %+v, p1Field %+v\n", err, sectorID, p1Field)
+		return nil
+	}
+
+	if !pubExist {
+		return nil
+	}
+
 	defer func() {
 		//update taskCount
-		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, p1Field)
 		if err != nil || !pubExist {
 			return
 		}
@@ -141,17 +151,6 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 			logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sectorID, hostName, err)
 		}
 	}()
-
-	//check pub res
-	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p1Field)
-	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist p1 params err %+v sectorID %+v, p1Field %+v\n", err, sectorID, p1Field)
-		return nil
-	}
-
-	if !pubExist {
-		return nil
-	}
 
 	//retry count ++
 	err = m.AddRetryCount(p1Field)
@@ -217,9 +216,19 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 }
 
 func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *gr.ParamsResP2 {
+	//check pub res
+	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p2Field)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd hexist p2 params err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
+		return nil
+	}
+
+	if !pubExist {
+		return nil
+	}
+
 	defer func() {
 		//update taskCount
-		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, p2Field)
 		if err != nil || !pubExist {
 			return
 		}
@@ -243,17 +252,6 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 			logrus.SchedLogger.Errorf("===== sector %+v p2 recovery finished , update %s taskCount err:%+v", sectorID, hostName, err)
 		}
 	}()
-
-	//check pub res
-	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, p2Field)
-	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist p2 params err %+v sectorID %+v, p2Field %+v\n", err, sectorID, p2Field)
-		return nil
-	}
-
-	if !pubExist {
-		return nil
-	}
 
 	//retry count ++
 	err = m.AddRetryCount(p2Field)
@@ -307,9 +305,19 @@ func (m *Manager) RecoveryP2(sectorID abi.SectorNumber, p2Field gr.RedisField) *
 }
 
 func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *gr.ParamsResC1 {
+	//check pub res
+	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, c1Field)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd hexist c1 params err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
+		return nil
+	}
+
+	if !pubExist {
+		return nil
+	}
+
 	defer func() {
 		//update taskCount
-		pubExist, err := m.redisCli.HExist(gr.PUB_NAME, c1Field)
 		if err != nil || !pubExist {
 			return
 		}
@@ -333,17 +341,6 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 			logrus.SchedLogger.Errorf("===== sector %+v c1 recovery finished , update %s taskCount err:%+v", sectorID, hostName, err)
 		}
 	}()
-
-	//check pub res
-	pubExist, err := m.redisCli.HExist(gr.PARAMS_NAME, c1Field)
-	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd hexist c1 params err %+v sectorID %+v, c1Field %+v\n", err, sectorID, c1Field)
-		return nil
-	}
-
-	if !pubExist {
-		return nil
-	}
 
 	//retry count ++
 	err = m.AddRetryCount(c1Field)
@@ -413,6 +410,10 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 	}
 	defer ticker.Stop()
 
+	resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
+	timer := time.NewTimer(APWaitTime)
+	start := time.Now()
+
 	for {
 		select {
 		//case msg := <-subCha:
@@ -454,10 +455,17 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 		//		continue
 		//	}
 
+		case <-timer.C: //12600
+			m.StoreWaitTime(APWaitTime, resField)
+			continue
+
 		case <-ticker.C:
+			usedTime := time.Now().Sub(start)
+			if usedTime > APWaitTime {
+				m.StoreWaitTime(usedTime, resField)
+			}
 			hostName := ""
 			//check params
-			resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== HExist ap res params err:%+v", err)
@@ -908,8 +916,23 @@ func (m *Manager) CanHandleTask(hostname string, taskType sealtasks.TaskType, se
 
 	//check p1 counter
 	if taskType == sealtasks.TTAddPiecePl || taskType == sealtasks.TTAddPieceSe || taskType == sealtasks.TTPreCommit1 {
-		cp1Exiit := m.CheckP1Counter(hostname)
-		if !cp1Exiit {
+		cp1Exist := m.CheckP1Counter(hostname)
+		if !cp1Exist {
+			return free, nil
+		}
+	}
+
+	//check p1waiting
+	if taskType == sealtasks.TTAddPiecePl || taskType == sealtasks.TTAddPieceSe {
+		var p1Cf uint64
+		err = m.redisCli.HGet(tfk, gr.ToFieldTaskType(sealtasks.TTPreCommit1), &p1Cf)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd CalculateWaitingTask err %+v worker %+v config :%+v ", err, hostname, p1Cf)
+		}
+
+		res := m.CalculateWaitingTask(hostname, taskType)
+		if len(res) >= int(p1Cf) {
+			logrus.SchedLogger.Infof("===== rd check worker %+v p1waiting count %d limit %d", hostname, len(res), p1Cf)
 			return free, nil
 		}
 	}
@@ -1062,6 +1085,7 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 	logrus.SchedLogger.Infof("===== rd DeleteDataForSid, sectorID %+v", sectorID)
 	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
 	tasklist := make([]sealtasks.TaskType, 0)
+	hostname := ""
 
 	res, err := m.redisCli.Exist(sealKey)
 	if err != nil {
@@ -1093,8 +1117,16 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 			//6 recovery
 			m.redisCli.HDel(gr.RECOVER_NAME, f)
 		}
-		//7 retry count
-		m.FreeRetryCount(f)
+		//7 wait time
+		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
+		//8 task status
+		err := m.redisCli.HGet(gr.PUB_NAME, f, &hostname)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+		}
+		m.redisCli.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
+		//9 retry count
+		m.FreeRetryCount(f, hostname)
 	}
 
 	if res == 0 {
@@ -1125,7 +1157,10 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 		//6 pub time
 		m.redisCli.HDel(gr.PUB_TIME, f)
 		//7 retry count
-		m.FreeRetryCount(f)
+		m.FreeRetryCount(f, hostname)
+		//8 wait time
+		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
+
 	}
 }
 
@@ -1140,6 +1175,8 @@ func (m *Manager) DeleteParamsRes(sectorID abi.SectorNumber, tashType sealtasks.
 	m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
 
 	m.redisCli.HDel(gr.PUB_RES_NAME, f)
+
+	m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
 
 }
 
@@ -1174,19 +1211,39 @@ func (m *Manager) AddRetryCount(retryField gr.RedisField) error {
 	return nil
 }
 
-func (m *Manager) FreeRetryCount(retryField gr.RedisField) error {
+func (m *Manager) FreeRetryCount(retryField gr.RedisField, hostname string) error {
 	sid, tt, _, _ := retryField.TailoredPubAndParamsfield()
-	hostname := ""
-	err := m.redisCli.HGet(gr.PUB_NAME, retryField, &hostname)
-	if err != nil {
-		logrus.SchedLogger.Errorf("===== rd free retry count, hget pledge pub err %+v sectorID %+v, pledgeField %+v\n", err, sid, retryField)
-	}
-
-	_, err = m.redisCli.HDel(gr.RETRY, retryField)
+	_, err := m.redisCli.HDel(gr.RETRY, retryField)
 	logrus.SchedLogger.Infof("===== rd free retry count, hostname %+v sectorID %+v taskType %+v field %+v", hostname, sid, tt, retryField)
 	if err != nil {
 		logrus.SchedLogger.Errorf("===== rd free retry count field %+v err %+v", retryField, err)
 		return err
+	}
+	return nil
+}
+
+func (m *Manager) WhetherToDeleteRetryCount(retryField gr.RedisField, hostname string) error {
+	//exist
+	//sid, tt, _, _ := retryField.TailoredPubAndParamsfield()
+	ex, err := m.redisCli.HExist(gr.RETRY, retryField)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd free retry count, hexists field %+v err %+v", retryField, err)
+		return err
+	}
+	if !ex {
+		return nil
+	}
+
+	//>1
+	var retryCount int64
+	err = m.redisCli.HGet(gr.RETRY, retryField, &retryCount)
+	if err != nil {
+		logrus.SchedLogger.Errorf("===== rd free retry count field, hget %+v err %+v", retryField, err)
+		return err
+	}
+	if retryCount == 1 {
+		logrus.SchedLogger.Errorf("===== rd WhetherToDeleteRetryCount field %+v retryCount %+v", retryField, retryCount)
+		m.FreeRetryCount(retryField, hostname)
 	}
 	return nil
 }
@@ -1206,4 +1263,67 @@ func (m *Manager) StoreWaitTime(usedTime time.Duration, retryField gr.RedisField
 		return err
 	}
 	return nil
+}
+
+func (m *Manager) CalculateWaitingTask(hostname string, taskType sealtasks.TaskType) []gr.RedisField {
+	pledgeKeys := make([]gr.RedisField, 0)
+	p1Keys := make([]gr.RedisField, 0)
+	allKeyList, _ := m.redisCli.HKeys(gr.RedisKey(hostname))
+	for _, key := range allKeyList {
+		var tt gr.RedisField
+		m.redisCli.HGet(gr.RedisKey(hostname), key, &tt)
+		switch gr.ToFieldTaskType(taskType) {
+		case gr.FIELDPLEDGEP:
+			field := gr.SplicingBackupPubAndParamsField(key.ToSectorNumber(), tt.ToOfficalTaskType(), 0)
+			if tt == gr.FIELDPLEDGEP {
+				pledgeKeys = append(pledgeKeys, field)
+			}
+			if tt == gr.FIELDP1 {
+				p1Keys = append(p1Keys, field)
+			}
+		}
+	}
+
+	i := 0
+	for j := 0; j < len(pledgeKeys); j++ {
+		ex, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, pledgeKeys[j])
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter3 err:%+v", err)
+		}
+		if !ex {
+			continue
+		}
+
+		pledgeRes := &gr.ParamsResAp{}
+		err = m.redisCli.HGet(gr.PARAMS_RES_NAME, pledgeKeys[j], pledgeRes)
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter4 err:%+v", err)
+		}
+
+		if pledgeRes.Err == "" {
+			pledgeKeys[i] = pledgeKeys[j]
+			i++
+		}
+	}
+
+	i = 0
+	for j := 0; j < len(p1Keys); j++ {
+		ex, err := m.redisCli.HExist(gr.PUB_NAME, p1Keys[j])
+		if err != nil {
+			log.Errorf("rd search recovery pledge, filter3 err:%+v", err)
+		}
+		if !ex {
+			p1Keys[i] = p1Keys[j]
+			i++
+		}
+
+	}
+	p1Keys = p1Keys[:i]
+	for _, v := range p1Keys {
+		pledgeKeys = append(pledgeKeys, gr.TypeToType(v, gr.FIELDPLEDGEP))
+	}
+
+	logrus.SchedLogger.Infof("===== rd CalculateWaitingTask worker %+v len %+v pledgeKeys %+v", hostname, len(pledgeKeys), pledgeKeys)
+
+	return pledgeKeys
 }

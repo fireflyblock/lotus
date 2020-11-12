@@ -444,10 +444,11 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		if res != nil {
 			if res.Err == "" {
 				logrus.SchedLogger.Infof("===== rd recovery miner ok, hostName %d, taskType %+v", sector.Number, tt)
+				m.WhetherToDeleteRetryCount(pubField, "")
 				return res.PieceInfo, nil
 			}
 			m.DeleteParamsRes(sector.Number, tt)
-			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, tt)
+			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.Number, tt)
 		}
 
 		//1.publish
@@ -488,6 +489,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		if res != nil {
 			if res.Err == "" {
 				logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.Number, sealtasks.TTPreCommit1)
+				m.WhetherToDeleteRetryCount(p1Field, "")
 				return res.Out, nil
 			}
 			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTPreCommit1)
@@ -528,6 +530,10 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	}
 	defer tick.Stop()
 
+	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+	timer := time.NewTimer(P1WaitTime)
+	start := time.Now()
+
 	for {
 		select {
 		//case msg := <-subCha:
@@ -567,10 +573,18 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		//		continue
 		//	}
 
+		case <-timer.C: //12600
+			m.StoreWaitTime(P1WaitTime, resField)
+			continue
+
 		case <-tick.C:
+			usedTime := time.Now().Sub(start)
+			if usedTime > P1WaitTime {
+				m.StoreWaitTime(usedTime, resField)
+			}
+
 			hostName := ""
 			//check params
-			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== HExist p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
@@ -634,8 +648,9 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	p2Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
 	res := m.RecoveryP2(sector.Number, p2Field)
 	if res != nil {
-		logrus.SchedLogger.Infof("===== rd recovery miner succeed, sectroID %d, taskType %+v", sector.Number, sealtasks.TTPreCommit2)
 		if res.Err == "" {
+			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.Number, sealtasks.TTPreCommit2)
+			m.WhetherToDeleteRetryCount(p2Field, "")
 			return res.Out, nil
 		}
 		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit2)
@@ -670,6 +685,10 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
 	defer tick.Stop()
+
+	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
+	timer := time.NewTimer(P2WaitTime)
+	start := time.Now()
 
 	for {
 		select {
@@ -710,10 +729,17 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		//		continue
 		//	}
 
+		case <-timer.C: //12600
+			m.StoreWaitTime(P2WaitTime, resField)
+			continue
+
 		case <-tick.C:
+			usedTime := time.Now().Sub(start)
+			if usedTime > P2WaitTime {
+				m.StoreWaitTime(usedTime, resField)
+			}
 			hostName := ""
 			//check params
-			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== HExist p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
@@ -786,8 +812,8 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	c1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
 	res := m.RecoveryC1(sector.Number, c1Field)
 	if res != nil {
-		logrus.SchedLogger.Infof("===== rd recovery miner succeed, sectorID %d, taskType %+v", sector.Number, sealtasks.TTCommit1)
 		if res.Err == "" {
+			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectorID %d, taskType %+v", sector.Number, sealtasks.TTCommit1)
 			hostName := ""
 			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
@@ -801,6 +827,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			if err == nil && cp1Exist {
 				m.FreeP1Count(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
 			}
+			m.WhetherToDeleteRetryCount(c1Field, "")
 
 			return res.Out, nil
 		}
@@ -837,6 +864,10 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
 	defer tick.Stop()
+
+	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
+	timer := time.NewTimer(C1WaitTime)
+	start := time.Now()
 
 	for {
 		select {
@@ -919,10 +950,17 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//		continue
 		//	}
 
+		case <-timer.C: //12600
+			m.StoreWaitTime(C1WaitTime, resField)
+			continue
+
 		case <-tick.C:
+			usedTime := time.Now().Sub(start)
+			if usedTime > C1WaitTime {
+				m.StoreWaitTime(usedTime, resField)
+			}
 			hostName := ""
 			//check params
-			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== HExist c1 res params err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
