@@ -267,7 +267,13 @@ func (m *Sealing) initRecoverSectorNumber(ctx context.Context) {
 		// 过滤sectorNumber是否在链上存在
 		_, err := m.api.StateSectorPreCommitInfo(ctx, m.maddr, sid.(abi.SectorNumber), tok)
 		if err != nil {
-			log.Warnf("check precommit info: %w ,skip %+v", err, sid.(abi.SectorNumber))
+			//log.Warnf("check precommit info: %w ,skip %+v", err, sid.(abi.SectorNumber))
+			continue
+		}
+
+		// 过滤RcoverPledge中的sector
+		_, ok := m.recoverPledgeSectors[sid.(abi.SectorNumber)]
+		if ok {
 			continue
 		}
 		m.recoverSectorNumbers[sid.(abi.SectorNumber)] = struct{}{}
