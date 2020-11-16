@@ -19,18 +19,19 @@ import (
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/sector-storage/zerocomm"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	"github.com/filecoin-project/specs-actors/actors/abi/big"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	"github.com/filecoin-project/specs-actors/actors/crypto"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/extern/sector-storage/zerocomm"
+
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
+	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper"
+	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper/basicfs"
+	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
+	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 	"github.com/filecoin-project/lotus/genesis"
-	"github.com/filecoin-project/sector-storage/ffiwrapper"
-	"github.com/filecoin-project/sector-storage/ffiwrapper/basicfs"
-	"github.com/filecoin-project/sector-storage/stores"
 )
 
 var log = logging.Logger("preseal")
@@ -93,7 +94,7 @@ func PreSeal(maddr address.Address, spt abi.RegisteredSealProof, offset abi.Sect
 			return nil, nil, err
 		}
 	} else {
-		minerAddr, err = wallet.GenerateKey(crypto.SigTypeBLS)
+		minerAddr, err = wallet.GenerateKey(types.KTBLS)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -114,6 +115,7 @@ func PreSeal(maddr address.Address, spt abi.RegisteredSealProof, offset abi.Sect
 	}
 
 	miner := &genesis.Miner{
+		ID:            maddr,
 		Owner:         minerAddr.Address,
 		Worker:        minerAddr.Address,
 		MarketBalance: big.Zero(),
@@ -186,7 +188,7 @@ func presealSector(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, sid abi.Sector
 }
 
 func presealSectorFake(sbfs *basicfs.Provider, sid abi.SectorID, spt abi.RegisteredSealProof, ssize abi.SectorSize) (*genesis.PreSeal, error) {
-	paths, done, err := sbfs.AcquireSector(context.TODO(), sid, 0, stores.FTSealed|stores.FTCache, true)
+	paths, done, err := sbfs.AcquireSector(context.TODO(), sid, 0, storiface.FTSealed|storiface.FTCache, storiface.PathSealing)
 	if err != nil {
 		return nil, xerrors.Errorf("acquire unsealed sector: %w", err)
 	}
@@ -210,7 +212,7 @@ func presealSectorFake(sbfs *basicfs.Provider, sid abi.SectorID, spt abi.Registe
 }
 
 func cleanupUnsealed(sbfs *basicfs.Provider, sid abi.SectorID) error {
-	paths, done, err := sbfs.AcquireSector(context.TODO(), sid, stores.FTUnsealed, stores.FTNone, stores.PathSealing)
+	paths, done, err := sbfs.AcquireSector(context.TODO(), sid, storiface.FTUnsealed, storiface.FTNone, storiface.PathSealing)
 	if err != nil {
 		return err
 	}
@@ -251,12 +253,13 @@ func WriteGenesisMiner(maddr address.Address, sbroot string, gm *genesis.Miner, 
 }
 
 func createDeals(m *genesis.Miner, k *wallet.Key, maddr address.Address, ssize abi.SectorSize) error {
-	for _, sector := range m.Sectors {
-		proposal := &market.DealProposal{
+	for i, sector := range m.Sectors {
+		proposal := &market2.DealProposal{
 			PieceCID:             sector.CommD,
 			PieceSize:            abi.PaddedPieceSize(ssize),
 			Client:               k.Address,
 			Provider:             maddr,
+			Label:                fmt.Sprintf("%d", i),
 			StartEpoch:           0,
 			EndEpoch:             9001,
 			StoragePricePerEpoch: big.Zero(),
