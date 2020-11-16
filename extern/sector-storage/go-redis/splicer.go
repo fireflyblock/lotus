@@ -193,7 +193,7 @@ func (rf RedisField) ToString() string {
 func (rf RedisField) ToTnt() int {
 	res, err := strconv.Atoi(string(rf))
 	if err != nil {
-		log.Infof("===== ToTnt err %+v", err)
+		log.Errorf("===== ToTnt err %+v", err)
 	}
 	return res
 }
@@ -201,7 +201,7 @@ func (rf RedisField) ToTnt() int {
 func (rf RedisField) ToSectorNumber() abi.SectorNumber {
 	res, err := strconv.Atoi(string(rf))
 	if err != nil {
-		log.Infof("===== ToTnt err %+v", err)
+		log.Errorf("===== ToTnt err %+v", err)
 	}
 	return abi.SectorNumber(res)
 }

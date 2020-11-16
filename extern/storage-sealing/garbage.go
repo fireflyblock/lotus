@@ -195,8 +195,8 @@ func (m *Sealing) RecoverPledgeSector() error {
 
 				pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
 				if err != nil {
-					log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
-					log.Warnf("%+v", err)
+					//log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
+					//log.Warnf("%+v", err)
 					return
 				}
 
@@ -217,8 +217,9 @@ func (m *Sealing) RecoverPledgeSector() error {
 					log.Errorf("%+v", err)
 					return
 				}
+				log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
 			}()
-			log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
+			//log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
 		}
 	}
 
