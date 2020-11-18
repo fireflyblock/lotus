@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,11 +50,11 @@ import (
 	"github.com/filecoin-project/go-storedcounter"
 
 	"github.com/filecoin-project/lotus/api"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/stores"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -194,7 +195,13 @@ func StorageMiner(fc config.MinerFeeConfig) func(params StorageMinerParams) (*st
 
 		lc.Append(fx.Hook{
 			OnStart: func(context.Context) error {
-				go fps.Run(ctx)
+				//go fps.Run(ctx)
+				if minertype.CanDoWDPost() {
+					go fps.Run(ctx)
+				} else {
+					log.Info("Do not do window post!!!!")
+				}
+
 				return sm.Run(ctx)
 			},
 			OnStop: sm.Stop,

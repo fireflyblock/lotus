@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -54,6 +55,10 @@ var runCmd = &cli.Command{
 			Usage: "manage open file limit",
 			Value: true,
 		},
+		&cli.StringFlag{
+			Name:  "miner-type",
+			Usage: "miner-type: winpost: winning post, wdpost: wdpost, sched:  sched, if not set ,do all task. sched,wdpost :can do sched and wdpost",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Bool("enable-gpu-proving") {
@@ -61,6 +66,10 @@ var runCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
+		}
+
+		if err := minertype.SetMinerType(cctx.String("miner-type")); err != nil {
+			return err
 		}
 
 		nodeApi, ncloser, err := lcli.GetFullNodeAPI(cctx)

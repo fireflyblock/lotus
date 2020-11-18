@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"sync"
 	"time"
 
@@ -115,7 +116,13 @@ func (m *Miner) Start(ctx context.Context) error {
 		return fmt.Errorf("miner already started")
 	}
 	m.stop = make(chan struct{})
-	go m.mine(context.TODO())
+	//go m.mine(context.TODO())
+	if minertype.CanDoWinningPost() {
+		go m.mine(context.TODO())
+	} else {
+		log.Info("Do not do winning post!!!!")
+	}
+
 	return nil
 }
 

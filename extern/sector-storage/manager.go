@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/transfordata"
 	"io"
@@ -170,7 +171,11 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, sc 
 	}
 	m.redisCli = rc
 
-	go m.sched.runSched()
+	if minertype.CanDoSched() {
+		go m.sched.runSched()
+	} else {
+		log.Info("Do not do sched!!!!!!")
+	}
 
 	localTasks := []sealtasks.TaskType{
 		sealtasks.TTCommit1, sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed,
