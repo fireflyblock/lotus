@@ -23,24 +23,28 @@ import (
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/test"
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/actors/policy"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
+	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/filecoin-project/lotus/cmd/lotus-seed/seed"
-	"github.com/filecoin-project/lotus/genesis"
-	miner2 "github.com/filecoin-project/lotus/miner"
-	"github.com/filecoin-project/lotus/node"
-	"github.com/filecoin-project/lotus/node/modules"
-	testing2 "github.com/filecoin-project/lotus/node/modules/testing"
-	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage/mockstorage"
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/mock"
-	"github.com/filecoin-project/specs-actors/actors/builtin"
-	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/genesis"
+	lotusminer "github.com/filecoin-project/lotus/miner"
+	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	testing2 "github.com/filecoin-project/lotus/node/modules/testing"
+	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/mockstorage"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -48,6 +52,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	chain.BootstrapPeerThreshold = 1
+	messagepool.HeadChangeCoalesceMinDelay = time.Microsecond
+	messagepool.HeadChangeCoalesceMaxDelay = 2 * time.Microsecond
+	messagepool.HeadChangeCoalesceMergeInterval = 100 * time.Nanosecond
+}
 
 func CreateTestStorageNode(ctx context.Context, t *testing.T, waddr address.Address, act address.Address, pk crypto.PrivKey, tnd test.TestNode, mn mocknet.Mocknet, opts node.Option) test.TestStorageNode {
 	r := repo.NewMemory(nil)
@@ -86,13 +97,13 @@ func CreateTestStorageNode(ctx context.Context, t *testing.T, waddr address.Addr
 	peerid, err := peer.IDFromPrivateKey(pk)
 	require.NoError(t, err)
 
-	enc, err := actors.SerializeParams(&miner0.ChangePeerIDParams{NewID: abi.PeerID(peerid)})
+	enc, err := actors.SerializeParams(&miner2.ChangePeerIDParams{NewID: abi.PeerID(peerid)})
 	require.NoError(t, err)
 
 	msg := &types.Message{
 		To:     act,
 		From:   waddr,
-		Method: builtin.MethodsMiner.ChangePeerID,
+		Method: miner.Methods.ChangePeerID,
 		Params: enc,
 		Value:  types.NewInt(0),
 	}
@@ -103,7 +114,7 @@ func CreateTestStorageNode(ctx context.Context, t *testing.T, waddr address.Addr
 	// start node
 	var minerapi api.StorageMiner
 
-	mineBlock := make(chan miner2.MineReq)
+	mineBlock := make(chan lotusminer.MineReq)
 	stop, err := node.New(ctx,
 		node.StorageMiner(&minerapi),
 		node.Online(),
@@ -113,7 +124,7 @@ func CreateTestStorageNode(ctx context.Context, t *testing.T, waddr address.Addr
 		node.MockHost(mn),
 
 		node.Override(new(api.FullNode), tnd),
-		node.Override(new(*miner2.Miner), miner2.NewTestMiner(mineBlock, act)),
+		node.Override(new(*lotusminer.Miner), lotusminer.NewTestMiner(mineBlock, act)),
 
 		opts,
 	)
@@ -129,7 +140,7 @@ func CreateTestStorageNode(ctx context.Context, t *testing.T, waddr address.Addr
 
 	err = minerapi.NetConnect(ctx, remoteAddrs)
 	require.NoError(t, err)*/
-	mineOne := func(ctx context.Context, req miner2.MineReq) error {
+	mineOne := func(ctx context.Context, req lotusminer.MineReq) error {
 		select {
 		case mineBlock <- req:
 			return nil
@@ -402,6 +413,9 @@ func mockSbBuilderOpts(t *testing.T, fullOpts []test.FullNodeOpts, storage []tes
 
 			node.Override(new(ffiwrapper.Verifier), mock.MockVerifier),
 
+			// so that we subscribe to pubsub topics immediately
+			node.Override(new(dtypes.Bootstrapper), dtypes.Bootstrapper(true)),
+
 			genesis,
 
 			fullOpts[i].Opts(fulls),
@@ -444,7 +458,7 @@ func mockSbBuilderOpts(t *testing.T, fullOpts []test.FullNodeOpts, storage []tes
 
 		storers[i] = CreateTestStorageNode(ctx, t, genms[i].Worker, maddrs[i], pidKeys[i], f, mn, node.Options(
 			node.Override(new(sectorstorage.SectorManager), func() (sectorstorage.SectorManager, error) {
-				return mock.NewMockSectorMgr(build.DefaultSectorSize(), sectors), nil
+				return mock.NewMockSectorMgr(policy.GetDefaultSectorSize(), sectors), nil
 			}),
 			node.Override(new(ffiwrapper.Verifier), mock.MockVerifier),
 			node.Unset(new(*sectorstorage.Manager)),

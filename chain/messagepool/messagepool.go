@@ -59,8 +59,6 @@ var MaxUntrustedActorPendingMessages = 10
 
 var MaxNonceGap = uint64(4)
 
-var DefaultMaxFee = abi.TokenAmount(types.MustParseFIL("0.007"))
-
 var (
 	ErrMessageTooBig = errors.New("message too big")
 
@@ -183,9 +181,15 @@ func ComputeMinRBF(curPrem abi.TokenAmount) abi.TokenAmount {
 	return types.BigAdd(minPrice, types.NewInt(1))
 }
 
-func CapGasFee(msg *types.Message, maxFee abi.TokenAmount) {
+func CapGasFee(mff dtypes.DefaultMaxFeeFunc, msg *types.Message, maxFee abi.TokenAmount) {
 	if maxFee.Equals(big.Zero()) {
-		maxFee = DefaultMaxFee
+		mf, err := mff()
+		if err != nil {
+			log.Errorf("failed to get default max gas fee: %+v", err)
+			mf = big.Zero()
+		}
+
+		maxFee = mf
 	}
 
 	gl := types.NewInt(uint64(msg.GasLimit))
@@ -260,7 +264,7 @@ func (ms *msgSet) add(m *types.SignedMessage, mp *MessagePool, strict, untrusted
 	}
 
 	if strict && nonceGap {
-		log.Warnf("adding nonce-gapped message from %s (nonce: %d, nextNonce: %d)",
+		log.Debugf("adding nonce-gapped message from %s (nonce: %d, nextNonce: %d)",
 			m.Message.From, m.Message.Nonce, nextNonce)
 	}
 
@@ -432,8 +436,13 @@ func (mp *MessagePool) runLoop() {
 	}
 }
 
-func (mp *MessagePool) addLocal(m *types.SignedMessage, msgb []byte) error {
+func (mp *MessagePool) addLocal(m *types.SignedMessage) error {
 	mp.localAddrs[m.Message.From] = struct{}{}
+
+	msgb, err := m.Serialize()
+	if err != nil {
+		return xerrors.Errorf("error serializing message: %w", err)
+	}
 
 	if err := mp.localMsgs.Put(datastore.NewKey(string(m.Cid().Bytes())), msgb); err != nil {
 		return xerrors.Errorf("persisting local message: %w", err)
@@ -507,11 +516,6 @@ func (mp *MessagePool) Push(m *types.SignedMessage) (cid.Cid, error) {
 		<-mp.addSema
 	}()
 
-	msgb, err := m.Serialize()
-	if err != nil {
-		return cid.Undef, err
-	}
-
 	mp.curTsLk.Lock()
 	publish, err := mp.addTs(m, mp.curTs, true, false)
 	if err != nil {
@@ -520,18 +524,19 @@ func (mp *MessagePool) Push(m *types.SignedMessage) (cid.Cid, error) {
 	}
 	mp.curTsLk.Unlock()
 
-	mp.lk.Lock()
-	if err := mp.addLocal(m, msgb); err != nil {
-		mp.lk.Unlock()
-		return cid.Undef, err
-	}
-	mp.lk.Unlock()
-
 	if publish {
+		msgb, err := m.Serialize()
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("error serializing message: %w", err)
+		}
+
 		err = mp.api.PubSubPublish(build.MessagesTopic(mp.netName), msgb)
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("error publishing message: %w", err)
+		}
 	}
 
-	return m.Cid(), err
+	return m.Cid(), nil
 }
 
 func (mp *MessagePool) checkMessage(m *types.SignedMessage) error {
@@ -670,7 +675,19 @@ func (mp *MessagePool) addTs(m *types.SignedMessage, curTs *types.TipSet, local,
 		return false, err
 	}
 
-	return publish, mp.addLocked(m, !local, untrusted)
+	err = mp.addLocked(m, !local, untrusted)
+	if err != nil {
+		return false, err
+	}
+
+	if local {
+		err = mp.addLocal(m)
+		if err != nil {
+			return false, xerrors.Errorf("error persisting local message: %w", err)
+		}
+	}
+
+	return publish, nil
 }
 
 func (mp *MessagePool) addLoaded(m *types.SignedMessage) error {
@@ -837,11 +854,6 @@ func (mp *MessagePool) PushUntrusted(m *types.SignedMessage) (cid.Cid, error) {
 		<-mp.addSema
 	}()
 
-	msgb, err := m.Serialize()
-	if err != nil {
-		return cid.Undef, err
-	}
-
 	mp.curTsLk.Lock()
 	publish, err := mp.addTs(m, mp.curTs, false, true)
 	if err != nil {
@@ -850,18 +862,19 @@ func (mp *MessagePool) PushUntrusted(m *types.SignedMessage) (cid.Cid, error) {
 	}
 	mp.curTsLk.Unlock()
 
-	mp.lk.Lock()
-	if err := mp.addLocal(m, msgb); err != nil {
-		mp.lk.Unlock()
-		return cid.Undef, err
-	}
-	mp.lk.Unlock()
-
 	if publish {
+		msgb, err := m.Serialize()
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("error serializing message: %w", err)
+		}
+
 		err = mp.api.PubSubPublish(build.MessagesTopic(mp.netName), msgb)
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("error publishing message: %w", err)
+		}
 	}
 
-	return m.Cid(), err
+	return m.Cid(), nil
 }
 
 func (mp *MessagePool) Remove(from address.Address, nonce uint64, applied bool) {
@@ -1206,7 +1219,7 @@ func (mp *MessagePool) MessagesForBlocks(blks []*types.BlockHeader) ([]*types.Si
 			if smsg != nil {
 				out = append(out, smsg)
 			} else {
-				log.Warnf("could not recover signature for bls message %s", msg.Cid())
+				log.Debugf("could not recover signature for bls message %s", msg.Cid())
 			}
 		}
 	}

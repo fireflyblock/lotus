@@ -20,17 +20,14 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
-	logrus "github.com/filecoin-project/sector-storage/log"
 	//rlepluslazy "github.com/filecoin-project/go-bitfield/rle"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/sector-storage/fr32"
-	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/zerocomm"
-	//"github.com/filecoin-project/go-fil-markets/filestore"
 )
 
 var _ Storage = &Sealer{}
@@ -102,9 +99,9 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		}
 	}()
 
-	var stagedPath stores.SectorPaths
+	var stagedPath storiface.SectorPaths
 	if len(existingPieceSizes) == 0 {
-		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, stores.PathSealing)
+		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, 0, storiface.FTUnsealed, storiface.PathSealing)
 		if err != nil {
 			return abi.PieceInfo{}, xerrors.Errorf("acquire unsealed sector: %w", err)
 		}
@@ -114,7 +111,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			return abi.PieceInfo{}, xerrors.Errorf("creating unsealed sector file: %w", err)
 		}
 	} else {
-		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, 0, stores.PathSealing)
+		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, storiface.FTUnsealed, 0, storiface.PathSealing)
 		if err != nil {
 			return abi.PieceInfo{}, xerrors.Errorf("acquire unsealed sector: %w", err)
 		}
@@ -237,12 +234,12 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 	maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 
 	// try finding existing
-	unsealedPath, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
+	unsealedPath, done, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTUnsealed, storiface.FTNone, storiface.PathStorage)
 	var pf *partialFile
 
 	switch {
 	case xerrors.Is(err, storiface.ErrSectorNotFound):
-		unsealedPath, done, err = sb.sectors.AcquireSector(ctx, sector, stores.FTNone, stores.FTUnsealed, stores.PathStorage)
+		unsealedPath, done, err = sb.sectors.AcquireSector(ctx, sector, storiface.FTNone, storiface.FTUnsealed, storiface.PathStorage)
 		if err != nil {
 			return xerrors.Errorf("acquire unsealed sector path (allocate): %w", err)
 		}
@@ -279,7 +276,7 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 		return nil
 	}
 
-	srcPaths, srcDone, err := sb.sectors.AcquireSector(ctx, sector, stores.FTCache|stores.FTSealed, stores.FTNone, stores.PathStorage)
+	srcPaths, srcDone, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTCache|storiface.FTSealed, storiface.FTNone, storiface.PathStorage)
 	if err != nil {
 		return xerrors.Errorf("acquire sealed sector paths: %w", err)
 	}
@@ -396,7 +393,7 @@ func (sb *Sealer) UnsealPiece(ctx context.Context, sector abi.SectorID, offset s
 }
 
 func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	path, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTNone, stores.PathStorage)
+	path, done, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTUnsealed, storiface.FTNone, storiface.PathStorage)
 	if err != nil {
 		return false, xerrors.Errorf("acquire unsealed sector path: %w", err)
 	}
@@ -448,7 +445,7 @@ func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.Se
 }
 
 func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTSealed|stores.FTCache, stores.PathSealing)
+	paths, done, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTUnsealed, storiface.FTSealed|storiface.FTCache, storiface.PathSealing)
 	if err != nil {
 		return nil, xerrors.Errorf("acquiring sector paths: %w", err)
 	}
@@ -505,17 +502,17 @@ func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 }
 
 func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (storage.SectorCids, error) {
-	logrus.SchedLogger.Infof("===== SealPreCommit2--> trans params \n sector:%+v\n phase1Out:%+v\n strphase1Out:%+v", sector, phase1Out, string(phase1Out))
+	log.Infof("===== SealPreCommit2--> trans params \n sector:%+v\n phase1Out:%+v\n strphase1Out:%+v", sector, phase1Out, string(phase1Out))
 
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
+	paths, done, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTSealed|storiface.FTCache, 0, storiface.PathSealing)
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector paths: %w", err)
 	}
 	defer done()
-	logrus.SchedLogger.Infof("===== SealPreCommit2--> AcquireSector return \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
+	log.Infof("===== SealPreCommit2--> AcquireSector return \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
 
 	sealedCID, unsealedCID, err := ffi.SealPreCommitPhase2(phase1Out, paths.Cache, paths.Sealed)
-	logrus.SchedLogger.Infof("===== SealPreCommit2--> SealPreCommitPhase2 return \n sealedCID:%+v\n unsealedCID:%+v\n err:%+v", sealedCID, unsealedCID, err)
+	log.Infof("===== SealPreCommit2--> SealPreCommitPhase2 return \n sealedCID:%+v\n unsealedCID:%+v\n err:%+v", sealedCID, unsealedCID, err)
 
 	if err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("presealing sector %d (%s): %w", sector.Number, paths.Unsealed, err)
@@ -528,11 +525,10 @@ func (sb *Sealer) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 }
 
 func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
-	logrus.SchedLogger.Infof("===== SealCommit1--> trans params \n sector:%+v\n ticket:%+v\n seed:%+v\n pieces:%+v\n cids:%+v", sector, ticket, seed, pieces, cids)
+	log.Infof("===== SealCommit1--> trans params \n sector:%+v\n ticket:%+v\n seed:%+v\n pieces:%+v\n cids:%+v", sector, ticket, seed, pieces, cids)
 
-	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTSealed|stores.FTCache, 0, stores.PathSealing)
-	logrus.SchedLogger.Infof("===== SealCommit1--> AcquireSector \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
-
+	paths, done, err := sb.sectors.AcquireSector(ctx, sector, storiface.FTSealed|storiface.FTCache, 0, storiface.PathSealing)
+	log.Infof("===== SealCommit1--> AcquireSector \n paths:%+v\n done:%+v\n err:%+v", paths, done, err)
 	if err != nil {
 		return nil, xerrors.Errorf("acquire sector paths: %w", err)
 	}
@@ -550,8 +546,8 @@ func (sb *Sealer) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		pieces,
 	)
 	if err != nil {
-		logrus.SchedLogger.Warn("StandaloneSealCommit error: ", err)
-		logrus.SchedLogger.Warnf("num:%d tkt:%v seed:%v, pi:%v sealedCID:%v, unsealedCID:%v", sector.Number, ticket, seed, pieces, cids.Sealed, cids.Unsealed)
+		log.Warn("StandaloneSealCommit error: ", err)
+		log.Warnf("num:%d tkt:%v seed:%v, pi:%v sealedCID:%v, unsealedCID:%v", sector.Number, ticket, seed, pieces, cids.Sealed, cids.Unsealed)
 
 		return nil, xerrors.Errorf("StandaloneSealCommit: %w", err)
 	}
@@ -562,16 +558,16 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	workerType := os.Getenv("LOTUS_WORKER_TYPE")
 	switch workerType {
 	case "", "DOCKER":
-		logrus.SchedLogger.Info("start SealCommit2 grpc c2_DOCKER! sector Number ", sector.Number)
+		log.Info("start SealCommit2 grpc c2_DOCKER! sector Number ", sector.Number)
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
 	case "MINER":
-		logrus.SchedLogger.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.Number)
+		log.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.Number)
 		result, err := miner.C2RPC(phase1Out, uint64(sector.Number), uint64(sector.Miner))
 		if err != nil {
-			logrus.SchedLogger.Errorf("grpc err: %s", err.Error())
+			log.Errorf("grpc err: %s", err.Error())
 			return []byte{}, err
 		}
-		logrus.SchedLogger.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
+		log.Info("end SealCommit2 grpc c2! sector Number ", sector.Number)
 		return result.Message, nil
 	default:
 		return ffi.SealCommitPhase2(phase1Out, sector.Number, sector.Miner)
@@ -579,7 +575,7 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 }
 
 func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
-	logrus.SchedLogger.Info("===== do FinalizeSector skip check keepUnsealed ")
+	log.Info("===== do FinalizeSector skip check keepUnsealed ")
 	//if len(keepUnsealed) > 0 {
 	//	maxPieceSize := abi.PaddedPieceSize(sb.ssize)
 

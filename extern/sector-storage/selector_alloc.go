@@ -9,15 +9,16 @@ import (
 
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
+	"github.com/filecoin-project/sector-storage/storiface"
 )
 
 type allocSelector struct {
 	index stores.SectorIndex
-	alloc stores.SectorFileType
-	ptype stores.PathType
+	alloc storiface.SectorFileType
+	ptype storiface.PathType
 }
 
-func newAllocSelector(index stores.SectorIndex, alloc stores.SectorFileType, ptype stores.PathType) *allocSelector {
+func newAllocSelector(index stores.SectorIndex, alloc storiface.SectorFileType, ptype storiface.PathType) *allocSelector {
 	return &allocSelector{
 		index: index,
 		alloc: alloc,
@@ -44,7 +45,12 @@ func (s *allocSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi
 		have[path.ID] = struct{}{}
 	}
 
-	best, err := s.index.StorageBestAlloc(ctx, s.alloc, spt, s.ptype)
+	ssize, err := spt.SectorSize()
+	if err != nil {
+		return false, xerrors.Errorf("getting sector size: %w", err)
+	}
+
+	best, err := s.index.StorageBestAlloc(ctx, s.alloc, ssize, s.ptype)
 	if err != nil {
 		return false, xerrors.Errorf("finding best alloc storage: %w", err)
 	}

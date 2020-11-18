@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"io"
 
 	"github.com/ipfs/go-cid"
 
@@ -23,6 +22,10 @@ type WorkerAPI interface {
 	Paths(context.Context) ([]stores.StoragePath, error)
 	Info(context.Context) (storiface.WorkerInfo, error)
 
+	//storiface.WorkerCalls
+	// Storage / Other
+	//Remove(ctx context.Context, sector abi.SectorID) error
+
 	//AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error)
 	AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error)
 
@@ -35,10 +38,23 @@ type WorkerAPI interface {
 
 	StorageAddLocal(ctx context.Context, path string) error
 
+	// SetEnabled marks the worker as enabled/disabled. Not that this setting
+	// may take a few seconds to propagate to task scheduler
+	//SetEnabled(ctx context.Context, enabled bool) error
+	//
+	//Enabled(ctx context.Context) (bool, error)
 	FetchRealData(ctx context.Context, id abi.SectorID) error
 	Fetch(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error
 	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
 	GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
 
-	Closing(context.Context) (<-chan struct{}, error)
+	// WaitQuiet blocks until there are no tasks running
+	WaitQuiet(ctx context.Context) error
+
+	// returns a random UUID of worker session, generated randomly when worker
+	// process starts
+	//ProcessSession(context.Context) (uuid.UUID, error)
+	//
+	//// Like ProcessSession, but returns an error when worker is disabled
+	//Session(context.Context) (uuid.UUID, error)
 }

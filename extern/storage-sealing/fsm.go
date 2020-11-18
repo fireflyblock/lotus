@@ -45,16 +45,22 @@ var fsmPlanners = map[SectorState]func(events []statemachine.Event, state *Secto
 		on(SectorAddPiece{}, WaitDeals),
 		on(SectorStartPacking{}, Packing),
 	),
-	Packing: planOne(on(SectorPacked{}, PreCommit1)),
+	Packing: planOne(on(SectorPacked{}, GetTicket)),
+	GetTicket: planOne(
+		on(SectorTicket{}, PreCommit1),
+		on(SectorCommitFailed{}, CommitFailed),
+	),
 	PreCommit1: planOne(
 		on(SectorPreCommit1{}, PreCommit2),
 		on(SectorSealPreCommit1Failed{}, SealPreCommit1Failed),
 		on(SectorDealsExpired{}, DealsExpired),
 		on(SectorInvalidDealIDs{}, RecoverDealIDs),
+		on(SectorOldTicket{}, GetTicket),
 	),
 	PreCommit2: planOne(
 		on(SectorPreCommit2{}, PreCommitting),
 		on(SectorSealPreCommit2Failed{}, SealPreCommit2Failed),
+		on(SectorSealPreCommit1Failed{}, SealPreCommit1Failed),
 	),
 	PreCommitting: planOne(
 		on(SectorSealPreCommit1Failed{}, SealPreCommit1Failed),
@@ -100,6 +106,7 @@ var fsmPlanners = map[SectorState]func(events []statemachine.Event, state *Secto
 	),
 	PreCommitFailed: planOne(
 		on(SectorRetryPreCommit{}, PreCommitting),
+		on(SectorRetryPreCommitWait{}, PreCommitWait),
 		on(SectorRetryWaitSeed{}, WaitSeed),
 		on(SectorSealPreCommit1Failed{}, SealPreCommit1Failed),
 		on(SectorPreCommitLanded{}, WaitSeed),
@@ -119,8 +126,10 @@ var fsmPlanners = map[SectorState]func(events []statemachine.Event, state *Secto
 		on(SectorChainPreCommitFailed{}, PreCommitFailed),
 		on(SectorRetryPreCommit{}, PreCommitting),
 		on(SectorRetryCommitWait{}, CommitWait),
+		on(SectorRetrySubmitCommit{}, SubmitCommit),
 		on(SectorDealsExpired{}, DealsExpired),
 		on(SectorInvalidDealIDs{}, RecoverDealIDs),
+		on(SectorTicketExpired{}, Removing),
 	),
 	FinalizeFailed: planOne(
 		on(SectorRetryFinalize{}, FinalizeSector),
@@ -219,6 +228,9 @@ func (m *Sealing) plan(events []statemachine.Event, state *SectorInfo) (func(sta
 				*<- Packing <- incoming committed capacity
 				|   |
 				|   v
+				|   GetTicket
+				|   |   ^
+				|   v   |
 				*<- PreCommit1 <--> SealPreCommit1Failed
 				|   |       ^          ^^
 				|   |       *----------++----\
@@ -267,6 +279,8 @@ func (m *Sealing) plan(events []statemachine.Event, state *SectorInfo) (func(sta
 		log.Infof("Waiting for deals %d", state.SectorNumber)
 	case Packing:
 		return m.handlePacking, processed, nil
+	case GetTicket:
+		return m.handleGetTicket, processed, nil
 	case PreCommit1:
 		return m.handlePreCommit1, processed, nil
 	case PreCommit2:
@@ -445,6 +459,13 @@ func (m *Sealing) ForceSectorState(ctx context.Context, id abi.SectorNumber, sta
 }
 
 func final(events []statemachine.Event, state *SectorInfo) (uint64, error) {
+	if len(events) > 0 {
+		if gm, ok := events[0].User.(globalMutator); ok {
+			gm.applyGlobal(state)
+			return 1, nil
+		}
+	}
+
 	return 0, xerrors.Errorf("didn't expect any events in state %s, got %+v", state.State, events)
 }
 

@@ -26,7 +26,10 @@ func init() {
 	})
 }
 
-var Address = builtin0.InitActorAddr
+var (
+	Address = builtin2.InitActorAddr
+	Methods = builtin2.MethodsInit
+)
 
 func Load(store adt.Store, act *types.Actor) (State, error) {
 	switch act.Code {
@@ -54,4 +57,6 @@ type State interface {
 
 	// Sets the network's name. This should only be used on upgrade/fork.
 	SetNetworkName(name string) error
+
+	addressMap() (adt.Map, error)
 }

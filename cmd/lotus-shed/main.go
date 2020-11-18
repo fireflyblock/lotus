@@ -19,6 +19,7 @@ func main() {
 		base32Cmd,
 		base16Cmd,
 		bitFieldCmd,
+		frozenMinersCmd,
 		keyinfoCmd,
 		jwtCmd,
 		noncefix,
@@ -44,6 +45,10 @@ func main() {
 		datastoreCmd,
 		ledgerCmd,
 		sectorsCmd,
+		msgCmd,
+		electionCmd,
+		rpcCmd,
+		cidCmd,
 	}
 
 	app := &cli.App{

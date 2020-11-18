@@ -87,9 +87,11 @@ func (d *Driver) ExecuteTipset(bs blockstore.Blockstore, ds ds.Batching, preroot
 		syscalls = vm.Syscalls(ffiwrapper.ProofVerifier)
 		vmRand   = NewFixedRand()
 
-		cs = store.NewChainStore(bs, ds, syscalls, nil)
+		cs = store.NewChainStore(bs, bs, ds, syscalls, nil)
 		sm = stmgr.NewStateManager(cs)
 	)
+
+	defer cs.Close() //nolint:errcheck
 
 	blocks := make([]store.BlockMessages, 0, len(tipset.Blocks))
 	for _, b := range tipset.Blocks {
@@ -248,7 +250,7 @@ func BaseFeeOrDefault(basefee *gobig.Int) abi.TokenAmount {
 // DefaultCirculatingSupply.
 func CircSupplyOrDefault(circSupply *gobig.Int) abi.TokenAmount {
 	if circSupply == nil {
-		return DefaultBaseFee
+		return DefaultCirculatingSupply
 	}
 	return big.NewFromGo(circSupply)
 }

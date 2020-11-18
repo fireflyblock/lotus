@@ -2,11 +2,11 @@ package sealing
 
 import (
 	"context"
+	"golang.org/x/xerrors"
 	"github.com/filecoin-project/go-state-types/abi"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/gogo/protobuf/sortkeys"
-	"golang.org/x/xerrors"
 	"gopkg.in/fatih/set.v0"
 	"strings"
 	"time"
@@ -125,13 +125,14 @@ func (m *Sealing) PledgeSector() error {
 			log.Infof("===== PledgeSector use m.sc.Next (%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
 		}
 
-		err = m.sealer.NewSector(ctx, m.minerSector(sid))
+		sectorID := m.minerSector(sid)
+		err = m.sealer.NewSector(ctx, sectorID)
 		if err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
 
-		pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
+		pieces, err := m.pledgeSector(ctx, sectorID, []abi.UnpaddedPieceSize{}, size)
 		if err != nil {
 			// 保存pledge garbage的sector
 			m.recoverLk.Lock()
