@@ -55,7 +55,7 @@ func main() {
 
 	local := []*cli.Command{
 		runCmd,
-		infoCmd,
+		//infoCmd,
 		storageCmd,
 	}
 
@@ -323,16 +323,25 @@ var runCmd = &cli.Command{
 
 		case "", "MINER":
 			// Connect to storage-miner
+			ctx := lcli.ReqContext(cctx)
+
 			var nodeApi api.StorageMiner
 			var closer func()
 			var err error
 			for {
-				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx,
-					jsonrpc.WithNoReconnect(),
-					jsonrpc.WithTimeout(300*time.Second),
-					jsonrpc.WithPingInterval(2*time.Second))
+				//nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx,
+				//	jsonrpc.WithNoReconnect(),
+				//	jsonrpc.WithTimeout(300*time.Second),
+				//	jsonrpc.WithPingInterval(2*time.Second))
+				//if err == nil {
+				//	break
+				//}
+				nodeApi, closer, err = lcli.GetStorageMinerAPI(cctx, lcli.StorageMinerUseHttp)
 				if err == nil {
-					break
+					_, err = nodeApi.Version(ctx)
+					if err == nil {
+						break
+					}
 				}
 				fmt.Printf("\r\x1b[0KConnecting to miner API... (%s)", err)
 				time.Sleep(time.Second)
@@ -340,7 +349,6 @@ var runCmd = &cli.Command{
 			}
 
 			defer closer()
-			ctx := lcli.ReqContext(cctx)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 

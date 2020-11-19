@@ -10,7 +10,7 @@ import (
 	"github.com/filecoin-project/sector-storage/fsutil"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
-	"github.com/filecoin-project/sector-storage/stores"
+	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/transfordata"
 	storage2 "github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
@@ -776,9 +776,9 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 
 	start := time.Now()
 	// send FTSealed
-	srcSealedPath := filepath.Join(rw.workerPath, stores.FTSealed.String()) + "/"
-	src := stores.SectorName(sector)
-	sealedPath := filepath.Join(destPath, stores.FTSealed.String()) + "/"
+	srcSealedPath := filepath.Join(rw.workerPath, storiface.FTSealed.String()) + "/"
+	src := storiface.SectorName(sector)
+	sealedPath := filepath.Join(destPath, storiface.FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
 	code, err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
 	if err != nil {
@@ -792,8 +792,8 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 	}
 
 	// send FTCache
-	srcCachePath := filepath.Join(rw.workerPath, stores.FTCache.String()) + "/"
-	cachePath := filepath.Join(destPath, stores.FTCache.String()) + "/"
+	srcCachePath := filepath.Join(rw.workerPath, storiface.FTCache.String()) + "/"
+	cachePath := filepath.Join(destPath, storiface.FTCache.String()) + "/"
 	//src:=SectorName(sector)
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
 	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
@@ -805,8 +805,8 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 
 	if !removeUnseal {
 		// send FTUnseal
-		srcUnsealPath := filepath.Join(rw.workerPath, stores.FTUnsealed.String()) + "/"
-		unsealPath := filepath.Join(destPath, stores.FTUnsealed.String()) + "/"
+		srcUnsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String()) + "/"
+		unsealPath := filepath.Join(destPath, storiface.FTUnsealed.String()) + "/"
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
 		code, err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
@@ -869,7 +869,7 @@ func getLayersAndTreeCAndTreeDFiles(url string, proofType abi.RegisteredSealProo
 // 删除cache中的临时文件
 func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector abi.SectorID, removeUnseal bool) {
 	log.Infof("===== try to remove sector(%+v) from worker", sector)
-	spath := filepath.Join(rw.workerPath, stores.FTCache.String(), stores.SectorName(sector))
+	spath := filepath.Join(rw.workerPath, storiface.FTCache.String(), storiface.SectorName(sector))
 
 	files := getLayersAndTreeCAndTreeDFiles(spath, rw.sealer.SealProofType())
 	log.Infof("===== try to remove sector [%+v] from worker--------->delete files:[%+v]", sector, files)
@@ -884,7 +884,7 @@ func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector abi.
 	// 是否删除Unseal文件
 	if removeUnseal {
 		// delete unseal
-		spath = filepath.Join(rw.workerPath, stores.FTUnsealed.String(), stores.SectorName(sector))
+		spath = filepath.Join(rw.workerPath, storiface.FTUnsealed.String(), storiface.SectorName(sector))
 		log.Infof("remove %s", spath)
 		if err := os.RemoveAll(spath); err != nil {
 			log.Errorf("removing sector (%v) from %s: %+v", sector, spath, err)

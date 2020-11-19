@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 
 	"github.com/ipfs/go-cid"
 
@@ -31,7 +32,7 @@ type WorkerAPI interface {
 
 	storage.Sealer
 
-	MoveStorage(ctx context.Context, sector abi.SectorID, types stores.SectorFileType) error
+	MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error
 
 	UnsealPiece(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
 	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
@@ -44,12 +45,14 @@ type WorkerAPI interface {
 	//
 	//Enabled(ctx context.Context) (bool, error)
 	FetchRealData(ctx context.Context, id abi.SectorID) error
-	Fetch(context.Context, abi.SectorID, stores.SectorFileType, stores.PathType, stores.AcquireMode) error
+	Fetch(context.Context, abi.SectorID, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error
 	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
 	GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
 
+	Closing(context.Context) (<-chan struct{}, error)
+
 	// WaitQuiet blocks until there are no tasks running
-	WaitQuiet(ctx context.Context) error
+	//WaitQuiet(ctx context.Context) error
 
 	// returns a random UUID of worker session, generated randomly when worker
 	// process starts

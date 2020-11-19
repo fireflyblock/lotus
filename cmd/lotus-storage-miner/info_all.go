@@ -76,10 +76,10 @@ var infoAllCmd = &cli.Command{
 			return err
 		}
 
-		fmt.Println("\n#: Sealing Jobs")
-		if err := sealingJobsCmd.Action(cctx); err != nil {
-			return err
-		}
+		//fmt.Println("\n#: Sealing Jobs")
+		//if err := sealingJobsCmd.Action(cctx); err != nil {
+		//	return err
+		//}
 
 		fmt.Println("\n#: Sched Diag")
 		if err := sealingSchedDiagCmd.Action(cctx); err != nil {

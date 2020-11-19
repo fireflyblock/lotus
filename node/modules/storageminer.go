@@ -45,15 +45,14 @@ import (
 	"github.com/filecoin-project/go-multistore"
 	//paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-statestore"
 	"github.com/filecoin-project/go-storedcounter"
 
 	"github.com/filecoin-project/lotus/api"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/stores"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -605,11 +604,12 @@ var ManagerWorkPrefix = datastore.NewKey("/stmgr/calls")
 
 func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, ls stores.LocalStorage, si stores.SectorIndex, cfg *ffiwrapper.Config, sc sectorstorage.SealerConfig, urls sectorstorage.URLs, sa sectorstorage.StorageAuth, ds dtypes.MetadataDS) (*sectorstorage.Manager, error) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
+	//
+	//wsts := statestore.New(namespace.Wrap(ds, WorkerCallsPrefix))
+	//smsts := statestore.New(namespace.Wrap(ds, ManagerWorkPrefix))
 
-	wsts := statestore.New(namespace.Wrap(ds, WorkerCallsPrefix))
-	smsts := statestore.New(namespace.Wrap(ds, ManagerWorkPrefix))
-
-	sst, err := sectorstorage.New(ctx, ls, si, cfg, sc, urls, sa, wsts, smsts)
+	//sst, err := sectorstorage.New(ctx, ls, si, cfg, sc, urls, sa, wsts, smsts)
+	sst, err := sectorstorage.New(ctx, ls, si, cfg, sc, urls, sa)
 	if err != nil {
 		return nil, err
 	}

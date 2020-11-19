@@ -76,7 +76,7 @@ type StorageMiner interface {
 	DeleteTaskCount(ctx context.Context, hostname string) (bool, error)
 
 	// SealingSchedDiag dumps internal sealing scheduler state
-	SealingSchedDiag(context.Context) (interface{}, error)
+	SealingSchedDiag(ctx context.Context, doSched bool) (interface{}, error)
 
 	stores.SectorIndex
 

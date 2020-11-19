@@ -13,9 +13,9 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
-	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper"
 	badgerbs "github.com/filecoin-project/lotus/lib/blockstore/badger"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/sector-storage/ffiwrapper"
 )
 
 type cidSet interface {

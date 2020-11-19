@@ -22,10 +22,10 @@ var (
 	//	"172.16.0.8:8001",
 	DefaultRedisURL      = ""
 	DefaultRedisPassWord = ""
-	APWaitTime           = time.Minute * 30
-	P1WaitTime           = time.Minute * 210
-	P2WaitTime           = time.Minute * 60
-	C1WaitTime           = time.Minute * 30
+	APWaitTime           = time.Second * 3 //0
+	P1WaitTime           = time.Second * 2 //10
+	P2WaitTime           = time.Second * 6 //0
+	C1WaitTime           = time.Second * 3 //0
 )
 
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
@@ -400,10 +400,10 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 	ticker := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		ticker = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Second)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		ticker = time.NewTicker(time.Minute)
+		ticker = time.NewTicker(time.Second * 10)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		ticker = time.NewTicker(CHECK_RES_GAP)

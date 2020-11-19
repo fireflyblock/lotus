@@ -24,11 +24,11 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/lotus/lib/tablewriter"
 )
 
 const metaFile = "sectorstore.json"
@@ -714,7 +714,7 @@ var storageCheckProvCmd = &cli.Command{
 			Number: abi.SectorNumber(snum),
 		}
 
-		locked, err := nodeApi.StorageTryLock(ctx, sid, stores.FTSealed|stores.FTCache, stores.FTNone)
+		locked, err := nodeApi.StorageTryLock(ctx, sid, storiface.FTSealed|storiface.FTCache, storiface.FTNone)
 		if err != nil {
 			log.Error(xerrors.Errorf("acquiring sector lock: %w", err))
 			return xerrors.Errorf("acquiring sector lock: %w", err)

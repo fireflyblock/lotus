@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
+	"github.com/filecoin-project/specs-storage/storage"
 	"sync/atomic"
 
-	"github.com/google/uuid"
+	//"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/build"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/stores"
-	"github.com/filecoin-project/sector-storage/storiface"
 )
 
 type worker struct {
@@ -59,21 +59,23 @@ func (w *worker) Enabled(ctx context.Context) (bool, error) {
 	return atomic.LoadInt64(&w.disabled) == 0, nil
 }
 
-func (w *worker) WaitQuiet(ctx context.Context) error {
-	w.LocalWorker.WaitQuiet() // uses WaitGroup under the hood so no ctx :/
-	return nil
-}
+//func (w *worker) WaitQuiet(ctx context.Context) error {
+//	w.LocalWorker.WaitQuiet() // uses WaitGroup under the hood so no ctx :/
+//	return nil
+//}
 
-func (w *worker) ProcessSession(ctx context.Context) (uuid.UUID, error) {
-	return w.LocalWorker.Session(ctx)
-}
+//func (w *worker) ProcessSession(ctx context.Context) (uuid.UUID, error) {
+//	return w.LocalWorker.Session(ctx)
+//}
 
-func (w *worker) Session(ctx context.Context) (uuid.UUID, error) {
-	if atomic.LoadInt64(&w.disabled) == 1 {
-		return uuid.UUID{}, xerrors.Errorf("worker disabled")
-	}
+//func (w *worker) Session(ctx context.Context) (uuid.UUID, error) {
+//	if atomic.LoadInt64(&w.disabled) == 1 {
+//		return uuid.UUID{}, xerrors.Errorf("worker disabled")
+//	}
+//
+//	return w.LocalWorker.Session(ctx)
+//}
 
-	return w.LocalWorker.Session(ctx)
-}
+//var _ storiface.WorkerCalls = &worker{}
 
-var _ storiface.WorkerCalls = &worker{}
+var _ storage.Sealer = &worker{}

@@ -26,11 +26,11 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/dline"
 	stnetwork "github.com/filecoin-project/go-state-types/network"
+	marketevents "github.com/filecoin-project/lotus/markets/loggers"
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
-	marketevents "github.com/filecoin-project/lotus/markets/loggers"
 	"github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/lotus/api"
@@ -317,7 +317,7 @@ type StorageMinerStruct struct {
 		DealTransCount  func(ctx context.Context, size int) (int, error)                                `perm:"admin"`
 		DeleteTaskCount func(ctx context.Context, hostname string) (bool, error)                        `perm:"admin"`
 
-		SealingSchedDiag func(context.Context) (interface{}, error) `perm:"admin"`
+		SealingSchedDiag func(context.Context, bool) (interface{}, error) `perm:"admin"`
 
 		StorageList          func(context.Context) (map[stores.ID][]stores.Decl, error)                                                                                   `perm:"admin"`
 		StorageLocal         func(context.Context) (map[stores.ID]string, error)                                                                                          `perm:"admin"`
@@ -375,16 +375,16 @@ type WorkerStruct struct {
 		FinalizeSector  func(context.Context, abi.SectorID, []storage.Range) error                                                                                                                                     `perm:"admin"`
 		ReleaseUnsealed func(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error                                                                                                               `perm:"admin"`
 		Remove          func(ctx context.Context, sector abi.SectorID) error                                                                                                                                           `perm:"admin"`
-		MoveStorage     func(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error                                                                                                              `perm:"admin"`
+		MoveStorage     func(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error                                                                                                           `perm:"admin"`
 		StorageAddLocal func(ctx context.Context, path string) error                                                                                                                                                   `perm:"admin"`
 
 		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
 		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)           `perm:"admin"`
 
-		FetchRealData     func(ctx context.Context, id abi.SectorID) error                                                      `perm:"admin"`
+		FetchRealData     func(ctx context.Context, id abi.SectorID) error                                                               `perm:"admin"`
 		Fetch             func(context.Context, abi.SectorID, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error `perm:"admin"`
-		PushDataToStorage func(ctx context.Context, sid abi.SectorID, dest string) error                                        `perm:"admin"`
-		GetBindSectors    func(ctx context.Context) ([]abi.SectorID, error)                                                     `perm:"admin"`
+		PushDataToStorage func(ctx context.Context, sid abi.SectorID, dest string) error                                                 `perm:"admin"`
+		GetBindSectors    func(ctx context.Context) ([]abi.SectorID, error)                                                              `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -1259,8 +1259,8 @@ func (c *StorageMinerStruct) WorkerJobs(ctx context.Context) (map[uint64][]stori
 	return c.Internal.WorkerJobs(ctx)
 }
 
-func (c *StorageMinerStruct) SealingSchedDiag(ctx context.Context) (interface{}, error) {
-	return c.Internal.SealingSchedDiag(ctx)
+func (c *StorageMinerStruct) SealingSchedDiag(ctx context.Context, doSched bool) (interface{}, error) {
+	return c.Internal.SealingSchedDiag(ctx, doSched)
 }
 
 func (c *StorageMinerStruct) SetWorkerConf(ctx context.Context, hostname string, config []byte) error {

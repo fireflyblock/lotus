@@ -37,12 +37,12 @@ type URLs []string
 type Worker interface {
 	ffiwrapper.StorageSealer
 
-	MoveStorage(ctx context.Context, sector abi.SectorID, types stores.SectorFileType) error
+	MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error
 
 	// FetchRealData get real useful data
 	FetchRealData(ctx context.Context, id abi.SectorID) error
 
-	Fetch(ctx context.Context, s abi.SectorID, ft stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error
+	Fetch(ctx context.Context, s abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error
 	UnsealPiece(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
 	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
 
@@ -299,7 +299,7 @@ func schedNop(context.Context, Worker) error {
 	return nil
 }
 
-func schedFetch(sector abi.SectorID, ft stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) func(context.Context, Worker) error {
+func schedFetch(sector abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) func(context.Context, Worker) error {
 	return func(ctx context.Context, worker Worker) error {
 		return worker.Fetch(ctx, sector, ft, ptype, am)
 	}
@@ -311,13 +311,13 @@ func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sect
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTUnsealed, stores.FTNone); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTUnsealed, storiface.FTNone); err != nil {
 		returnErr = xerrors.Errorf("acquiring read sector lock: %w", err)
 		return
 	}
 
 	// passing 0 spt because we only need it when allowFetch is true
-	best, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
+	best, err := m.index.StorageFindSector(ctx, sector, storiface.FTUnsealed, 0, false)
 	if err != nil {
 		returnErr = xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
 		return
@@ -327,9 +327,9 @@ func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sect
 	if foundUnsealed { // append to existing
 		// There is unsealed sector, see if we can read from it
 
-		selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+		selector = newExistingSelector(m.index, sector, storiface.FTUnsealed, false)
 
-		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, storiface.FTUnsealed, storiface.PathSealing, storiface.AcquireMove), func(ctx context.Context, w Worker) error {
 			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 			return err
 		})
@@ -337,7 +337,7 @@ func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sect
 			returnErr = xerrors.Errorf("reading piece from sealed sector: %w", err)
 		}
 	} else {
-		selector = newAllocSelector(m.index, stores.FTUnsealed, stores.PathSealing)
+		selector = newAllocSelector(m.index, storiface.FTUnsealed, storiface.PathSealing)
 	}
 	return
 }
@@ -353,17 +353,17 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTSealed|stores.FTCache, stores.FTUnsealed); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed|storiface.FTCache, storiface.FTUnsealed); err != nil {
 		return xerrors.Errorf("acquiring unseal sector lock: %w", err)
 	}
 
 	unsealFetch := func(ctx context.Context, worker Worker) error {
-		if err := worker.Fetch(ctx, sector, stores.FTSealed|stores.FTCache, stores.PathSealing, stores.AcquireCopy); err != nil {
+		if err := worker.Fetch(ctx, sector, storiface.FTSealed|storiface.FTCache, storiface.PathSealing, storiface.AcquireCopy); err != nil {
 			return xerrors.Errorf("copy sealed/cache sector data: %w", err)
 		}
 
 		if foundUnsealed {
-			if err := worker.Fetch(ctx, sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove); err != nil {
+			if err := worker.Fetch(ctx, sector, storiface.FTUnsealed, storiface.PathSealing, storiface.AcquireMove); err != nil {
 				return xerrors.Errorf("copy unsealed sector data: %w", err)
 			}
 		}
@@ -380,9 +380,9 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return err
 	}
 
-	selector = newExistingSelector(m.index, sector, stores.FTUnsealed, false)
+	selector = newExistingSelector(m.index, sector, storiface.FTUnsealed, false)
 
-	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, storiface.FTUnsealed, storiface.PathSealing, storiface.AcquireMove), func(ctx context.Context, w Worker) error {
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
 		return err
 	})
@@ -407,7 +407,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTUnsealed); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTNone, storiface.FTUnsealed); err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -466,7 +466,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTUnsealed, stores.FTSealed|stores.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTUnsealed, storiface.FTSealed|storiface.FTCache); err != nil {
 		return nil, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -517,10 +517,10 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	tick := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second * 10)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
@@ -633,7 +633,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTSealed, stores.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed, storiface.FTCache); err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -672,10 +672,10 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	tick := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second * 10)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
@@ -788,7 +788,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTSealed, stores.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed, storiface.FTCache); err != nil {
 		return storage.Commit1Out{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -852,10 +852,10 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	tick := &time.Ticker{}
 	switch m.scfg.SealProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second)
 
 	case abi.RegisteredSealProof_StackedDrg512MiBV1:
-		tick = time.NewTicker(time.Minute)
+		tick = time.NewTicker(time.Second * 10)
 
 	case abi.RegisteredSealProof_StackedDrg32GiBV1:
 		tick = time.NewTicker(CHECK_RES_GAP)
@@ -924,10 +924,10 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//
 		//		if exist {
 		//			// deal sector 存储unseal文件
-		//			err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache|stores.FTUnsealed, true)
+		//			err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache|storiface.FTUnsealed, true)
 		//		} else {
 		//			// not deal sector 不存储unseal文件
-		//			err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache, true)
+		//			err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache, true)
 		//		}
 		//
 		//		if err != nil {
@@ -1021,10 +1021,10 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 			if exist {
 				// deal sector 存储unseal文件
-				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache|stores.FTUnsealed, true)
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache|storiface.FTUnsealed, true)
 			} else {
 				// not deal sector 不存储unseal文件
-				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, stores.FTSealed|stores.FTCache, true)
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache, true)
 			}
 
 			if err != nil {
@@ -1050,7 +1050,11 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 // 获取存储路径列表
 func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) ([]string, map[string]string) {
 	// 筛选存储机器
-	sis, err := m.index.StorageBestAlloc(ctx, stores.FTSealed, abi.RegisteredSealProof_StackedDrg32GiBV1, stores.PathStorage)
+	ssize, err := abi.RegisteredSealProof_StackedDrg32GiBV1.SectorSize()
+	if err != nil {
+		return []string{}, map[string]string{}
+	}
+	sis, err := m.index.StorageBestAlloc(ctx, storiface.FTSealed, ssize, storiface.PathStorage)
 	//m.index.StorageList
 	if err != nil {
 		logrus.SchedLogger.Errorf("doing sector(%+v) c1 get storage paths error : %w", sector, err)
@@ -1093,7 +1097,11 @@ func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) (
 
 func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.SectorID, w Worker) (string, stores.ID) {
 	// 筛选存储机器
-	sis, err := m.index.StorageBestAlloc(ctx, stores.FTSealed, abi.RegisteredSealProof_StackedDrg32GiBV1, stores.PathStorage)
+	ssize, err := abi.RegisteredSealProof_StackedDrg32GiBV1.SectorSize()
+	if err != nil {
+		return "", ""
+	}
+	sis, err := m.index.StorageBestAlloc(ctx, storiface.FTSealed, ssize, storiface.PathStorage)
 	//m.index.StorageList
 	if err != nil {
 		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding best storage error : %w", sector, err)
@@ -1232,26 +1240,26 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	//if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTSealed|stores.FTUnsealed|stores.FTCache); err != nil {
+	//if err := m.index.StorageLock(ctx, sector, storiface.FTNone, storiface.FTSealed|storiface.FTUnsealed|storiface.FTCache); err != nil {
 	//	return xerrors.Errorf("acquiring sector lock: %w", err)
 	//}
 	//
-	//unsealed := stores.FTUnsealed
+	//unsealed := storiface.FTUnsealed
 	//{
-	//	unsealedStores, err := m.index.StorageFindSector(ctx, sector, stores.FTUnsealed, 0, false)
+	//	unsealedStores, err := m.index.StorageFindSector(ctx, sector, storiface.FTUnsealed, 0, false)
 	//	if err != nil {
 	//		return xerrors.Errorf("finding unsealed sector: %w", err)
 	//	}
 	//
 	//	if len(unsealedStores) == 0 { // Is some edge-cases unsealed sector may not exist already, that's fine
-	//		unsealed = stores.FTNone
+	//		unsealed = storiface.FTNone
 	//	}
 	//}
 
-	selector := newExistingSelector(m.index, sector, stores.FTCache|stores.FTSealed, false)
+	selector := newExistingSelector(m.index, sector, storiface.FTCache|storiface.FTSealed, false)
 
 	err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
-		//schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
+		//schedFetch(sector, storiface.FTCache|stores.FTSealed|unsealed, storiface.PathSealing, storiface.AcquireMove),
 		schedNop,
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
@@ -1273,20 +1281,20 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.Number)
 	m.DeleteDataForSid(sector.Number)
 
-	//fetchSel := newAllocSelector(m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
+	//fetchSel := newAllocSelector(m.index, storiface.FTCache|stores.FTSealed, storiface.PathStorage)
 	//moveUnsealed := unsealed
 	//{
 	//	if len(keepUnsealed) == 0 {
-	//		moveUnsealed = stores.FTNone
+	//		moveUnsealed = storiface.FTNone
 	//	}
 	//}
 
 	// 禁止拉取数据,修复FinalizeFaild
 	//err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
-	//	//schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
+	//	//schedFetch(sector, storiface.FTCache|stores.FTSealed|moveUnsealed, storiface.PathStorage, storiface.AcquireMove),
 	//	schedNop,
 	//	func(ctx context.Context, w Worker) error {
-	//		err := w.MoveStorage(ctx, sector, stores.FTCache|stores.FTSealed|moveUnsealed)
+	//		err := w.MoveStorage(ctx, sector, storiface.FTCache|stores.FTSealed|moveUnsealed)
 	//		if err != nil {
 	//			return err
 	//		}
@@ -1310,19 +1318,19 @@ func (m *Manager) Remove(ctx context.Context, sector abi.SectorID) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTSealed|stores.FTUnsealed|stores.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector, storiface.FTNone, storiface.FTSealed|storiface.FTUnsealed|storiface.FTCache); err != nil {
 		return xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
 	var err error
 
-	if rerr := m.storage.Remove(ctx, sector, stores.FTSealed, true); rerr != nil {
+	if rerr := m.storage.Remove(ctx, sector, storiface.FTSealed, true); rerr != nil {
 		err = multierror.Append(err, xerrors.Errorf("removing sector (sealed): %w", rerr))
 	}
-	if rerr := m.storage.Remove(ctx, sector, stores.FTCache, true); rerr != nil {
+	if rerr := m.storage.Remove(ctx, sector, storiface.FTCache, true); rerr != nil {
 		err = multierror.Append(err, xerrors.Errorf("removing sector (cache): %w", rerr))
 	}
-	if rerr := m.storage.Remove(ctx, sector, stores.FTUnsealed, true); rerr != nil {
+	if rerr := m.storage.Remove(ctx, sector, storiface.FTUnsealed, true); rerr != nil {
 		err = multierror.Append(err, xerrors.Errorf("removing sector (unsealed): %w", rerr))
 	}
 
@@ -1347,7 +1355,7 @@ func (m *Manager) FsStat(ctx context.Context, id stores.ID) (fsutil.FsStat, erro
 	return m.storage.FsStat(ctx, id)
 }
 
-func (m *Manager) SchedDiag(ctx context.Context) (interface{}, error) {
+func (m *Manager) SchedDiag(ctx context.Context, doSched bool) (interface{}, error) {
 	return m.sched.Info(ctx)
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/sector-storage/sealtasks"
-	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
 )
 
@@ -120,7 +119,7 @@ func (t *trackedWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID,
 func (t *trackedWorker) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
 	return t.Worker.GetBindSectors(ctx)
 }
-func (t *trackedWorker) Fetch(ctx context.Context, s abi.SectorID, ft stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
+func (t *trackedWorker) Fetch(ctx context.Context, s abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
 	defer t.tracker.track(s, sealtasks.TTFetch)()
 
 	return t.Worker.Fetch(ctx, s, ft, ptype, am)
