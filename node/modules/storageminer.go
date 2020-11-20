@@ -45,14 +45,15 @@ import (
 	"github.com/filecoin-project/go-multistore"
 	//paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-state-types/abi"
+	//"github.com/filecoin-project/go-statestore"
 	"github.com/filecoin-project/go-storedcounter"
 
 	"github.com/filecoin-project/lotus/api"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
-	sectorstorage "github.com/filecoin-project/sector-storage"
+	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/stores"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -84,23 +85,23 @@ func minerAddrFromDS(ds dtypes.MetadataDS) (address.Address, error) {
 	return address.NewFromBytes(maddrb)
 }
 
-func GetParams(sbc *ffiwrapper.Config) error {
-	return nil
-	//ssize, err := sbc.SealProofType.SectorSize()
+func GetParams(spt abi.RegisteredSealProof) error {
+	//ssize, err := spt.SectorSize()
 	//if err != nil {
 	//	return err
 	//}
 
-	//// If built-in assets are disabled, we expect the user to have placed the right
-	//// parameters in the right location on the filesystem (/var/tmp/filecoin-proof-parameters).
+	// If built-in assets are disabled, we expect the user to have placed the right
+	// parameters in the right location on the filesystem (/var/tmp/filecoin-proof-parameters).
 	//if build.DisableBuiltinAssets {
 	//	return nil
 	//}
 
+	// TODO: We should fetch the params for the actual proof type, not just based on the size.
 	//if err := paramfetch.GetParams(context.TODO(), build.ParametersJSON(), uint64(ssize)); err != nil {
 	//	return xerrors.Errorf("fetching proof parameters: %w", err)
 	//}
-
+	//
 	//return nil
 }
 
@@ -121,22 +122,13 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a lapi.FullNode) (dtypes.Network
 	return a.StateNetworkName(ctx)
 }
 
-func ProofsConfig(maddr dtypes.MinerAddress, fnapi lapi.FullNode) (*ffiwrapper.Config, error) {
+func SealProofType(maddr dtypes.MinerAddress, fnapi lapi.FullNode) (abi.RegisteredSealProof, error) {
 	mi, err := fnapi.StateMinerInfo(context.TODO(), address.Address(maddr), types.EmptyTSK)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	spt, err := ffiwrapper.SealProofTypeFromSectorSize(mi.SectorSize)
-	if err != nil {
-		return nil, xerrors.Errorf("bad sector size: %w", err)
-	}
-
-	sb := &ffiwrapper.Config{
-		SealProofType: spt,
-	}
-
-	return sb, nil
+	return mi.SealProofType, nil
 }
 
 type sidsc struct {
@@ -519,7 +511,6 @@ func BasicDealFilter(user dtypes.StorageDealFilter) func(onlineOk dtypes.Conside
 }
 
 func StorageProvider(minerAddress dtypes.MinerAddress,
-	ffiConfig *ffiwrapper.Config,
 	storedAsk *storedask.StoredAsk,
 	h host.Host, ds dtypes.MetadataDS,
 	mds dtypes.StagingMultiDstore,
@@ -537,7 +528,7 @@ func StorageProvider(minerAddress dtypes.MinerAddress,
 
 	opt := storageimpl.CustomDealDecisionLogic(storageimpl.DealDeciderFunc(df))
 
-	return storageimpl.NewProvider(net, namespace.Wrap(ds, datastore.NewKey("/deals/provider")), store, mds, pieceStore, dataTransfer, spn, address.Address(minerAddress), ffiConfig.SealProofType, storedAsk, opt)
+	return storageimpl.NewProvider(net, namespace.Wrap(ds, datastore.NewKey("/deals/provider")), store, mds, pieceStore, dataTransfer, spn, address.Address(minerAddress), storedAsk, opt)
 }
 
 func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
@@ -602,14 +593,14 @@ func RetrievalProvider(h host.Host,
 var WorkerCallsPrefix = datastore.NewKey("/worker/calls")
 var ManagerWorkPrefix = datastore.NewKey("/stmgr/calls")
 
-func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, ls stores.LocalStorage, si stores.SectorIndex, cfg *ffiwrapper.Config, sc sectorstorage.SealerConfig, urls sectorstorage.URLs, sa sectorstorage.StorageAuth, ds dtypes.MetadataDS) (*sectorstorage.Manager, error) {
+func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, ls stores.LocalStorage, si stores.SectorIndex, sc sectorstorage.SealerConfig, urls sectorstorage.URLs, sa sectorstorage.StorageAuth, ds dtypes.MetadataDS) (*sectorstorage.Manager, error) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
 	//
 	//wsts := statestore.New(namespace.Wrap(ds, WorkerCallsPrefix))
 	//smsts := statestore.New(namespace.Wrap(ds, ManagerWorkPrefix))
 
 	//sst, err := sectorstorage.New(ctx, ls, si, cfg, sc, urls, sa, wsts, smsts)
-	sst, err := sectorstorage.New(ctx, ls, si, cfg, sc, urls, sa)
+	sst, err := sectorstorage.New(ctx, ls, si, sc, urls, sa)
 	if err != nil {
 		return nil, err
 	}

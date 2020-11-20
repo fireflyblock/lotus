@@ -6,13 +6,14 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"github.com/filecoin-project/sector-storage/sealtasks"
+	"github.com/filecoin-project/specs-storage/storage"
 	"github.com/gogo/protobuf/sortkeys"
 	"gopkg.in/fatih/set.v0"
 	"strings"
 	"time"
 )
 
-func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
+func (m *Sealing) pledgeSector(ctx context.Context, sectorID storage.SectorRef, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
 	// 说明
 	// 当len(existingPieceSizes)>0 && len(sizes)>0时表明是deal发单后需要填充sector剩余空间。否则是纯垃圾sector
 	// 原因参考pledgeSector调用即可明白
@@ -91,7 +92,17 @@ func (m *Sealing) PledgeSector() error {
 		// this, as we run everything here async, and it's cancelled when the
 		// command exits
 
-		size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
+		spt, err := m.currentSealProof(ctx)
+		if err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
+
+		size, err := spt.SectorSize()
+		if err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
 
 		// 恢复garbage sid
 		var sid abi.SectorNumber
@@ -125,14 +136,14 @@ func (m *Sealing) PledgeSector() error {
 			log.Infof("===== PledgeSector use m.sc.Next (%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
 		}
 
-		sectorID := m.minerSector(sid)
+		sectorID := m.minerSector(spt, sid)
 		err = m.sealer.NewSector(ctx, sectorID)
 		if err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
 
-		pieces, err := m.pledgeSector(ctx, sectorID, []abi.UnpaddedPieceSize{}, size)
+		pieces, err := m.pledgeSector(ctx, sectorID, []abi.UnpaddedPieceSize{}, abi.PaddedPieceSize(size).Unpadded())
 		if err != nil {
 			// 保存pledge garbage的sector
 			m.recoverLk.Lock()
@@ -151,7 +162,7 @@ func (m *Sealing) PledgeSector() error {
 			}
 		}
 
-		if err := m.newSectorCC(sid, ps); err != nil {
+		if err := m.newSectorCC(ctx, sid, ps); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}

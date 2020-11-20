@@ -101,7 +101,7 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sroot cid.Cid
 		i := i
 		m := m
 
-		spt, err := ffiwrapper.SealProofTypeFromSectorSize(m.SectorSize)
+		spt, err := miner.SealProofTypeFromSectorSize(m.SectorSize, GenesisNetworkVersion)
 		if err != nil {
 			return cid.Undef, err
 		}

@@ -513,6 +513,10 @@ func (c *CommonStruct) Shutdown(ctx context.Context) error {
 	return c.Internal.Shutdown(ctx)
 }
 
+//func (c *CommonStruct) Session(ctx context.Context) (uuid.UUID, error) {
+//	return c.Internal.Session(ctx)
+//}
+
 func (c *CommonStruct) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return c.Internal.Closing(ctx)
 }
@@ -1477,7 +1481,7 @@ func (w *WorkerStruct) Info(ctx context.Context) (storiface.WorkerInfo, error) {
 	return w.Internal.Info(ctx)
 }
 
-//func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
+//func (w *WorkerStruct) AddPiece(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string) (abi.PieceInfo, error) {
 //	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName)
 //}
 
@@ -1485,27 +1489,27 @@ func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceS
 	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName, apTtype)
 }
 
-func (w *WorkerStruct) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error) {
+func (w *WorkerStruct) SealPreCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error) {
 	return w.Internal.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 }
 
-func (w *WorkerStruct) SealPreCommit2(ctx context.Context, sector abi.SectorID, p1o storage.PreCommit1Out) (storage.SectorCids, error) {
+func (w *WorkerStruct) SealPreCommit2(ctx context.Context, sector storage.SectorRef, p1o storage.PreCommit1Out) (storage.SectorCids, error) {
 	return w.Internal.SealPreCommit2(ctx, sector, p1o)
 }
 
-func (w *WorkerStruct) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
+func (w *WorkerStruct) SealCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
 	return w.Internal.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
 }
 
-func (w *WorkerStruct) SealCommit2(ctx context.Context, sector abi.SectorID, c1o storage.Commit1Out) (storage.Proof, error) {
+func (w *WorkerStruct) SealCommit2(ctx context.Context, sector storage.SectorRef, c1o storage.Commit1Out) (storage.Proof, error) {
 	return w.Internal.SealCommit2(ctx, sector, c1o)
 }
 
-func (w *WorkerStruct) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+func (w *WorkerStruct) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) error {
 	return w.Internal.FinalizeSector(ctx, sector, keepUnsealed)
 }
 
-func (w *WorkerStruct) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
+func (w *WorkerStruct) ReleaseUnsealed(ctx context.Context, sector storage.SectorRef, safeToFree []storage.Range) error {
 	return w.Internal.ReleaseUnsealed(ctx, sector, safeToFree)
 }
 
@@ -1513,7 +1517,7 @@ func (w *WorkerStruct) Remove(ctx context.Context, sector abi.SectorID) error {
 	return w.Internal.Remove(ctx, sector)
 }
 
-func (w *WorkerStruct) MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error {
+func (w *WorkerStruct) MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error {
 	return w.Internal.MoveStorage(ctx, sector, types)
 }
 
@@ -1521,25 +1525,25 @@ func (w *WorkerStruct) StorageAddLocal(ctx context.Context, path string) error {
 	return w.Internal.StorageAddLocal(ctx, path)
 }
 
-func (w *WorkerStruct) UnsealPiece(ctx context.Context, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, c cid.Cid) error {
-	return w.Internal.UnsealPiece(ctx, id, index, size, randomness, c)
+func (w *WorkerStruct) UnsealPiece(ctx context.Context, sector storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, c cid.Cid) error {
+	return w.Internal.UnsealPiece(ctx, sector, index, size, randomness, c)
 }
 
-func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
-	return w.Internal.ReadPiece(ctx, writer, id, index, size)
+func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, sector storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+	return w.Internal.ReadPiece(ctx, writer, sector, index, size)
 }
 
-func (w *WorkerStruct) FetchRealData(ctx context.Context, id abi.SectorID) error {
-	return w.Internal.FetchRealData(ctx, id)
+func (w *WorkerStruct) FetchRealData(ctx context.Context, sector storage.SectorRef) error {
+	return w.Internal.FetchRealData(ctx, sector)
 }
-func (w *WorkerStruct) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
+func (w *WorkerStruct) PushDataToStorage(ctx context.Context, sid storage.SectorRef, dest string) error {
 	return w.Internal.PushDataToStorage(ctx, sid, dest)
 }
 func (w *WorkerStruct) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
 	return w.Internal.GetBindSectors(ctx)
 }
-func (w *WorkerStruct) Fetch(ctx context.Context, id abi.SectorID, fileType storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
-	return w.Internal.Fetch(ctx, id, fileType, ptype, am)
+func (w *WorkerStruct) Fetch(ctx context.Context, sector storage.SectorRef, fileType storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
+	return w.Internal.Fetch(ctx, sector, fileType, ptype, am)
 }
 
 func (w *WorkerStruct) Closing(ctx context.Context) (<-chan struct{}, error) {

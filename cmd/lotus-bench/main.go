@@ -32,6 +32,7 @@ import (
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/genesis"
@@ -327,15 +328,6 @@ var sealBenchCmd = &cli.Command{
 		}
 		sectorSize := abi.SectorSize(sectorSizeInt)
 
-		spt, err := ffiwrapper.SealProofTypeFromSectorSize(sectorSize)
-		if err != nil {
-			return err
-		}
-
-		cfg := &ffiwrapper.Config{
-			SealProofType: spt,
-		}
-
 		// Only fetch parameters if actually needed
 		if !c.Bool("skip-commit2") {
 			if err := paramfetch.GetParams(lcli.ReqContext(c), build.ParametersJSON(), uint64(sectorSize)); err != nil {
@@ -347,7 +339,7 @@ var sealBenchCmd = &cli.Command{
 			Root: sbdir,
 		}
 
-		sb, err := ffiwrapper.New(sbfs, cfg)
+		sb, err := ffiwrapper.New(sbfs)
 		if err != nil {
 			return err
 		}
@@ -411,7 +403,7 @@ var sealBenchCmd = &cli.Command{
 
 		if !c.Bool("skip-commit2") {
 			log.Info("generating winning post candidates")
-			wipt, err := spt.RegisteredWinningPoStProof()
+			wipt, err := spt(sectorSize).RegisteredWinningPoStProof()
 			if err != nil {
 				return err
 			}
@@ -544,7 +536,7 @@ var sealBenchCmd = &cli.Command{
 
 			fmt.Println(string(data))
 		} else {
-			fmt.Printf("----\nresults (v27) (%d)\n", sectorSize)
+			fmt.Printf("----\nresults (v28) (%d)\n", sectorSize)
 			if robench == "" {
 				fmt.Printf("seal: addPiece: %s (%s)\n", bo.SealingResults[0].AddPiece, bps(bo.SectorSize, bo.SealingResults[0].AddPiece)) // TODO: average across multiple sealings
 				fmt.Printf("seal: preCommit phase 1: %s (%s)\n", bo.SealingResults[0].PreCommit1, bps(bo.SectorSize, bo.SealingResults[0].PreCommit1))
@@ -593,9 +585,12 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 	}
 
 	for i := abi.SectorNumber(1); i <= abi.SectorNumber(numSectors); i++ {
-		sid := abi.SectorID{
-			Miner:  mid,
-			Number: i,
+		sid := storage.SectorRef{
+			ID: abi.SectorID{
+				Miner:  mid,
+				Number: i,
+			},
+			ProofType: spt(sectorSize),
 		}
 
 		start := time.Now()
@@ -624,9 +619,12 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 				end := start + sectorsPerWorker
 				for i := abi.SectorNumber(start); i < abi.SectorNumber(end); i++ {
 					ix := int(i - 1)
-					sid := abi.SectorID{
-						Miner:  mid,
-						Number: i,
+					sid := storage.SectorRef{
+						ID: abi.SectorID{
+							Miner:  mid,
+							Number: i,
+						},
+						ProofType: spt(sectorSize),
 					}
 
 					start := time.Now()
@@ -655,7 +653,7 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 					<-preCommit2Sema
 
 					sealedSectors[ix] = saproof2.SectorInfo{
-						SealProof:    sb.SealProofType(),
+						SealProof:    sid.ProofType,
 						SectorNumber: i,
 						SealedCID:    cids.Sealed,
 					}
@@ -709,7 +707,7 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 						svi := saproof2.SealVerifyInfo{
 							SectorID:              abi.SectorID{Miner: mid, Number: i},
 							SealedCID:             cids.Sealed,
-							SealProof:             sb.SealProofType(),
+							SealProof:             sid.ProofType,
 							Proof:                 proof,
 							DealIDs:               nil,
 							Randomness:            ticket,
@@ -731,7 +729,7 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 					if !skipunseal {
 						log.Infof("[%d] Unsealing sector", i)
 						{
-							p, done, err := sbfs.AcquireSector(context.TODO(), abi.SectorID{Miner: mid, Number: 1}, storiface.FTUnsealed, storiface.FTNone, storiface.PathSealing)
+							p, done, err := sbfs.AcquireSector(context.TODO(), sid, storiface.FTUnsealed, storiface.FTNone, storiface.PathSealing)
 							if err != nil {
 								return xerrors.Errorf("acquire unsealed sector for removing: %w", err)
 							}
@@ -742,7 +740,7 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 							}
 						}
 
-						err := sb.UnsealPiece(context.TODO(), abi.SectorID{Miner: mid, Number: 1}, 0, abi.PaddedPieceSize(sectorSize).Unpadded(), ticket, cids.Unsealed)
+						err := sb.UnsealPiece(context.TODO(), sid, 0, abi.PaddedPieceSize(sectorSize).Unpadded(), ticket, cids.Unsealed)
 						if err != nil {
 							return err
 						}
@@ -825,23 +823,22 @@ var proveCmd = &cli.Command{
 			return err
 		}
 
-		spt, err := ffiwrapper.SealProofTypeFromSectorSize(abi.SectorSize(c2in.SectorSize))
-		if err != nil {
-			return err
-		}
-
-		cfg := &ffiwrapper.Config{
-			SealProofType: spt,
-		}
-
-		sb, err := ffiwrapper.New(nil, cfg)
+		sb, err := ffiwrapper.New(nil)
 		if err != nil {
 			return err
 		}
 
 		start := time.Now()
 
-		proof, err := sb.SealCommit2(context.TODO(), abi.SectorID{Miner: abi.ActorID(mid), Number: abi.SectorNumber(c2in.SectorNum)}, c2in.Phase1Out)
+		ref := storage.SectorRef{
+			ID: abi.SectorID{
+				Miner:  abi.ActorID(mid),
+				Number: abi.SectorNumber(c2in.SectorNum),
+			},
+			ProofType: spt(abi.SectorSize(c2in.SectorSize)),
+		}
+
+		proof, err := sb.SealCommit2(context.TODO(), ref, c2in.Phase1Out)
 		if err != nil {
 			return err
 		}
@@ -850,7 +847,7 @@ var proveCmd = &cli.Command{
 
 		fmt.Printf("proof: %x\n", proof)
 
-		fmt.Printf("----\nresults (v27) (%d)\n", c2in.SectorSize)
+		fmt.Printf("----\nresults (v28) (%d)\n", c2in.SectorSize)
 		dur := sealCommit2.Sub(start)
 
 		fmt.Printf("seal: commit phase 2: %s (%s)\n", dur, bps(abi.SectorSize(c2in.SectorSize), dur))
@@ -863,4 +860,13 @@ func bps(data abi.SectorSize, d time.Duration) string {
 	bdata = bdata.Mul(bdata, big.NewInt(time.Second.Nanoseconds()))
 	bps := bdata.Div(bdata, big.NewInt(d.Nanoseconds()))
 	return types.SizeStr(types.BigInt{Int: bps}) + "/s"
+}
+
+func spt(ssize abi.SectorSize) abi.RegisteredSealProof {
+	spt, err := miner.SealProofTypeFromSectorSize(ssize, build.NewestNetworkVersion)
+	if err != nil {
+		panic(err)
+	}
+
+	return spt
 }
