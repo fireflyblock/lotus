@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	logrus "github.com/filecoin-project/sector-storage/log"
+	"github.com/filecoin-project/specs-storage/storage"
 	"os"
 	"sync"
 	"time"
@@ -130,7 +131,7 @@ type activeResources struct {
 }
 
 type workerRequest struct {
-	sector   abi.SectorID
+	sector   storage.SectorRef
 	taskType sealtasks.TaskType
 	priority int // larger values more important
 	sel      WorkerSelector
@@ -151,9 +152,9 @@ type workerResponse struct {
 	err error
 }
 
-func newScheduler(spt abi.RegisteredSealProof) *scheduler {
+func newScheduler() *scheduler {
 	return &scheduler{
-		spt: spt,
+		//spt: spt,
 
 		nextWorker: 0,
 		workers:    map[WorkerID]*workerHandle{},
@@ -181,7 +182,7 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 	}
 }
 
-func (sh *scheduler) Schedule(ctx context.Context, sector abi.SectorID, taskType sealtasks.TaskType, sel WorkerSelector, prepare WorkerAction, work WorkerAction) error {
+func (sh *scheduler) Schedule(ctx context.Context, sector storage.SectorRef, taskType sealtasks.TaskType, sel WorkerSelector, prepare WorkerAction, work WorkerAction) error {
 	logrus.SchedLogger.Infof("===== new req sched, sectorID:%+v, taskType:%+v\n", sector, taskType)
 
 	if taskType == sealtasks.TTAddPiecePl {
@@ -282,7 +283,7 @@ func (sh *scheduler) runSched() {
 			}
 
 			sh.schedQueue.Push(req)
-			//go sh.StartStore(req.sector.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
+			//go sh.StartStore(req.sector.ID.Number, req.taskType, "", req.sector.Miner, TS_WAITING, time.Now())
 			sh.trySched()
 
 			if sh.testSync != nil {
@@ -306,7 +307,7 @@ func (sh *scheduler) diag() SchedDiagInfo {
 		task := (*sh.schedQueue)[sqi]
 
 		out.Requests = append(out.Requests, SchedDiagRequestInfo{
-			Sector:   task.sector,
+			Sector:   task.sector.ID,
 			TaskType: task.taskType,
 			Priority: task.priority,
 		})
@@ -360,7 +361,7 @@ func (sh *scheduler) trySched() {
 
 		switch task.taskType {
 		case sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed, sealtasks.TTUnseal:
-			logrus.SchedLogger.Infof("===== taskType is :%+v, sqi:%d, sector %d,hostname:%+v,", task.taskType, sqi, task.sector.Number, sh.workers[worker0].info.Hostname)
+			logrus.SchedLogger.Infof("===== taskType is :%+v, sqi:%d, sector %d,hostname:%+v,", task.taskType, sqi, task.sector.ID.Number, sh.workers[worker0].info.Hostname)
 			sh.assignWorker(worker0, sh.workers[worker0], task)
 			sh.schedQueue.Remove(sqi)
 			sqi--
@@ -380,7 +381,7 @@ func (sh *scheduler) trySched() {
 					continue
 				}
 
-				if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector, wid) {
+				if !sh.canHandleRequestForTask(task.taskType, worker.info.Hostname, task.sector.ID, wid) {
 					logrus.SchedLogger.Infof("===== [canHandleRequestForTask] "+
 						"workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n",
 						wid, worker.info.Hostname, task.sector, task.taskType, sqi)
@@ -486,7 +487,7 @@ func (sh *scheduler) trySched() {
 
 	Judge:
 		{
-			if !sh.canHandleRequestForTask(task.taskType, acceptableWorker, task.sector, acceptableWorkerID) {
+			if !sh.canHandleRequestForTask(task.taskType, acceptableWorker, task.sector.ID, acceptableWorkerID) {
 				logrus.SchedLogger.Infof("===== [canHandleRequestForTask] "+
 					"workerID:%+v, Worker:%s, sector:%+v，type:%+v, sqi:%+v\n", acceptableWorkerID, acceptableWorker, task.sector, task.taskType, sqi)
 				continue
@@ -518,41 +519,10 @@ func (sh *scheduler) updateTransforCount(updatetype int) {
 	logrus.SchedLogger.Infof("===== total wait transforing count is :%d\n", wCount)
 }
 
-// 拉取数据
-func (sh *scheduler) tryFetchData(wid WorkerID, req *workerRequest) {
-	// 开始调度C2 再去拉取数据
-	if req.taskType != sealtasks.TTCommit2 {
-		return
-	}
-
-	logrus.SchedLogger.Infof("===== before sector(%+v) to do SealCommit2 tryFetchData", req.sector)
-
-	// transferChannel存储key：wid，value：channel
-	// 存储channel用于计算任务完成后检测传输是否完成，如果未完成则等待传输完成。
-	tch := make(chan abi.SectorID)
-	sh.transferChannel.Store(req.sector, tch)
-
-	// 更新传输任务等待状态
-	sh.updateTransforCount(1)
-
-	// 默认使用miner拉取
-	sh.workersLk.Lock()
-	w := sh.workers[WorkerID(0)]
-	sh.workersLk.Unlock()
-
-	// 执行拉取
-	transforStartAt := time.Now()
-	_ = w.w.FetchRealData(req.ctx, req.sector)
-	logrus.SchedLogger.Infof("===== sector(%+v) transfor cost time : %s", req.sector, time.Now().Sub(transforStartAt))
-	//time.Sleep(time.Minute * 1)
-
-	// 写入数据完成信号
-	tch <- req.sector
-}
 
 func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequest) error {
 	logrus.SchedLogger.Infof("===== assignfree, sector:%+v, tasktype:%+v", req.sector, req.taskType)
-	needRes := ResourceTable[req.taskType][sh.spt]
+	needRes := ResourceTable[req.taskType][req.sector.ProofType]
 
 	w.lk.Lock()
 	w.preparing.add(w.info.Resources, needRes)
@@ -565,7 +535,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 		//defer sh.freeTask(req.taskType, w.info.Hostname, req.sector)
 		defer func() {
 			logrus.SchedLogger.Infof("===== defer free, sector:%+v, tasktype:%+v", req.sector, req.taskType)
-			sh.freeTask(req.taskType, w.info.Hostname, req.sector)
+			sh.freeTask(req.taskType, w.info.Hostname, req.sector.ID)
 		}()
 
 		err := req.prepare(req.ctx, w.wt.worker(w.w))

@@ -12,7 +12,7 @@ import (
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/transfordata"
-	storage2 "github.com/filecoin-project/specs-storage/storage"
+	"github.com/filecoin-project/specs-storage/storage"
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/xerrors"
 	"io"
@@ -33,22 +33,22 @@ type RedisWorker struct {
 
 func NewSealer(sectorSizeInt int64, path string) (*RedisWorker, error) {
 	// sector size
-	sectorSize := abi.SectorSize(sectorSizeInt)
+	//sectorSize := abi.SectorSize(sectorSizeInt)
 
-	spt, err := ffiwrapper.SealProofTypeFromSectorSize(sectorSize)
-	if err != nil {
-		return nil, err
-	}
+	//spt, err := ffiwrapper.SealProofTypeFromSectorSize(sectorSize)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	cfg := &ffiwrapper.Config{
-		SealProofType: spt,
-	}
+	//cfg := &ffiwrapper.Config{
+	//	SealProofType: spt,
+	//}
 
 	sbfs := &basicfs.Provider{
 		Root: path,
 	}
 
-	sb, err := ffiwrapper.New(sbfs, cfg)
+	sb, err := ffiwrapper.New(sbfs)
 
 	//init redis data
 	var rurl string
@@ -467,8 +467,8 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 		//pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, data, params.ApType)
 		startAt := time.Now()
 		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
-		//log.Infof("===== rd pledge, sectorID %+v err %+v", params.Sector.Number, err)
-		log.Infof("===== rd pledge finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
+		//log.Infof("===== rd pledge, sectorID %+v err %+v", params.sector.ID.Number, err)
+		log.Infof("===== rd pledge finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 
 		if err != nil {
@@ -519,7 +519,7 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 		//todo addpiece seal transfer file (io.reader)
 		startAt := time.Now()
 		pi, err := rw.sealer.AddPiece(ctx, params.Sector, params.PieceSizes, params.NewPieceSize, params.FilePath, params.FileName, params.ApType)
-		log.Infof("===== rd seal finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
+		log.Infof("===== rd seal finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 		if err != nil {
 			paramsRes = &gr.ParamsResAp{
@@ -568,7 +568,7 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 	{
 		out, err := rw.sealer.SealPreCommit1(ctx, params.Sector, params.Ticket, params.Pieces, params.Recover)
 		startAt := time.Now()
-		log.Infof("===== rd p1 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
+		log.Infof("===== rd p1 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 		if err != nil {
 			paramsRes = &gr.ParamsResP1{
@@ -608,7 +608,7 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 	if err != nil {
 		log.Errorf("===== hget p2 params err:%+v", err)
 		paramsRes = &gr.ParamsResP2{
-			Out: storage2.SectorCids{},
+			Out: storage.SectorCids{},
 			Err: err.Error(),
 		}
 		goto RESRETURN
@@ -617,7 +617,7 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 	{
 		startAt := time.Now()
 		out, err := rw.sealer.SealPreCommit2(ctx, params.Sector, params.Pc1o)
-		log.Infof("===== rd p2 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
+		log.Infof("===== rd p2 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 		if err != nil {
 			paramsRes = &gr.ParamsResP2{
@@ -666,7 +666,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 	{
 		startAt := time.Now()
 		out, err := rw.sealer.SealCommit1(ctx, params.Sector, params.Ticket, params.Seed, params.Pieces, params.Cids)
-		log.Infof("===== rd c1 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.Number, err,
+		log.Infof("===== rd c1 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 		if err != nil {
 			paramsRes = &gr.ParamsResC1{
@@ -685,7 +685,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 	// 传输文件
 	{
 		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.Number, sealtasks.TTAddPieceSe, 1))
+		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.ID.Number, sealtasks.TTAddPieceSe, 1))
 		if err != nil {
 			log.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", params.Sector, err)
 			paramsRes.StoragePath = ""
@@ -754,7 +754,7 @@ RESRETURN:
 	//}
 }
 
-func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector abi.SectorID, dest string, removeUnseal bool) error {
+func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector storage.SectorRef, dest string, removeUnseal bool) error {
 
 	// 尝试 开始发送 通过解析p.local来获取NFS ip
 	ip, destPath := transfordata.PareseDestFromePath(dest)
@@ -777,7 +777,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector a
 	start := time.Now()
 	// send FTSealed
 	srcSealedPath := filepath.Join(rw.workerPath, storiface.FTSealed.String()) + "/"
-	src := storiface.SectorName(sector)
+	src := storiface.SectorName(sector.ID)
 	sealedPath := filepath.Join(destPath, storiface.FTSealed.String()) + "/"
 	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcSealedPath, src, ip, sealedPath)
 	code, err := transfordata.SendFile(srcSealedPath, src, sealedPath, ip)
@@ -867,11 +867,11 @@ func getLayersAndTreeCAndTreeDFiles(url string, proofType abi.RegisteredSealProo
 }
 
 // 删除cache中的临时文件
-func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector abi.SectorID, removeUnseal bool) {
+func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector storage.SectorRef, removeUnseal bool) {
 	log.Infof("===== try to remove sector(%+v) from worker", sector)
-	spath := filepath.Join(rw.workerPath, storiface.FTCache.String(), storiface.SectorName(sector))
+	spath := filepath.Join(rw.workerPath, storiface.FTCache.String(), storiface.SectorName(sector.ID))
 
-	files := getLayersAndTreeCAndTreeDFiles(spath, rw.sealer.SealProofType())
+	files := getLayersAndTreeCAndTreeDFiles(spath, sector.ProofType)
 	log.Infof("===== try to remove sector [%+v] from worker--------->delete files:[%+v]", sector, files)
 	for _, file := range files {
 		log.Infof("remove %s", file)
@@ -884,7 +884,7 @@ func (rw *RedisWorker) RemoveLayersAndTreeCAndD(ctx context.Context, sector abi.
 	// 是否删除Unseal文件
 	if removeUnseal {
 		// delete unseal
-		spath = filepath.Join(rw.workerPath, storiface.FTUnsealed.String(), storiface.SectorName(sector))
+		spath = filepath.Join(rw.workerPath, storiface.FTUnsealed.String(), storiface.SectorName(sector.ID))
 		log.Infof("remove %s", spath)
 		if err := os.RemoveAll(spath); err != nil {
 			log.Errorf("removing sector (%v) from %s: %+v", sector, spath, err)

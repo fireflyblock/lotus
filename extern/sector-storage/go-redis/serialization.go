@@ -11,7 +11,7 @@ import (
 
 type ParamsAp struct {
 	//Ctx          context.Context         `json:"ctx"`
-	Sector       abi.SectorID            `json:"sector"`
+	Sector       storage.SectorRef            `json:"sector"`
 	PieceSizes   []abi.UnpaddedPieceSize `json:"piece_sizes"`
 	NewPieceSize abi.UnpaddedPieceSize   `json:"new_piece_size"`
 	FilePath     string                  `json:"file_path"`
@@ -26,7 +26,7 @@ type ParamsResAp struct {
 
 type ParamsP1 struct {
 	//Ctx     context.Context    `json:"ctx"`
-	Sector  abi.SectorID       `json:"sector"`
+	Sector  storage.SectorRef       `json:"sector"`
 	Ticket  abi.SealRandomness `json:"ticket"`
 	Pieces  []abi.PieceInfo    `json:"pieces"`
 	Recover bool               `json:"recover"`
@@ -43,7 +43,7 @@ type PreCommit1RD struct {
 }
 
 type ParamsP2 struct {
-	Sector abi.SectorID          `json:"sector"`
+	Sector storage.SectorRef          `json:"sector"`
 	Pc1o   storage.PreCommit1Out `json:"pc_1_o"`
 }
 
@@ -54,7 +54,7 @@ type ParamsResP2 struct {
 
 type ParamsC1 struct {
 	//Ctx    context.Context
-	Sector   abi.SectorID                  `json:"sector"`
+	Sector   storage.SectorRef                  `json:"sector"`
 	Ticket   abi.SealRandomness            `json:"ticket"`
 	Seed     abi.InteractiveSealRandomness `json:"seed"`
 	Pieces   []abi.PieceInfo               `json:"pieces"`
@@ -70,7 +70,7 @@ type ParamsResC1 struct {
 
 type ParamsC2 struct {
 	//Ctx    context.Context
-	Sector abi.SectorID       `json:"sector"`
+	Sector storage.SectorRef       `json:"sector"`
 	C1o    storage.Commit1Out `json:"c_1_o"`
 }
 

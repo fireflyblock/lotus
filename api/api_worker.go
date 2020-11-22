@@ -28,14 +28,14 @@ type WorkerAPI interface {
 	//Remove(ctx context.Context, sector abi.SectorID) error
 
 	//AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error)
-	AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error)
+	AddPiece(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error)
 
 	storage.Sealer
 
-	MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error
+	MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error
 
-	UnsealPiece(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
-	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
+	UnsealPiece(context.Context, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
+	ReadPiece(context.Context, io.Writer, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
 
 	StorageAddLocal(ctx context.Context, path string) error
 
@@ -44,10 +44,10 @@ type WorkerAPI interface {
 	//SetEnabled(ctx context.Context, enabled bool) error
 	//
 	//Enabled(ctx context.Context) (bool, error)
-	FetchRealData(ctx context.Context, id abi.SectorID) error
-	Fetch(context.Context, abi.SectorID, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error
-	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
-	GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
+	//FetchRealData(ctx context.Context, id storage.SectorRef) error
+	Fetch(context.Context, storage.SectorRef, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error
+	//PushDataToStorage(ctx context.Context, sid storage.SectorRef, dest string) error
+	//GetBindSectors(ctx context.Context) ([]storage.SectorRef, error)
 
 	Closing(context.Context) (<-chan struct{}, error)
 

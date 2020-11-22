@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/go-units"
-	"github.com/filecoin-project/go-state-types/abi"
 	"sync"
 
 	"io/ioutil"
@@ -36,7 +35,6 @@ import (
 	"github.com/filecoin-project/lotus/lib/rpcenc"
 	"github.com/filecoin-project/lotus/node/repo"
 	sectorstorage "github.com/filecoin-project/sector-storage"
-	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 )
@@ -493,18 +491,13 @@ var runCmd = &cli.Command{
 				}
 			}
 
-			sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
-			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"}, abi.SectorSize(sectorSizeInt))
+			//sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
+			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"}, ) //abi.SectorSize(sectorSizeInt)
 			if err != nil {
 				return err
 			}
 
 			// Setup remote sector store
-			spt, err := ffiwrapper.SealProofTypeFromSectorSize(ssize)
-			if err != nil {
-				return xerrors.Errorf("getting proof type: %w", err)
-			}
-
 			sminfo, err := lcli.GetAPIInfo(cctx, repo.StorageMiner)
 			if err != nil {
 				return xerrors.Errorf("could not get api info: %w", err)
@@ -514,15 +507,16 @@ var runCmd = &cli.Command{
 
 			// Create / expose the worker
 
+			//wsts := statestore.New(namespace.Wrap(ds, modules.WorkerCallsPrefix))
+
 			workerApi := &worker{
 				LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
-					SealProof: spt,
 					TaskTypes: taskTypes,
-					NoSwap:    cctx.Bool("no-swap")}, remote, localStore, nodeApi),
+					NoSwap:    cctx.Bool("no-swap"),
+				}, remote, localStore, nodeApi),   //wsts
 				localStore: localStore,
 				ls:         lr,
 			}
-
 			mux := mux.NewRouter()
 
 			log.Info("Setting up control endpoint at " + address)

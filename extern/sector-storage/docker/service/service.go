@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/filecoin-project/specs-storage/storage"
 	"net"
 	"os"
 	"time"
@@ -36,9 +37,9 @@ func (c ConnectServer) ConnectTest(ctx context.Context, in *proto.ConnectRequest
 
 func (s *Server) C2Client(ctx context.Context, in *proto.Request) (*proto.Reply, error) {
 	log.Info("machine Received")
-	message, err := c2.SealCommit2(ctx, abi.SectorID{
-		Miner:  abi.ActorID(in.ActorID),
-		Number: abi.SectorNumber(in.SectorNumber),
+	message, err := c2.SealCommit2(ctx, storage.SectorRef{
+		ID:        abi.SectorID{abi.ActorID(in.ActorID), abi.SectorNumber(in.SectorNumber)},
+		ProofType: abi.RegisteredSealProof(in.ProofType),
 	}, in.Commit1Out)
 
 	if err != nil {

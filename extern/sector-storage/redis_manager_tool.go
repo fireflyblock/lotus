@@ -7,13 +7,14 @@ import (
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/sector-storage/sealtasks"
+	"github.com/filecoin-project/specs-storage/storage"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const CHECK_RES_GAP = time.Minute * 1
-const CHECK_RECOVERY_RES_GAP = time.Minute * 5
+const CHECK_RES_GAP = time.Second * 1
+const CHECK_RECOVERY_RES_GAP = time.Second * 5
 
 var (
 	//DefaultRedisURL = "192.168.20.178:6379"
@@ -396,9 +397,9 @@ func (m *Manager) RecoveryC1(sectorID abi.SectorNumber, c1Field gr.RedisField) *
 	}
 }
 
-func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
+func (m *Manager) SubscribeResult(sectorID storage.SectorRef, taskType sealtasks.TaskType, sealApId uint64) (out abi.PieceInfo, err error) {
 	ticker := &time.Ticker{}
-	switch m.scfg.SealProofType {
+	switch sectorID.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
 		ticker = time.NewTicker(time.Second)
 
@@ -410,7 +411,7 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 	}
 	defer ticker.Stop()
 
-	resField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealApId)
+	resField := gr.SplicingBackupPubAndParamsField(sectorID.ID.Number, taskType, sealApId)
 	timer := time.NewTimer(APWaitTime)
 	start := time.Now()
 
@@ -499,7 +500,7 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 
 			//update taskCount (need lock)
 			defer func() {
-				err = m.FreeTaskCount(hostName, sectorID, taskType, sealApId)
+				err = m.FreeTaskCount(hostName, sectorID.ID.Number, taskType, sealApId)
 				if err != nil {
 					logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
 				}
@@ -510,7 +511,7 @@ func (m *Manager) SubscribeResult(sectorID abi.SectorNumber, taskType sealtasks.
 	}
 }
 
-func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.TaskType, params []byte, sealAPID uint64) (uint64, error) {
+func (m *Manager) PublishTask(sectorID storage.SectorRef, taskType sealtasks.TaskType, params []byte, sealAPID uint64) (uint64, error) {
 	var publishCha string
 	switch taskType {
 	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
@@ -536,7 +537,7 @@ func (m *Manager) PublishTask(sectorID abi.SectorNumber, taskType sealtasks.Task
 
 	//1.1 select worker
 SEACHAGAIN:
-	hostName, err := m.SelectWorker(sectorID, taskType)
+	hostName, err := m.SelectWorker(sectorID.ID.Number, taskType)
 	if err != nil {
 		logrus.SchedLogger.Errorf("===== rd select worker failed, sectorID %+v taskType %+v select worker err: %+v", sectorID, taskType, err)
 		return sealAPID, err
@@ -569,10 +570,10 @@ SEACHAGAIN:
 	logrus.SchedLogger.Infof("===== rd select worker success hostname %+v sectorID %+v taskType %+v", hostName, sectorID, taskType)
 	//update sealAPID
 	if taskType == sealtasks.TTAddPieceSe {
-		sealAPID, err = m.redisCli.IncrSealAPID(sectorID, 1)
+		sealAPID, err = m.redisCli.IncrSealAPID(sectorID.ID.Number, 1)
 	}
 
-	pubField := gr.SplicingBackupPubAndParamsField(sectorID, taskType, sealAPID)
+	pubField := gr.SplicingBackupPubAndParamsField(sectorID.ID.Number, taskType, sealAPID)
 	//1.2 backup params
 	//logrus.SchedLogger.Infof("===== rd backup params ")
 	err = m.redisCli.HSet(gr.PARAMS_NAME, pubField, params)
@@ -594,14 +595,14 @@ SEACHAGAIN:
 	}
 
 	//1.5 update status
-	err = m.UpdateStatus(sectorID, taskType, hostName)
+	err = m.UpdateStatus(sectorID.ID.Number, taskType, hostName)
 	if err != nil {
 		log.Errorf("===== rd update status err", err)
 	}
 
 	//1.6 publish task
 	//logrus.SchedLogger.Infof("===== rd start publish")
-	pubMsg := gr.SplicingPubMessage(sectorID, taskType, hostName, sealAPID)
+	pubMsg := gr.SplicingPubMessage(sectorID.ID.Number, taskType, hostName, sealAPID)
 	_, err = m.redisCli.Publish(publishCha, pubMsg)
 	logrus.SchedLogger.Infof("===== rd publish cha %s msg %+v, sectorID %+v taskType %+v err %+v", publishCha, pubMsg, sectorID, taskType, err)
 	if err != nil {
@@ -614,13 +615,13 @@ SEACHAGAIN:
 	}
 
 	//1.7 update taskCount (need lock)
-	err = m.AddTaskCount(hostName, sectorID, taskType, sealAPID)
+	err = m.AddTaskCount(hostName, sectorID.ID.Number, taskType, sealAPID)
 	if err != nil {
 		return sealAPID, err
 	}
 	//1.8 update p1Counter
 	if taskType == sealtasks.TTPreCommit1 {
-		err = m.AddP1Count(hostName, sectorID, taskType, sealAPID)
+		err = m.AddP1Count(hostName, sectorID.ID.Number, taskType, sealAPID)
 		if err != nil {
 			return sealAPID, err
 		}
@@ -629,7 +630,7 @@ SEACHAGAIN:
 	return sealAPID, nil
 }
 
-func (m *Manager) SubscribeFreeWorker(taskType sealtasks.TaskType, sectorID abi.SectorNumber) (hostName string, err error) {
+func (m *Manager) SubscribeFreeWorker(taskType sealtasks.TaskType, sectorID storage.SectorRef) (hostName string, err error) {
 	ticker := &time.Ticker{}
 	switch taskType {
 	case sealtasks.TTAddPieceSe:
@@ -648,7 +649,7 @@ func (m *Manager) SubscribeFreeWorker(taskType sealtasks.TaskType, sectorID abi.
 
 	logrus.SchedLogger.Infof("===== rd start subscribe free worker, sectorID %+v taskType %+v", sectorID, taskType)
 
-	switch m.scfg.SealProofType {
+	switch sectorID.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
 		ticker = time.NewTicker(time.Minute)
 
@@ -707,29 +708,29 @@ func (m *Manager) SubscribeFreeWorker(taskType sealtasks.TaskType, sectorID abi.
 		//	}
 
 		case <-ticker.C:
-			m.SelectLock(taskType, sectorID)
+			m.SelectLock(taskType, sectorID.ID.Number)
 			logrus.SchedLogger.Infof("===== rd ticker free worker, sectorID %+v taskType %+v", sectorID, taskType)
 			switch taskType {
 			case sealtasks.TTAddPieceSe:
-				hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType), sectorID)
+				hostName, err = m.SeachWorker(gr.ToFieldTaskType(taskType), sectorID.ID.Number)
 				if err != nil {
-					m.SelectUnLock(taskType, sectorID)
+					m.SelectUnLock(taskType, sectorID.ID.Number)
 					continue
 				}
 				if hostName == "" {
-					m.SelectUnLock(taskType, sectorID)
+					m.SelectUnLock(taskType, sectorID.ID.Number)
 					continue
 				}
 				return hostName, nil
 
 			case sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1:
-				hostName, err = m.BindWorker(sectorID, taskType)
+				hostName, err = m.BindWorker(sectorID.ID.Number, taskType)
 				if err != nil {
-					m.SelectUnLock(taskType, sectorID)
+					m.SelectUnLock(taskType, sectorID.ID.Number)
 					continue
 				}
 				if hostName == "" {
-					m.SelectUnLock(taskType, sectorID)
+					m.SelectUnLock(taskType, sectorID.ID.Number)
 					continue
 				}
 				return hostName, nil

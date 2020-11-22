@@ -148,7 +148,8 @@ func (p *path) sectorPath(sid abi.SectorID, fileType storiface.SectorFileType) s
 	return filepath.Join(p.local, fileType.String(), storiface.SectorName(sid))
 }
 
-func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []string, size abi.SectorSize) (*Local, error) {
+//func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []string, size abi.SectorSize) (*Local, error) {
+func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []string) (*Local, error) {
 	l := &Local{
 		localStorage: ls,
 		index:        index,
@@ -156,7 +157,7 @@ func NewLocal(ctx context.Context, ls LocalStorage, index SectorIndex, urls []st
 
 		paths: map[ID]*path{},
 
-		size: size,
+		//size: size,
 	}
 	return l, l.open(ctx)
 }
@@ -384,10 +385,10 @@ func (st *Local) reportStorage(ctx context.Context) {
 }
 
 func (st *Local) Reserve(ctx context.Context, sid storage.SectorRef, ft storiface.SectorFileType, storageIDs storiface.SectorPaths, overheadTab map[storiface.SectorFileType]int) (func(), error) {
-	//ssize, err := sid.ProofType.SectorSize()
-	//if err != nil {
-	//	return nil, err
-	//}
+	ssize, err := sid.ProofType.SectorSize()
+	if err != nil {
+		return nil, err
+	}
 
 	st.localLk.Lock()
 
@@ -418,7 +419,8 @@ func (st *Local) Reserve(ctx context.Context, sid storage.SectorRef, ft storifac
 		overhead := int64(overheadTab[fileType]) * int64(ssize) / storiface.FSOverheadDen
 
 		if stat.Available < overhead {
-			return nil, storiface.Err(storiface.ErrTempAllocateSpace, xerrors.Errorf("can't reserve %d bytes in '%s' (id:%s), only %d available", overhead, p.local, id, stat.Available))
+			//return nil, storiface.Err(storiface.ErrTempAllocateSpace, xerrors.Errorf("can't reserve %d bytes in '%s' (id:%s), only %d available", overhead, p.local, id, stat.Available))
+			return nil, xerrors.Errorf("can't reserve %d bytes in '%s' (id:%s), only %d available", overhead, p.local, id, stat.Available)
 		}
 
 		p.reserved += overhead

@@ -65,8 +65,8 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID storage.SectorRef, 
 	}
 
 	go func() {
-		log.Infof("====== send turnOnCh pledge, sectorID %+v", sectorID.Number)
-		m.turnOnCh <- gr.SplicingBackupPubAndParamsField(sectorID.Number, sealtasks.TTAddPiecePl, 0)
+		log.Infof("====== send turnOnCh pledge, sectorID %+v", sectorID.ID.Number)
+		m.turnOnCh <- gr.SplicingBackupPubAndParamsField(sectorID.ID.Number, sealtasks.TTAddPiecePl, 0)
 	}()
 
 	return out, nil
@@ -203,9 +203,21 @@ func (m *Sealing) RecoverPledgeSector() error {
 				ctx := context.TODO() // we can't use the context from command which invokes
 				// this, as we run everything here async, and it's cancelled when the
 				// command exits
-				size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
+				spt, err := m.currentSealProof(ctx)
+				if err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
 
-				pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
+				size, err := spt.SectorSize()
+				if err != nil {
+					log.Errorf("%+v", err)
+					return
+				}
+
+				//size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
+
+				pieces, err := m.pledgeSector(ctx, m.minerSector(abi.RegisteredSealProof_StackedDrg32GiBV1, sid), []abi.UnpaddedPieceSize{}, abi.PaddedPieceSize(size).Unpadded())
 				if err != nil {
 					//log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
 					//log.Warnf("%+v", err)
@@ -225,7 +237,7 @@ func (m *Sealing) RecoverPledgeSector() error {
 				delete(m.recoverPledgeSectors, sid)
 				m.recoverPledgeLK.Unlock()
 
-				if err := m.newSectorCC(sid, ps); err != nil {
+				if err := m.newSectorCC(ctx, sid, ps); err != nil {
 					log.Errorf("%+v", err)
 					return
 				}

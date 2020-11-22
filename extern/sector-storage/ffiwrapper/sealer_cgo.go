@@ -61,7 +61,7 @@ func (sb *Sealer) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(Reader{}, int64(size))
 }
 
-func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+func (sb *Sealer) AddPiece(ctx context.Context, sector storage.SectorRef, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
 	//func (sb *Sealer) AddPiece(ctx context.Context, sector storage.SectorRef, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data, apType string) (abi.PieceInfo, error) {
 	log.Infof("===== existingPieceSizes:%+v,apType:%+v", existingPieceSizes, apType)
 	var offset abi.UnpaddedPieceSize
@@ -580,7 +580,7 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector storage.SectorRef, pha
 	}
 }
 
-func (sb *Sealer) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+func (sb *Sealer) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) error {
 	log.Info("===== do FinalizeSector skip check keepUnsealed ")
 	//if len(keepUnsealed) > 0 {
 	//	maxPieceSize := abi.PaddedPieceSize(sb.ssize)
@@ -658,7 +658,7 @@ func (sb *Sealer) ReleaseUnsealed(ctx context.Context, sector storage.SectorRef,
 	return xerrors.Errorf("not supported at this layer")
 }
 
-func (sb *Sealer) Remove(ctx context.Context, sector storage.SectorRef) error {
+func (sb *Sealer) Remove(ctx context.Context, sector abi.SectorID) error {
 	return xerrors.Errorf("not supported at this layer") // happens in localworker
 }
 

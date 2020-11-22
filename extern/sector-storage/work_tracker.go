@@ -24,7 +24,7 @@ type workTracker struct {
 	// TODO: done, aggregate stats, queue stats, scheduler feedback
 }
 
-func (wt *workTracker) track(sid abi.SectorID, task sealtasks.TaskType) func() {
+func (wt *workTracker) track(sid storage.SectorRef, task sealtasks.TaskType) func() {
 	wt.lk.Lock()
 	defer wt.lk.Unlock()
 
@@ -33,7 +33,7 @@ func (wt *workTracker) track(sid abi.SectorID, task sealtasks.TaskType) func() {
 
 	wt.running[id] = storiface.WorkerJob{
 		ID:     id,
-		Sector: sid,
+		Sector: sid.ID,
 		Task:   task,
 		Start:  time.Now(),
 	}
@@ -71,67 +71,69 @@ type trackedWorker struct {
 	tracker *workTracker
 }
 
-func (t *trackedWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error) {
+func (t *trackedWorker) SealPreCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error) {
 	defer t.tracker.track(sector, sealtasks.TTPreCommit1)()
 
 	return t.Worker.SealPreCommit1(ctx, sector, ticket, pieces, recover)
 }
 
-func (t *trackedWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, pc1o storage.PreCommit1Out) (storage.SectorCids, error) {
+func (t *trackedWorker) SealPreCommit2(ctx context.Context, sector storage.SectorRef, pc1o storage.PreCommit1Out) (storage.SectorCids, error) {
 	defer t.tracker.track(sector, sealtasks.TTPreCommit2)()
 
 	return t.Worker.SealPreCommit2(ctx, sector, pc1o)
 }
 
-func (t *trackedWorker) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
+func (t *trackedWorker) SealCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error) {
 	defer t.tracker.track(sector, sealtasks.TTCommit1)()
 
 	return t.Worker.SealCommit1(ctx, sector, ticket, seed, pieces, cids)
 }
 
-func (t *trackedWorker) SealCommit2(ctx context.Context, sector abi.SectorID, c1o storage.Commit1Out) (storage.Proof, error) {
+func (t *trackedWorker) SealCommit2(ctx context.Context, sector storage.SectorRef, c1o storage.Commit1Out) (storage.Proof, error) {
 	defer t.tracker.track(sector, sealtasks.TTCommit2)()
 
 	return t.Worker.SealCommit2(ctx, sector, c1o)
 }
 
-func (t *trackedWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+func (t *trackedWorker) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) error {
 	defer t.tracker.track(sector, sealtasks.TTFinalize)()
 
 	return t.Worker.FinalizeSector(ctx, sector, keepUnsealed)
 }
 
-/*func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) {
+/*func (t *trackedWorker) AddPiece(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) {
 	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
 
 	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData, apType)
 }*/
 
-func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+func (t *trackedWorker) AddPiece(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
 	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
 
 	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName, apType)
 }
-func (t *trackedWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
-	return t.Worker.PushDataToStorage(ctx, sid, dest)
-}
 
-func (t *trackedWorker) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
-	return t.Worker.GetBindSectors(ctx)
-}
-func (t *trackedWorker) Fetch(ctx context.Context, s abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
+//func (t *trackedWorker) PushDataToStorage(ctx context.Context, sid storage.SectorRef, dest string) error {
+//	return t.Worker.PushDataToStorage(ctx, sid, dest)
+//}
+
+//func (t *trackedWorker) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
+//	return t.Worker.GetBindSectors(ctx)
+//}
+
+func (t *trackedWorker) Fetch(ctx context.Context, s storage.SectorRef, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
 	defer t.tracker.track(s, sealtasks.TTFetch)()
 
 	return t.Worker.Fetch(ctx, s, ft, ptype, am)
 }
 
-func (t *trackedWorker) UnsealPiece(ctx context.Context, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, cid cid.Cid) error {
+func (t *trackedWorker) UnsealPiece(ctx context.Context, id storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, cid cid.Cid) error {
 	defer t.tracker.track(id, sealtasks.TTUnseal)()
 
 	return t.Worker.UnsealPiece(ctx, id, index, size, randomness, cid)
 }
 
-func (t *trackedWorker) ReadPiece(ctx context.Context, writer io.Writer, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+func (t *trackedWorker) ReadPiece(ctx context.Context, writer io.Writer, id storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
 	defer t.tracker.track(id, sealtasks.TTReadUnsealed)()
 
 	return t.Worker.ReadPiece(ctx, writer, id, index, size)

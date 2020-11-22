@@ -59,6 +59,11 @@ func (w *worker) Enabled(ctx context.Context) (bool, error) {
 	return atomic.LoadInt64(&w.disabled) == 0, nil
 }
 
+//func (w *worker) MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error {
+//	r.closer()
+//	return nil
+//}
+
 //func (w *worker) WaitQuiet(ctx context.Context) error {
 //	w.LocalWorker.WaitQuiet() // uses WaitGroup under the hood so no ctx :/
 //	return nil

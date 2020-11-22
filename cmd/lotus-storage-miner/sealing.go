@@ -230,7 +230,7 @@ var sealingWorkersCmd = &cli.Command{
 //
 //			_, _ = fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
 //				hex.EncodeToString(l.ID.ID[:4]),
-//				l.Sector.Number,
+//				l.sector.ID.Number,
 //				hex.EncodeToString(l.wid[:4]),
 //				hostname,
 //				l.Task.Short(),
@@ -313,7 +313,7 @@ var sealingSchedDiagCmd = &cli.Command{
 //			return xerrors.Errorf("job with specified id prefix not found")
 //		}
 //
-//		fmt.Printf("aborting job %s, task %s, sector %d, running on host %s\n", job.ID.String(), job.Task.Short(), job.Sector.Number, job.Hostname)
+//		fmt.Printf("aborting job %s, task %s, sector %d, running on host %s\n", job.ID.String(), job.Task.Short(), job.sector.ID.Number, job.Hostname)
 //
 //		return nodeApi.SealingAbort(ctx, job.ID)
 //	},

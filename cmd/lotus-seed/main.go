@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/docker/go-units"
-	"github.com/filecoin-project/sector-storage/ffiwrapper"
+	//"github.com/filecoin-project/sector-storage/ffiwrapper"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
@@ -129,10 +129,14 @@ var preSealCmd = &cli.Command{
 		}
 		sectorSize := abi.SectorSize(sectorSizeInt)
 
+		fmt.Println("1 ================= ", sectorSize)
+
 		spt, err := miner.SealProofTypeFromSectorSize(sectorSize, build.NewestNetworkVersion)
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("2 ================= ", spt, err)
 
 		gm, key, err := seed.PreSeal(maddr, spt, abi.SectorNumber(c.Uint64("sector-offset")), c.Int("num-sectors"), sbroot, []byte(c.String("ticket-preimage")), k, c.Bool("fake-sectors"))
 		if err != nil {

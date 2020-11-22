@@ -366,25 +366,25 @@ type WorkerStruct struct {
 		Paths     func(context.Context) ([]stores.StoragePath, error)            `perm:"admin"`
 		Info      func(context.Context) (storiface.WorkerInfo, error)            `perm:"admin"`
 
-		//AddPiece func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) `perm:"admin"`
-		AddPiece        func(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) `perm:"admin"`
-		SealPreCommit1  func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error)                                                 `perm:"admin"`
-		SealPreCommit2  func(context.Context, abi.SectorID, storage.PreCommit1Out) (cids storage.SectorCids, err error)                                                                                                `perm:"admin"`
-		SealCommit1     func(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error)     `perm:"admin"`
-		SealCommit2     func(context.Context, abi.SectorID, storage.Commit1Out) (storage.Proof, error)                                                                                                                 `perm:"admin"`
-		FinalizeSector  func(context.Context, abi.SectorID, []storage.Range) error                                                                                                                                     `perm:"admin"`
-		ReleaseUnsealed func(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error                                                                                                               `perm:"admin"`
-		Remove          func(ctx context.Context, sector abi.SectorID) error                                                                                                                                           `perm:"admin"`
-		MoveStorage     func(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error                                                                                                           `perm:"admin"`
-		StorageAddLocal func(ctx context.Context, path string) error                                                                                                                                                   `perm:"admin"`
+		//AddPiece func(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data, apType string) (abi.PieceInfo, error) `perm:"admin"`
+		AddPiece        func(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) `perm:"admin"`
+		SealPreCommit1  func(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (storage.PreCommit1Out, error)                                                 `perm:"admin"`
+		SealPreCommit2  func(context.Context, storage.SectorRef, storage.PreCommit1Out) (cids storage.SectorCids, err error)                                                                                                `perm:"admin"`
+		SealCommit1     func(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (storage.Commit1Out, error)     `perm:"admin"`
+		SealCommit2     func(context.Context, storage.SectorRef, storage.Commit1Out) (storage.Proof, error)                                                                                                                 `perm:"admin"`
+		FinalizeSector  func(context.Context, storage.SectorRef, []storage.Range) error                                                                                                                                     `perm:"admin"`
+		ReleaseUnsealed func(ctx context.Context, sector storage.SectorRef, safeToFree []storage.Range) error                                                                                                               `perm:"admin"`
+		Remove          func(ctx context.Context, sector abi.SectorID) error                                                                                                                                                `perm:"admin"`
+		MoveStorage     func(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error                                                                                                           `perm:"admin"`
+		StorageAddLocal func(ctx context.Context, path string) error                                                                                                                                                        `perm:"admin"`
 
-		UnsealPiece func(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
-		ReadPiece   func(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)           `perm:"admin"`
+		UnsealPiece func(context.Context, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error `perm:"admin"`
+		ReadPiece   func(context.Context, io.Writer, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)           `perm:"admin"`
 
-		FetchRealData     func(ctx context.Context, id abi.SectorID) error                                                               `perm:"admin"`
-		Fetch             func(context.Context, abi.SectorID, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error `perm:"admin"`
-		PushDataToStorage func(ctx context.Context, sid abi.SectorID, dest string) error                                                 `perm:"admin"`
-		GetBindSectors    func(ctx context.Context) ([]abi.SectorID, error)                                                              `perm:"admin"`
+		//FetchRealData     func(ctx context.Context, id storage.SectorRef) error                                                               `perm:"admin"`
+		Fetch             func(context.Context, storage.SectorRef, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error `perm:"admin"`
+		//PushDataToStorage func(ctx context.Context, sid storage.SectorRef, dest string) error                                                 `perm:"admin"`
+		//GetBindSectors    func(ctx context.Context) ([]storage.SectorRef, error)                                                              `perm:"admin"`
 
 		Closing func(context.Context) (<-chan struct{}, error) `perm:"admin"`
 	}
@@ -1485,7 +1485,7 @@ func (w *WorkerStruct) Info(ctx context.Context) (storiface.WorkerInfo, error) {
 //	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName)
 //}
 
-func (w *WorkerStruct) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apTtype string) (abi.PieceInfo, error) {
+func (w *WorkerStruct) AddPiece(ctx context.Context, sector storage.SectorRef, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, filePath string, fileName string, apTtype string) (abi.PieceInfo, error) {
 	return w.Internal.AddPiece(ctx, sector, pieceSizes, newPieceSize, filePath, fileName, apTtype)
 }
 
@@ -1533,15 +1533,15 @@ func (w *WorkerStruct) ReadPiece(ctx context.Context, writer io.Writer, sector s
 	return w.Internal.ReadPiece(ctx, writer, sector, index, size)
 }
 
-func (w *WorkerStruct) FetchRealData(ctx context.Context, sector storage.SectorRef) error {
-	return w.Internal.FetchRealData(ctx, sector)
-}
-func (w *WorkerStruct) PushDataToStorage(ctx context.Context, sid storage.SectorRef, dest string) error {
-	return w.Internal.PushDataToStorage(ctx, sid, dest)
-}
-func (w *WorkerStruct) GetBindSectors(ctx context.Context) ([]abi.SectorID, error) {
-	return w.Internal.GetBindSectors(ctx)
-}
+//func (w *WorkerStruct) FetchRealData(ctx context.Context, sector storage.SectorRef) error {
+//	return w.Internal.FetchRealData(ctx, sector)
+//}
+//func (w *WorkerStruct) PushDataToStorage(ctx context.Context, sid storage.SectorRef, dest string) error {
+//	return w.Internal.PushDataToStorage(ctx, sid, dest)
+//}
+//func (w *WorkerStruct) GetBindSectors(ctx context.Context) ([]storage.SectorRef, error) {
+//	return w.Internal.GetBindSectors(ctx)
+//}
 func (w *WorkerStruct) Fetch(ctx context.Context, sector storage.SectorRef, fileType storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
 	return w.Internal.Fetch(ctx, sector, fileType, ptype, am)
 }

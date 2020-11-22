@@ -428,7 +428,7 @@ func TestSched(t *testing.T) {
 		return func(t *testing.T, s *scheduler, index *stores.Index, meta *runMeta) {
 			time.Sleep(20 * time.Millisecond)
 			for _, request := range s.diag().Requests {
-				log.Infof("!!! sDIAG: sid(%d) task(%s)", request.Sector.Number, request.TaskType)
+				log.Infof("!!! sDIAG: sid(%d) task(%s)", request.sector.ID.Number, request.TaskType)
 			}
 
 			wj := (&Manager{sched: s}).WorkerJobs()
@@ -458,7 +458,7 @@ func TestSched(t *testing.T) {
 			})
 
 			for _, l := range lines {
-				log.Infof("!!! wDIAG: rw(%d) sid(%d) t(%s)", l.RunWait, l.Sector.Number, l.Task)
+				log.Infof("!!! wDIAG: rw(%d) sid(%d) t(%s)", l.RunWait, l.sector.ID.Number, l.Task)
 			}
 		}
 	}

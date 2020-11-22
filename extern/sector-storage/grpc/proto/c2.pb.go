@@ -36,6 +36,7 @@ type Request struct {
 
 	ActorID      uint64 `protobuf:"varint,1,opt,name=actorID,proto3" json:"actorID,omitempty"`
 	SectorNumber uint64 `protobuf:"varint,2,opt,name=SectorNumber,proto3" json:"SectorNumber,omitempty"`
+	ProofType    int64  `protobuf:"varint,4,opt,name=ProofType,proto3" json:"ProofType,omitempty"`
 	Commit1Out   []byte `protobuf:"bytes,3,opt,name=commit1Out,proto3" json:"commit1Out,omitempty"`
 }
 

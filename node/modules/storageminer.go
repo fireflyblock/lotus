@@ -49,7 +49,7 @@ import (
 	"github.com/filecoin-project/go-storedcounter"
 
 	"github.com/filecoin-project/lotus/api"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
+	sectorstorage "github.com/filecoin-project/sector-storage"
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/stores"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
@@ -102,7 +102,7 @@ func GetParams(spt abi.RegisteredSealProof) error {
 	//	return xerrors.Errorf("fetching proof parameters: %w", err)
 	//}
 	//
-	//return nil
+	return nil
 }
 
 func MinerAddress(ds dtypes.MetadataDS) (dtypes.MinerAddress, error) {

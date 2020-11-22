@@ -18,7 +18,7 @@ import (
 	ffi "github.com/filecoin-project/filecoin-ffi"
 	"github.com/filecoin-project/go-state-types/abi"
 	logrus "github.com/filecoin-project/sector-storage/log"
-	storage2 "github.com/filecoin-project/specs-storage/storage"
+	"github.com/filecoin-project/specs-storage/storage"
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/sealtasks"
@@ -38,7 +38,7 @@ type WorkerConfig struct {
 }
 
 type LocalWorker struct {
-	scfg       *ffiwrapper.Config
+	//scfg       *ffiwrapper.Config
 	storage    stores.Store
 	localStore *stores.Local
 	sindex     stores.SectorIndex
@@ -63,9 +63,9 @@ func NewLocalWorker(wcfg WorkerConfig, store stores.Store, local *stores.Local, 
 	}
 
 	return &LocalWorker{
-		scfg: &ffiwrapper.Config{
-			SealProofType: wcfg.SealProof,
-		},
+		//scfg: &ffiwrapper.Config{
+		//	SealProofType: wcfg.SealProof,
+		//},
 		storage:    store,
 		localStore: local,
 		sindex:     sindex,
@@ -86,17 +86,17 @@ func GrpcInit() {
 	docker.Init()
 }
 
-func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing storiface.SectorFileType, allocate storiface.SectorFileType, sealing storiface.PathType) (storiface.SectorPaths, func(), error) {
-	ssize, err := l.w.scfg.SealProofType.SectorSize()
-	if err != nil {
-		return storiface.SectorPaths{}, nil, err
-	}
-	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, ssize, existing, allocate, sealing, l.op)
+func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector storage.SectorRef, existing storiface.SectorFileType, allocate storiface.SectorFileType, sealing storiface.PathType) (storiface.SectorPaths, func(), error) {
+	//ssize, err := l.w.scfg.SealProofType.SectorSize()
+	//if err != nil {
+	//	return storiface.SectorPaths{}, nil, err
+	//}
+	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, existing, allocate, sealing, l.op)
 	if err != nil {
 		return storiface.SectorPaths{}, nil, err
 	}
 
-	releaseStorage, err := l.w.localStore.Reserve(ctx, sector, ssize, allocate, storageIDs, storiface.FSOverheadSeal)
+	releaseStorage, err := l.w.localStore.Reserve(ctx, sector, allocate, storageIDs, storiface.FSOverheadSeal)
 	if err != nil {
 		return storiface.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
 	}
@@ -113,7 +113,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 
 			sid := storiface.PathByType(storageIDs, fileType)
 
-			if err := l.w.sindex.StorageDeclareSector(ctx, stores.ID(sid), sector, fileType, l.op == storiface.AcquireMove); err != nil {
+			if err := l.w.sindex.StorageDeclareSector(ctx, stores.ID(sid), sector.ID, fileType, l.op == storiface.AcquireMove); err != nil {
 				log.Errorf("declare sector error: %+v", err)
 			}
 		}
@@ -121,10 +121,11 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 }
 
 func (l *LocalWorker) sb() (ffiwrapper.Storage, error) {
-	return ffiwrapper.New(&localWorkerPathProvider{w: l}, l.scfg)
+	//ffiwrapper.New(&localWorkerPathProvider{w: l}, l.scfg)
+	return ffiwrapper.New(&localWorkerPathProvider{w: l})
 }
 
-func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error {
+func (l *LocalWorker) NewSector(ctx context.Context, sector storage.SectorRef) error {
 	sb, err := l.sb()
 	if err != nil {
 		return err
@@ -158,7 +159,7 @@ func (l *LocalWorker) AddPiece1(ctx context.Context, sector abi.SectorID, epcs [
 	return abi.PieceInfo{}, nil
 }
 
-func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
+func (l *LocalWorker) Fetch(ctx context.Context, sector storage.SectorRef, fileType storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error {
 	_, done, err := (&localWorkerPathProvider{w: l, op: am}).AcquireSector(ctx, sector, fileType, storiface.FTNone, ptype)
 	if err != nil {
 		return err
@@ -167,15 +168,15 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 	return nil
 }
 
-func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage2.PreCommit1Out, err error) {
+func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
 	if !recover {
 		{
 			// cleanup previous failed attempts if they exist
-			if err := l.storage.Remove(ctx, sector, storiface.FTSealed, true); err != nil {
+			if err := l.storage.Remove(ctx, sector.ID, storiface.FTSealed, true); err != nil {
 				return nil, xerrors.Errorf("cleaning up sealed data: %w", err)
 			}
 
-			if err := l.storage.Remove(ctx, sector, storiface.FTCache, true); err != nil {
+			if err := l.storage.Remove(ctx, sector.ID, storiface.FTCache, true); err != nil {
 				return nil, xerrors.Errorf("cleaning up cache data: %w", err)
 			}
 		}
@@ -188,7 +189,7 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 
 	// check disk size
 	for {
-		if l.CheckCanDoTaskByAvaliableDisk(sector, 2) {
+		if l.CheckCanDoTaskByAvaliableDisk(sector.ID, 2) {
 			break
 		}
 		log.Warnf("Disk avaliable size is low, and can not do p1 for sector(%+v)", sector)
@@ -205,15 +206,15 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 	//	return sb.SealPreCommit1(ctx, sector, ticket, pieces)
 }
 
-func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.PreCommit1Out) (cids storage2.SectorCids, err error) {
+func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector storage.SectorRef, phase1Out storage.PreCommit1Out) (cids storage.SectorCids, err error) {
 	sb, err := l.sb()
 	if err != nil {
-		return storage2.SectorCids{}, err
+		return storage.SectorCids{}, err
 	}
 
 	// check disk size
 	for {
-		if l.CheckCanDoTaskByAvaliableDisk(sector, 3) {
+		if l.CheckCanDoTaskByAvaliableDisk(sector.ID, 3) {
 			break
 		}
 		log.Warnf("Disk avaliable size is low, and can not do p2 for sector(%+v)", sector)
@@ -228,7 +229,7 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 	//return sb.SealPreCommit2(ctx, sector, phase1Out)
 }
 
-func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage2.SectorCids) (output storage2.Commit1Out, err error) {
+func (l *LocalWorker) SealCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (output storage.Commit1Out, err error) {
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err
@@ -253,22 +254,22 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 	目的：worker直接写入文件到存储机器，并且创建sector索引
 	注意点：通过这个方法传输文件，则不使用FetchRealData来拉取数据
 */
-func (l *LocalWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
-	// 根据C2是否为存在C2类型来判断worker是否是做deal订单的机器
-	var isDealWorker bool
-	_, ok := l.acceptTasks[sealtasks.TTCommit2]
-	if !ok {
-		isDealWorker = true
-		log.Infof("===== I am deal worker....")
-	} else {
-		isDealWorker = false
-		log.Infof("===== I am normal worker....")
-	}
-	return l.localStore.TransforDataToStorageServer(ctx, sid, l.scfg.SealProofType, dest, isDealWorker)
-}
+//func (l *LocalWorker) PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error {
+//	// 根据C2是否为存在C2类型来判断worker是否是做deal订单的机器
+//	var isDealWorker bool
+//	_, ok := l.acceptTasks[sealtasks.TTCommit2]
+//	if !ok {
+//		isDealWorker = true
+//		log.Infof("===== I am deal worker....")
+//	} else {
+//		isDealWorker = false
+//		log.Infof("===== I am normal worker....")
+//	}
+//	return l.localStore.TransforDataToStorageServer(ctx, sid, l.scfg.SealProofType, dest, isDealWorker)
+//}
 
 // this method can only called by worker0
-func (l *LocalWorker) FetchRealData(ctx context.Context, sector abi.SectorID) error {
+func (l *LocalWorker) FetchRealData(ctx context.Context, sector storage.SectorRef) error {
 	//logrus.SchedLogger.Infof("===== before to do SealCommit2 for sector [%v], delete remote workers' cache layer and tree_d and tree_c files",
 	//	sector)
 	//l.storage.RemoveLayersAndTreeCAndD(ctx,sector,l.scfg.SealProofType,stores.FTCache)
@@ -281,7 +282,7 @@ func (l *LocalWorker) FetchRealData(ctx context.Context, sector abi.SectorID) er
 	return nil
 }
 
-func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.Commit1Out) (proof storage2.Proof, err error) {
+func (l *LocalWorker) SealCommit2(ctx context.Context, sector storage.SectorRef, phase1Out storage.Commit1Out) (proof storage.Proof, err error) {
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err
@@ -296,7 +297,7 @@ func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phas
 	//return sb.SealCommit2(ctx, sector, phase1Out)
 }
 
-func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage2.Range) error {
+func (l *LocalWorker) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) error {
 	sb, err := l.sb()
 	if err != nil {
 		return err
@@ -307,7 +308,7 @@ func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, k
 	}
 
 	if len(keepUnsealed) == 0 {
-		if err := l.storage.Remove(ctx, sector, storiface.FTUnsealed, true); err != nil {
+		if err := l.storage.Remove(ctx, sector.ID, storiface.FTUnsealed, true); err != nil {
 			return xerrors.Errorf("removing unsealed data: %w", err)
 		}
 	}
@@ -315,7 +316,7 @@ func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, k
 	return nil
 }
 
-func (l *LocalWorker) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage2.Range) error {
+func (l *LocalWorker) ReleaseUnsealed(ctx context.Context, sector storage.SectorRef, safeToFree []storage.Range) error {
 	return xerrors.Errorf("implement me")
 }
 
@@ -335,19 +336,19 @@ func (l *LocalWorker) Remove(ctx context.Context, sector abi.SectorID) error {
 	return err
 }
 
-func (l *LocalWorker) MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error {
-	ssize, err := l.scfg.SealProofType.SectorSize()
-	if err != nil {
-		return err
-	}
-	if err := l.storage.MoveStorage(ctx, sector, ssize, types); err != nil {
+func (l *LocalWorker) MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error {
+	//ssize, err := l.scfg.SealProofType.SectorSize()
+	//if err != nil {
+	//	return err
+	//}
+	if err := l.storage.MoveStorage(ctx, sector, types); err != nil {
 		return xerrors.Errorf("moving sealed data to storage: %w", err)
 	}
 
 	return nil
 }
 
-func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, cid cid.Cid) error {
+func (l *LocalWorker) UnsealPiece(ctx context.Context, sector storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, randomness abi.SealRandomness, cid cid.Cid) error {
 	sb, err := l.sb()
 	if err != nil {
 		return err
@@ -357,18 +358,18 @@ func (l *LocalWorker) UnsealPiece(ctx context.Context, sector abi.SectorID, inde
 		return xerrors.Errorf("unsealing sector: %w", err)
 	}
 
-	if err := l.storage.RemoveCopies(ctx, sector, storiface.FTSealed); err != nil {
+	if err := l.storage.RemoveCopies(ctx, sector.ID, storiface.FTSealed); err != nil {
 		return xerrors.Errorf("removing source data: %w", err)
 	}
 
-	if err := l.storage.RemoveCopies(ctx, sector, storiface.FTCache); err != nil {
+	if err := l.storage.RemoveCopies(ctx, sector.ID, storiface.FTCache); err != nil {
 		return xerrors.Errorf("removing source data: %w", err)
 	}
 
 	return nil
 }
 
-func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+func (l *LocalWorker) ReadPiece(ctx context.Context, writer io.Writer, sector storage.SectorRef, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
 	sb, err := l.sb()
 	if err != nil {
 		return false, err
@@ -557,7 +558,7 @@ func (l *LocalWorker) Close() error {
 	return nil
 }
 
-func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath, fileName, apType string) (abi.PieceInfo, error) {
+func (l *LocalWorker) AddPiece(ctx context.Context, sector storage.SectorRef, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath, fileName, apType string) (abi.PieceInfo, error) {
 	sb, err := l.sb()
 	if err != nil {
 		return abi.PieceInfo{}, err
@@ -565,10 +566,10 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 
 	// check disk size
 	for {
-		if l.CheckCanDoTaskByAvaliableDisk(sector, 1) {
+		if l.CheckCanDoTaskByAvaliableDisk(sector.ID, 1) {
 			break
 		}
-		log.Warnf("Disk avaliable size is low, and can not do addpiece for sector(%+v)", sector)
+		log.Warnf("Disk avaliable size is low, and can not do addpiece for sector(%+v)", sector.ID)
 		time.Sleep(time.Minute * 5)
 	}
 

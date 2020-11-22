@@ -2,13 +2,15 @@ package impl
 
 import (
 	"context"
+	"github.com/filecoin-project/sector-storage/storiface"
+	"github.com/filecoin-project/specs-storage/storage"
 	"net/http"
 
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-jsonrpc/auth"
-	"github.com/filecoin-project/go-state-types/abi"
+	//"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -20,7 +22,7 @@ type remoteWorker struct {
 	closer jsonrpc.ClientCloser
 }
 
-func (r *remoteWorker) NewSector(ctx context.Context, sector abi.SectorID) error {
+func (r *remoteWorker) NewSector(ctx context.Context, sector storage.SectorRef) error {
 	return xerrors.New("unsupported")
 }
 
@@ -42,6 +44,11 @@ func connectRemoteWorker(ctx context.Context, fa api.Common, url string) (*remot
 }
 
 func (r *remoteWorker) Close() error {
+	r.closer()
+	return nil
+}
+
+func (r *remoteWorker) MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error {
 	r.closer()
 	return nil
 }

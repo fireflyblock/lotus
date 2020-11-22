@@ -37,14 +37,14 @@ type URLs []string
 type Worker interface {
 	ffiwrapper.StorageSealer
 
-	MoveStorage(ctx context.Context, sector abi.SectorID, types storiface.SectorFileType) error
+	MoveStorage(ctx context.Context, sector storage.SectorRef, types storiface.SectorFileType) error
 
 	// FetchRealData get real useful data
-	FetchRealData(ctx context.Context, id abi.SectorID) error
+	//FetchRealData(ctx context.Context, id storage.SectorRef) error
 
-	Fetch(ctx context.Context, s abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error
-	UnsealPiece(context.Context, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
-	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
+	Fetch(ctx context.Context, s storage.SectorRef, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) error
+	UnsealPiece(context.Context, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
+	ReadPiece(context.Context, io.Writer, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)
 
 	TaskTypes(context.Context) (map[sealtasks.TaskType]struct{}, error)
 
@@ -57,18 +57,16 @@ type Worker interface {
 	Closing(context.Context) (<-chan struct{}, error)
 
 	// worker push sealed data to Storage
-	PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
+	//PushDataToStorage(ctx context.Context, sid abi.SectorID, dest string) error
 
 	// init get worker bind sectors
-	GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
+	//GetBindSectors(ctx context.Context) ([]abi.SectorID, error)
 
 	Close() error
 }
 
 type SectorManager interface {
-	SectorSize() abi.SectorSize
-
-	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
+	ReadPiece(context.Context, io.Writer, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
 
 	ffiwrapper.StorageSealer
 	storage.Prover
@@ -78,7 +76,7 @@ type SectorManager interface {
 type WorkerID uint64
 
 type Manager struct {
-	scfg *ffiwrapper.Config
+	//scfg *ffiwrapper.Config
 
 	ls         stores.LocalStorage
 	storage    *stores.Remote
@@ -111,15 +109,15 @@ type SealerConfig struct {
 
 type StorageAuth http.Header
 
-func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg *ffiwrapper.Config, sc SealerConfig, urls URLs, sa StorageAuth) (*Manager, error) {
+func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, sc SealerConfig, urls URLs, sa StorageAuth) (*Manager, error) {
 	logrus.Init()
-	sectorSize, _ := cfg.SealProofType.SectorSize()
-	lstor, err := stores.NewLocal(ctx, ls, si, urls, sectorSize)
+	//sectorSize, _ := cfg.SealProofType.SectorSize()
+	lstor, err := stores.NewLocal(ctx, ls, si, urls)
 	if err != nil {
 		return nil, err
 	}
 
-	prover, err := ffiwrapper.New(&readonlyProvider{stor: lstor, index: si}, cfg)
+	prover, err := ffiwrapper.New(&readonlyProvider{stor: lstor, index: si})
 	if err != nil {
 		return nil, xerrors.Errorf("creating prover instance: %w", err)
 	}
@@ -127,15 +125,13 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	stor := stores.NewRemote(lstor, si, http.Header(sa), sc.ParallelFetchLimit)
 
 	m := &Manager{
-		scfg: cfg,
-
 		ls:              ls,
 		storage:         stor,
 		localStore:      lstor,
 		remoteHnd:       &stores.FetchHandler{Local: lstor},
 		index:           si,
 		isExistSealTask: true,
-		sched:           newScheduler(cfg.SealProofType),
+		sched: newScheduler(),
 
 		Prover: prover,
 
@@ -196,7 +192,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	}
 
 	err = m.AddWorker(ctx, NewLocalWorker(WorkerConfig{
-		SealProof: cfg.SealProofType,
+		//SealProof: cfg.SealProofType,
 		TaskTypes: localTasks,
 	}, stor, lstor, si))
 	if err != nil {
@@ -250,25 +246,6 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		logrus.SchedLogger.Infof("===== c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
 	}
 
-	// 获取woeker做过的任务，并且建立绑定
-	sectors, err := w.GetBindSectors(ctx)
-	if err != nil {
-		logrus.SchedLogger.Errorf("init worker init Bind sectors err :%+v", err)
-	}
-	logrus.SchedLogger.Infof("init worker %s,Bind sectors:%+v", info.Hostname, sectors)
-	for _, sid := range sectors {
-		// 随便给的一个状态不知道是否正确
-		tr := m.getTaskRecord(sid)
-		taskRd := tr.(sectorTaskRecord)
-
-		if taskRd.taskStatus != 0 {
-			logrus.SchedLogger.Infof("sector(%+v) bind ralationship is exist....", sid)
-			continue
-		}
-		taskRd.taskStatus = 0
-		taskRd.workerFortask = info.Hostname
-		m.sched.taskRecorder.Store(sid, taskRd)
-	}
 
 	m.sched.newWorkers <- &workerHandle{
 		w: w,
@@ -290,34 +267,34 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.remoteHnd.ServeHTTP(w, r)
 }
 
-func (m *Manager) SectorSize() abi.SectorSize {
-	sz, _ := m.scfg.SealProofType.SectorSize()
-	return sz
-}
+//func (m *Manager) SectorSize() abi.SectorSize {
+//	sz, _ := m.scfg.SealProofType.SectorSize()
+//	return sz
+//}
 
 func schedNop(context.Context, Worker) error {
 	return nil
 }
 
-func schedFetch(sector abi.SectorID, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) func(context.Context, Worker) error {
+func schedFetch(sector storage.SectorRef, ft storiface.SectorFileType, ptype storiface.PathType, am storiface.AcquireMode) func(context.Context, Worker) error {
 	return func(ctx context.Context, worker Worker) error {
 		return worker.Fetch(ctx, sector, ft, ptype, am)
 	}
 }
 
-func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (foundUnsealed bool, readOk bool, selector WorkerSelector, returnErr error) {
+func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sector storage.SectorRef, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (foundUnsealed bool, readOk bool, selector WorkerSelector, returnErr error) {
 
 	// acquire a lock purely for reading unsealed sectors
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTUnsealed, storiface.FTNone); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTUnsealed, storiface.FTNone); err != nil {
 		returnErr = xerrors.Errorf("acquiring read sector lock: %w", err)
 		return
 	}
 
 	// passing 0 spt because we only need it when allowFetch is true
-	best, err := m.index.StorageFindSector(ctx, sector, storiface.FTUnsealed, 0, false)
+	best, err := m.index.StorageFindSector(ctx, sector.ID, storiface.FTUnsealed, 0, false)
 	if err != nil {
 		returnErr = xerrors.Errorf("read piece: checking for already existing unsealed sector: %w", err)
 		return
@@ -327,7 +304,7 @@ func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sect
 	if foundUnsealed { // append to existing
 		// There is unsealed sector, see if we can read from it
 
-		selector = newExistingSelector(m.index, sector, storiface.FTUnsealed, false)
+		selector = newExistingSelector(m.index, sector.ID, storiface.FTUnsealed, false)
 
 		err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, storiface.FTUnsealed, storiface.PathSealing, storiface.AcquireMove), func(ctx context.Context, w Worker) error {
 			readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
@@ -342,7 +319,7 @@ func (m *Manager) tryReadUnsealedPiece(ctx context.Context, sink io.Writer, sect
 	return
 }
 
-func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.SectorID, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, ticket abi.SealRandomness, unsealed cid.Cid) error {
+func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector storage.SectorRef, offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize, ticket abi.SealRandomness, unsealed cid.Cid) error {
 	foundUnsealed, readOk, selector, err := m.tryReadUnsealedPiece(ctx, sink, sector, offset, size)
 	if err != nil {
 		return err
@@ -353,7 +330,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed|storiface.FTCache, storiface.FTUnsealed); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTSealed|storiface.FTCache, storiface.FTUnsealed); err != nil {
 		return xerrors.Errorf("acquiring unseal sector lock: %w", err)
 	}
 
@@ -380,7 +357,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 		return err
 	}
 
-	selector = newExistingSelector(m.index, sector, storiface.FTUnsealed, false)
+	selector = newExistingSelector(m.index, sector.ID, storiface.FTUnsealed, false)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, storiface.FTUnsealed, storiface.PathSealing, storiface.AcquireMove), func(ctx context.Context, w Worker) error {
 		readOk, err = w.ReadPiece(ctx, sink, sector, offset, size)
@@ -397,17 +374,17 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	return nil
 }
 
-func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
+func (m *Manager) NewSector(ctx context.Context, sector storage.SectorRef) error {
 	logrus.SchedLogger.Warnf("stub NewSector")
 	return nil
 }
 
-func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
+func (m *Manager) AddPiece(ctx context.Context, sector storage.SectorRef, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, filePath string, fileName string, apType string) (abi.PieceInfo, error) {
 	//func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader, apType string) (abi.PieceInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTNone, storiface.FTUnsealed); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTNone, storiface.FTUnsealed); err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -430,43 +407,43 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		//"_seal", "_filPledgeToDealSector":
 		tt = sealtasks.TTAddPieceSe
 		//1.publish
-		currentSealApId, err := m.PublishTask(sector.Number, tt, apInfo, 1)
+		currentSealApId, err := m.PublishTask(sector, tt, apInfo, 1)
 		if err != nil {
 			return out, err
 		}
-		return m.SubscribeResult(sector.Number, tt, currentSealApId)
+		return m.SubscribeResult(sector, tt, currentSealApId)
 
 	case "_pledgeSector":
 		tt = sealtasks.TTAddPiecePl
 		//checkout
-		pubField := gr.SplicingBackupPubAndParamsField(sector.Number, tt, 0)
-		res := m.RecoveryPledge(sector.Number, pubField)
+		pubField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, tt, 0)
+		res := m.RecoveryPledge(sector.ID.Number, pubField)
 		if res != nil {
 			if res.Err == "" {
-				logrus.SchedLogger.Infof("===== rd recovery miner ok, hostName %d, taskType %+v", sector.Number, tt)
+				logrus.SchedLogger.Infof("===== rd recovery miner ok, hostName %d, taskType %+v", sector.ID.Number, tt)
 				m.WhetherToDeleteRetryCount(pubField, "")
 				return res.PieceInfo, nil
 			}
-			m.DeleteParamsRes(sector.Number, tt)
-			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.Number, tt)
+			m.DeleteParamsRes(sector.ID.Number, tt)
+			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, tt)
 		}
 
 		//1.publish
-		_, err = m.PublishTask(sector.Number, tt, apInfo, 1)
+		_, err = m.PublishTask(sector, tt, apInfo, 1)
 		if err != nil {
 			return out, err
 		}
-		return m.SubscribeResult(sector.Number, tt, 0)
+		return m.SubscribeResult(sector, tt, 0)
 	}
 }
 
-func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
+func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, pieces []abi.PieceInfo, recover bool) (out storage.PreCommit1Out, err error) {
 	ticketEpoch := ctx.Value("p1RecoverDate")
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTUnsealed, storiface.FTSealed|storiface.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTUnsealed, storiface.FTSealed|storiface.FTCache); err != nil {
 		return nil, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -481,29 +458,29 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	}
 
 	//recovery
-	p1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+	p1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 
 	if rd, ok := ticketEpoch.(gr.PreCommit1RD); ok {
-		logrus.SchedLogger.Infof("===== rd PreCommit1RD sectorID %d rd %+v", rd, sector.Number)
-		res := m.RecoveryP1(sector.Number, p1Field, rd.TicketEpoch)
+		logrus.SchedLogger.Infof("===== rd PreCommit1RD sectorID %d rd %+v", rd, sector.ID.Number)
+		res := m.RecoveryP1(sector.ID.Number, p1Field, rd.TicketEpoch)
 		if res != nil {
 			if res.Err == "" {
-				logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.Number, sealtasks.TTPreCommit1)
+				logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit1)
 				m.WhetherToDeleteRetryCount(p1Field, "")
 				return res.Out, nil
 			}
-			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTPreCommit1)
+			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit1)
 		}
 		err = m.redisCli.HSet(gr.RECOVER_NAME, p1Field, rd)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v  sectorID %+v, p1Field %+v\n", rd, sector.Number, p1Field)
+			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v  sectorID %+v, p1Field %+v\n", rd, sector.ID.Number, p1Field)
 		}
-		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit1)
+		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTPreCommit1)
 	}
 
 	//1.publish
-	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit1)
-	_, err = m.PublishTask(sector.Number, sealtasks.TTPreCommit1, pp1Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.ID.Number, sealtasks.TTPreCommit1)
+	_, err = m.PublishTask(sector, sealtasks.TTPreCommit1, pp1Info, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +492,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	//}
 
 	tick := &time.Ticker{}
-	switch m.scfg.SealProofType {
+	switch sector.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
 		tick = time.NewTicker(time.Second)
 
@@ -530,7 +507,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	}
 	defer tick.Stop()
 
-	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 	timer := time.NewTimer(P1WaitTime)
 	start := time.Now()
 
@@ -544,27 +521,27 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 		//		logrus.SchedLogger.Errorf("===== sub tailored err:", err)
 		//	}
 		//
-		//	if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit1 {
-		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.Number, sealtasks.TTPreCommit1)
+		//	if sid == sector.ID.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit1 {
+		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.ID.Number, sealtasks.TTPreCommit1)
 		//		//2.1 get params res
-		//		resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+		//		resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 		//		paramsRes := &gr.ParamsResP1{}
 		//		err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 		//		if err != nil {
-		//			logrus.SchedLogger.Errorf("===== get p1 res err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
+		//			logrus.SchedLogger.Errorf("===== get p1 res err %+v sectorID %+v, p1Field %+v\n", err, sector.ID.Number, p1Field)
 		//			return nil, err
 		//		}
 		//
 		//		if paramsRes.Err != "" {
 		//			logrus.SchedLogger.Errorf("===== sector(%+v) p1 computing err:%+v", sector, paramsRes.Err)
-		//			return nil, errors.New(fmt.Sprintf("%d p1 res err: %s", sector.Number, paramsRes.Err))
+		//			return nil, errors.New(fmt.Sprintf("%d p1 res err: %s", sector.ID.Number, paramsRes.Err))
 		//		}
 		//
 		//		//2.2 update taskCount (need lock)
 		//		defer func() {
-		//			err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+		//			err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
 		//			if err != nil {
-		//				logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+		//				logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 		//			}
 		//		}()
 		//
@@ -587,7 +564,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			//check params
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
+				logrus.SchedLogger.Errorf("===== HExist p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.ID.Number, p1Field)
 				continue
 			}
 
@@ -602,25 +579,25 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 				continue
 			}
 
-			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTPreCommit1, hostName)
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTPreCommit1, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResP1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.Number, p1Field)
+				logrus.SchedLogger.Errorf("===== hget p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.ID.Number, p1Field)
 				continue
 			}
 
 			if paramsRes.Err != "" {
 				logrus.SchedLogger.Errorf("===== sector(%+v) p1 computing err:%+v", sector, paramsRes.Err)
-				return out, errors.New(fmt.Sprintf("%d p1 res err: %s", sector.Number, paramsRes.Err))
+				return out, errors.New(fmt.Sprintf("%d p1 res err: %s", sector.ID.Number, paramsRes.Err))
 			}
 
 			//update taskCount (need lock)
 			defer func() {
-				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 				}
 			}()
 
@@ -629,11 +606,11 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 	}
 }
 
-func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (out storage.SectorCids, err error) {
+func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, phase1Out storage.PreCommit1Out) (out storage.SectorCids, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed, storiface.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTSealed, storiface.FTCache); err != nil {
 		return storage.SectorCids{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
@@ -645,21 +622,21 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		return out, err
 	}
 
-	p2Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
-	res := m.RecoveryP2(sector.Number, p2Field)
+	p2Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit2, 0)
+	res := m.RecoveryP2(sector.ID.Number, p2Field)
 	if res != nil {
 		if res.Err == "" {
-			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.Number, sealtasks.TTPreCommit2)
+			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit2)
 			m.WhetherToDeleteRetryCount(p2Field, "")
 			return res.Out, nil
 		}
-		m.DeleteParamsRes(sector.Number, sealtasks.TTPreCommit2)
-		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTPreCommit2)
+		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTPreCommit2)
+		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit2)
 	}
 
 	//1.publish
-	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTPreCommit2)
-	_, err = m.PublishTask(sector.Number, sealtasks.TTPreCommit2, pp2Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.ID.Number, sealtasks.TTPreCommit2)
+	_, err = m.PublishTask(sector, sealtasks.TTPreCommit2, pp2Info, 1)
 	if err != nil {
 		return out, err
 	}
@@ -670,7 +647,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	//}
 
 	tick := &time.Ticker{}
-	switch m.scfg.SealProofType {
+	switch sector.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
 		tick = time.NewTicker(time.Second)
 
@@ -686,7 +663,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	}
 	defer tick.Stop()
 
-	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
+	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit2, 0)
 	timer := time.NewTimer(P2WaitTime)
 	start := time.Now()
 
@@ -697,30 +674,30 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		//	pl := gr.RedisField(msg.Payload)
 		//	sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		//	if err != nil {
-		//		logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
+		//		logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 		//	}
 		//
-		//	if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit2 {
-		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.Number, sealtasks.TTPreCommit2)
+		//	if sid == sector.ID.Number && tt.ToOfficalTaskType() == sealtasks.TTPreCommit2 {
+		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.ID.Number, sealtasks.TTPreCommit2)
 		//		//2.1 get params res
-		//		resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit2, 0)
+		//		resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit2, 0)
 		//		paramsRes := &gr.ParamsResP2{}
 		//		err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 		//		if err != nil {
-		//			logrus.SchedLogger.Errorf("===== get p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
+		//			logrus.SchedLogger.Errorf("===== get p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 		//			return out, err
 		//		}
 		//
 		//		if paramsRes.Err != "" {
 		//			logrus.SchedLogger.Errorf("===== sector(%+v) p2 computing err:%+v", sector, paramsRes.Err)
-		//			return out, errors.New(fmt.Sprintf("%d p2 res err: %s", sector.Number, paramsRes.Err))
+		//			return out, errors.New(fmt.Sprintf("%d p2 res err: %s", sector.ID.Number, paramsRes.Err))
 		//		}
 		//
 		//		//2.2 update taskCount (need lock)
 		//		defer func() {
-		//			err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit2, 0)
+		//			err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit2, 0)
 		//			if err != nil {
-		//				logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+		//				logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 		//			}
 		//		}()
 		//
@@ -742,7 +719,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			//check params
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
+				logrus.SchedLogger.Errorf("===== HExist p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 				continue
 			}
 
@@ -753,29 +730,29 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			//get res
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
+				logrus.SchedLogger.Errorf("===== hget p2 res err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 				continue
 			}
 
-			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTPreCommit2, hostName)
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTPreCommit2, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResP2{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.Number, p2Field)
+				logrus.SchedLogger.Errorf("===== hget p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 				continue
 			}
 
 			if paramsRes.Err != "" {
 				logrus.SchedLogger.Errorf("===== sector(%+v) p2 computing err:%+v", sector, paramsRes.Err)
-				return out, errors.New(fmt.Sprintf("%d p2 res err: %s", sector.Number, paramsRes.Err))
+				return out, errors.New(fmt.Sprintf("%d p2 res err: %s", sector.ID.Number, paramsRes.Err))
 			}
 
 			//update taskCount (need lock)
 			defer func() {
-				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTPreCommit2, 0)
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit2, 0)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 				}
 			}()
 
@@ -784,15 +761,15 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 	}
 }
 
-func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (out storage.Commit1Out, err error) {
+func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (out storage.Commit1Out, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := m.index.StorageLock(ctx, sector, storiface.FTSealed, storiface.FTCache); err != nil {
+	if err := m.index.StorageLock(ctx, sector.ID, storiface.FTSealed, storiface.FTCache); err != nil {
 		return storage.Commit1Out{}, xerrors.Errorf("acquiring sector lock: %w", err)
 	}
 
-	storagePaths, path2sid := m.GetStoragePathList(ctx, sector)
+	storagePaths, path2sid := m.GetStoragePathList(ctx, sector.ID)
 	if len(storagePaths) == 0 || len(path2sid) == 0 {
 		logrus.SchedLogger.Errorf("try to doing sector(%+v) c1 task, but storagePaths = 0", sector)
 	}
@@ -809,36 +786,36 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		return out, err
 	}
 
-	c1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
-	res := m.RecoveryC1(sector.Number, c1Field)
+	c1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 0)
+	res := m.RecoveryC1(sector.ID.Number, c1Field)
 	if res != nil {
 		if res.Err == "" {
-			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectorID %d, taskType %+v", sector.Number, sealtasks.TTCommit1)
+			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectorID %d, taskType %+v", sector.ID.Number, sealtasks.TTCommit1)
 			hostName := ""
-			resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
+			resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 0)
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget c1 res err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
+				logrus.SchedLogger.Errorf("===== hget c1 res err %+v sectorID %+v, c1Field %+v\n", err, sector.ID.Number, c1Field)
 			}
 			//free p1 counter
-			p1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+			p1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 			cp1 := gr.SplicingCounterP1Key(hostName)
 			cp1Exist, err := m.redisCli.HExist(cp1, p1Field)
 			if err == nil && cp1Exist {
-				m.FreeP1Count(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+				m.FreeP1Count(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
 			}
 			m.WhetherToDeleteRetryCount(c1Field, "")
 
 			return res.Out, nil
 		}
 		//delete res
-		m.DeleteParamsRes(sector.Number, sealtasks.TTCommit1)
-		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.Number, sealtasks.TTCommit1)
+		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTCommit1)
+		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTCommit1)
 	}
 
 	//1.publish
-	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.Number, sealtasks.TTCommit1)
-	_, err = m.PublishTask(sector.Number, sealtasks.TTCommit1, pc1Info, 1)
+	//logrus.SchedLogger.Infof("===== rd publish task, sectorID %+v taskType %+v", sector.ID.Number, sealtasks.TTCommit1)
+	_, err = m.PublishTask(sector, sealtasks.TTCommit1, pc1Info, 1)
 	if err != nil {
 		return out, err
 	}
@@ -850,7 +827,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	//}
 
 	tick := &time.Ticker{}
-	switch m.scfg.SealProofType {
+	switch sector.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1:
 		tick = time.NewTicker(time.Second)
 
@@ -865,7 +842,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 	}
 	defer tick.Stop()
 
-	resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
+	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 0)
 	timer := time.NewTimer(C1WaitTime)
 	start := time.Now()
 
@@ -876,23 +853,23 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//	pl := gr.RedisField(msg.Payload)
 		//	sid, tt, hostName, _, err := pl.TailoredSubMessage()
 		//	if err != nil {
-		//		logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
+		//		logrus.SchedLogger.Errorf("===== sub tailored err %+v sectorID %+v, c1Field %+v\n", err, sector.ID.Number, c1Field)
 		//	}
 		//
-		//	if sid == sector.Number && tt.ToOfficalTaskType() == sealtasks.TTCommit1 {
-		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.Number, sealtasks.TTCommit1)
+		//	if sid == sector.ID.Number && tt.ToOfficalTaskType() == sealtasks.TTCommit1 {
+		//		logrus.SchedLogger.Infof("===== rd subscribe task, Cha %+v msg %+v sectorID %+v taskType %+v", msg.Channel, msg.Payload, sector.ID.Number, sealtasks.TTCommit1)
 		//		//2.1 get params res
-		//		resField := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 0)
+		//		resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 0)
 		//		paramsRes := &gr.ParamsResC1{}
 		//		err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 		//		if err != nil {
-		//			logrus.SchedLogger.Errorf("===== sector(%+v) c1 res err %+v sectorID %+v, c1Field %+v\n", sector, err, sector.Number, c1Field)
+		//			logrus.SchedLogger.Errorf("===== sector(%+v) c1 res err %+v sectorID %+v, c1Field %+v\n", sector, err, sector.ID.Number, c1Field)
 		//			return out, err
 		//		}
 		//
 		//		if paramsRes.Err != "" {
 		//			logrus.SchedLogger.Errorf("===== sector(%+v) c1 computing err:%+v", sector, paramsRes.Err)
-		//			return out, errors.New(fmt.Sprintf("%d c1 res err: %s", sector.Number, paramsRes.Err))
+		//			return out, errors.New(fmt.Sprintf("%d c1 res err: %s", sector.ID.Number, paramsRes.Err))
 		//		}
 		//
 		//		if paramsRes.StoragePath == "" {
@@ -908,15 +885,15 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//
 		//		//2.2 update taskCount (need lock)
 		//		defer func() {
-		//			err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTCommit1, 0)
+		//			err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTCommit1, 0)
 		//			if err != nil {
-		//				logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+		//				logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 		//			}
 		//		}()
 		//
 		//		// 2.3 declareSector  申明新的存储路径
 		//		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-		//		exist, err := m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTCommit1, 1))
+		//		exist, err := m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 1))
 		//		if err != nil {
 		//			logrus.SchedLogger.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", sector, err)
 		//			return out, err
@@ -938,11 +915,11 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		//		}
 		//
 		//		//free p1 counter
-		//		p1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+		//		p1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 		//		cp1 := gr.SplicingCounterP1Key(hostName)
 		//		cp1Exist, err := m.redisCli.HExist(cp1, p1Field)
 		//		if err == nil && cp1Exist {
-		//			m.FreeP1Count(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+		//			m.FreeP1Count(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
 		//		}
 		//
 		//		return paramsRes.Out, nil
@@ -963,7 +940,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			//check params
 			exist, err := m.redisCli.HExist(gr.PARAMS_RES_NAME, resField)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== HExist c1 res params err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
+				logrus.SchedLogger.Errorf("===== HExist c1 res params err %+v sectorID %+v, c1Field %+v\n", err, sector.ID.Number, c1Field)
 				continue
 			}
 
@@ -974,22 +951,22 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			//get res
 			err = m.redisCli.HGet(gr.PUB_RES_NAME, resField, &hostName)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget c1 res err %+v sectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
+				logrus.SchedLogger.Errorf("===== hget c1 res err %+v sectorID %+v, c1Field %+v\n", err, sector.ID.Number, c1Field)
 				continue
 			}
 
-			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.Number, sealtasks.TTCommit1, hostName)
+			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTCommit1, hostName)
 			//get params res
 			paramsRes := &gr.ParamsResC1{}
 			err = m.redisCli.HGet(gr.PARAMS_RES_NAME, resField, paramsRes)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== hget c1 res params err %+vsectorID %+v, c1Field %+v\n", err, sector.Number, c1Field)
+				logrus.SchedLogger.Errorf("===== hget c1 res params err %+vsectorID %+v, c1Field %+v\n", err, sector.ID.Number, c1Field)
 				continue
 			}
 
 			if paramsRes.Err != "" {
 				logrus.SchedLogger.Errorf("===== sector(%+v) c1 computing err:%+v", sector, paramsRes.Err)
-				return out, errors.New(fmt.Sprintf("%d c1 res err: %s", sector.Number, paramsRes.Err))
+				return out, errors.New(fmt.Sprintf("%d c1 res err: %s", sector.ID.Number, paramsRes.Err))
 			}
 
 			if paramsRes.StoragePath == "" {
@@ -1005,15 +982,15 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 			//update taskCount (need lock)
 			defer func() {
-				err = m.FreeTaskCount(hostName, sector.Number, sealtasks.TTCommit1, 0)
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTCommit1, 0)
 				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.Number, hostName, err)
+					logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
 				}
 			}()
 
 			// declareSector  申明新的存储路径
 			// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-			exist, err = m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTAddPieceSe, 1))
+			exist, err = m.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTAddPieceSe, 1))
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", sector, err)
 				return out, err
@@ -1021,10 +998,10 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 			if exist {
 				// deal sector 存储unseal文件
-				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache|storiface.FTUnsealed, true)
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector.ID, storiface.FTSealed|storiface.FTCache|storiface.FTUnsealed, true)
 			} else {
 				// not deal sector 不存储unseal文件
-				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector, storiface.FTSealed|storiface.FTCache, true)
+				err = m.index.StorageDeclareSector(ctx, stores.ID(path2sid[paramsRes.StoragePath]), sector.ID, storiface.FTSealed|storiface.FTCache, true)
 			}
 
 			if err != nil {
@@ -1035,11 +1012,11 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			}
 
 			//free p1 counter
-			p1Field := gr.SplicingBackupPubAndParamsField(sector.Number, sealtasks.TTPreCommit1, 0)
+			p1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 			cp1 := gr.SplicingCounterP1Key(hostName)
 			cp1Exist, err := m.redisCli.HExist(cp1, p1Field)
 			if err == nil && cp1Exist {
-				m.FreeP1Count(hostName, sector.Number, sealtasks.TTPreCommit1, 0)
+				m.FreeP1Count(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
 			}
 
 			return paramsRes.Out, nil
@@ -1095,115 +1072,115 @@ func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) (
 	return paths, path2sid
 }
 
-func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.SectorID, w Worker) (string, stores.ID) {
-	// 筛选存储机器
-	ssize, err := abi.RegisteredSealProof_StackedDrg32GiBV1.SectorSize()
-	if err != nil {
-		return "", ""
-	}
-	sis, err := m.index.StorageBestAlloc(ctx, storiface.FTSealed, ssize, storiface.PathStorage)
-	//m.index.StorageList
-	if err != nil {
-		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding best storage error : %w", sector, err)
-		return "", ""
-	}
+//func (m *Manager) FindBestStoragePathToPushData(ctx context.Context, sector abi.SectorID, w Worker) (string, stores.ID) {
+//	// 筛选存储机器
+//	ssize, err := abi.RegisteredSealProof_StackedDrg32GiBV1.SectorSize()
+//	if err != nil {
+//		return "", ""
+//	}
+//	sis, err := m.index.StorageBestAlloc(ctx, storiface.FTSealed, ssize, storiface.PathStorage)
+//	//m.index.StorageList
+//	if err != nil {
+//		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding best storage error : %w", sector, err)
+//		return "", ""
+//	}
+//
+//	storagePaths, err := m.StorageLocal(ctx)
+//	if err != nil {
+//		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding storagePaths error : %w", sector, err)
+//		return "", ""
+//	}
+//
+//	var hasNFS bool
+//	var transErrCount int
+//RetryFindStorage:
+//	//var bestSi stores.StorageInfo
+//	for _, si := range sis {
+//		p, ok := storagePaths[si.ID]
+//		if !ok {
+//			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage ID(%+v)", sector, si.ID)
+//			continue
+//		}
+//
+//		if p == "" { // TODO: can that even be the case?
+//			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage path is null", sector)
+//			continue
+//		}
+//
+//		// 尝试 开始发送 通过解析p.local来获取NFS ip
+//		ip, destPath := transfordata.PareseDestFromePath(p)
+//		if ip == "" {
+//			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest ip", sector, p)
+//		} else if destPath == "" {
+//			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, p)
+//		} else {
+//			logrus.SchedLogger.Infof("===== find best destPath(%+v) ip(%+v)", destPath, ip)
+//			hasNFS = true
+//			if w == nil {
+//				return p, si.ID
+//			}
+//
+//			// 检测连通行
+//			ok, err := transfordata.ConnectTest(destPath+"/firefly-miner", ip)
+//			if !ok || err != nil {
+//				continue
+//			}
+//
+//			// 绑定传输，设置传输数量最多同时为8
+//			m.transLK.Lock()
+//			_, ok = m.transIP2Count.Load(ip)
+//			if !ok {
+//				m.transIP2Count.Store(ip, 0)
+//			}
+//			v, _ := m.transIP2Count.Load(ip)
+//			if v.(int) >= m.maxTransCount {
+//				logrus.SchedLogger.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据,配置最大值为%d", v.(int), ip, m.maxTransCount)
+//				m.transLK.Unlock()
+//				continue
+//			}
+//			m.transIP2Count.Store(ip, v.(int)+1)
+//			//v, _ = m.transIP2Count.Load(ip)
+//			logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) try to it", ip, v.(int)+1, sector)
+//			m.transLK.Unlock()
+//
+//			// 开始传输数据
+//			err = w.PushDataToStorage(ctx, sector, p)
+//
+//			m.transLK.Lock()
+//			v, _ = m.transIP2Count.Load(ip)
+//			m.transIP2Count.Store(ip, v.(int)-1)
+//			m.transLK.Unlock()
+//
+//			if err != nil {
+//				// 如果发送错误次数超过10，则放弃，可能数据有问题
+//				transErrCount += 1
+//				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
+//			} else {
+//				// 传输成功，返回
+//				//logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
+//				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
+//				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
+//				return p, si.ID
+//			}
+//		}
+//	}
+//	//if bestSi.ID == "" {
+//	if hasNFS {
+//		logrus.SchedLogger.Warnf("all storage transfor task count is more then %d, please check it", m.maxTransCount)
+//		if transErrCount < 10 {
+//			time.Sleep(time.Minute)
+//			goto RetryFindStorage
+//		} else {
+//			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, error more then %d times", sector, 10)
+//			return "", ""
+//		}
+//	}
+//	logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
+//	//}
+//	return "", ""
+//}
 
-	storagePaths, err := m.StorageLocal(ctx)
-	if err != nil {
-		logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server,finding storagePaths error : %w", sector, err)
-		return "", ""
-	}
-
-	var hasNFS bool
-	var transErrCount int
-RetryFindStorage:
-	//var bestSi stores.StorageInfo
-	for _, si := range sis {
-		p, ok := storagePaths[si.ID]
-		if !ok {
-			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage ID(%+v)", sector, si.ID)
-			continue
-		}
-
-		if p == "" { // TODO: can that even be the case?
-			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, but not found storage path is null", sector)
-			continue
-		}
-
-		// 尝试 开始发送 通过解析p.local来获取NFS ip
-		ip, destPath := transfordata.PareseDestFromePath(p)
-		if ip == "" {
-			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest ip", sector, p)
-		} else if destPath == "" {
-			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, Parse path(%+v) error,not find dest path", sector, p)
-		} else {
-			logrus.SchedLogger.Infof("===== find best destPath(%+v) ip(%+v)", destPath, ip)
-			hasNFS = true
-			if w == nil {
-				return p, si.ID
-			}
-
-			// 检测连通行
-			ok, err := transfordata.ConnectTest(destPath+"/firefly-miner", ip)
-			if !ok || err != nil {
-				continue
-			}
-
-			// 绑定传输，设置传输数量最多同时为8
-			m.transLK.Lock()
-			_, ok = m.transIP2Count.Load(ip)
-			if !ok {
-				m.transIP2Count.Store(ip, 0)
-			}
-			v, _ := m.transIP2Count.Load(ip)
-			if v.(int) >= m.maxTransCount {
-				logrus.SchedLogger.Infof("===== 当前有超过%d个传输任务向IP(%+v)传输数据,配置最大值为%d", v.(int), ip, m.maxTransCount)
-				m.transLK.Unlock()
-				continue
-			}
-			m.transIP2Count.Store(ip, v.(int)+1)
-			//v, _ = m.transIP2Count.Load(ip)
-			logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) try to it", ip, v.(int)+1, sector)
-			m.transLK.Unlock()
-
-			// 开始传输数据
-			err = w.PushDataToStorage(ctx, sector, p)
-
-			m.transLK.Lock()
-			v, _ = m.transIP2Count.Load(ip)
-			m.transIP2Count.Store(ip, v.(int)-1)
-			m.transLK.Unlock()
-
-			if err != nil {
-				// 如果发送错误次数超过10，则放弃，可能数据有问题
-				transErrCount += 1
-				logrus.SchedLogger.Errorf("===== after sector(%+v) finished Commit1,but push data to Storage(%+v) failed. err:%+v", sector, p, err)
-			} else {
-				// 传输成功，返回
-				//logrus.SchedLogger.Infof("ip(%s) transfor task count is %d,sector(%+v) success send to it", ip, v.(int)-1, sector)
-				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
-				logrus.SchedLogger.Infof("===== finished sector(%+v) Commit1 transfored to destPath(%+v) success!!", sector, p)
-				return p, si.ID
-			}
-		}
-	}
-	//if bestSi.ID == "" {
-	if hasNFS {
-		logrus.SchedLogger.Warnf("all storage transfor task count is more then %d, please check it", m.maxTransCount)
-		if transErrCount < 10 {
-			time.Sleep(time.Minute)
-			goto RetryFindStorage
-		} else {
-			logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, error more then %d times", sector, 10)
-			return "", ""
-		}
-	}
-	logrus.SchedLogger.Errorf("try to send sector (%+v) to storage Server, can not find any storage Server", sector)
-	//}
-	return "", ""
-}
-
-func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
+func (m *Manager) SealCommit2(ctx context.Context, sector storage.SectorRef, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
 	selector := newTaskSelector()
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
@@ -1218,13 +1195,13 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		taskRd.taskStatus = COMMIT2_COMPUTING
 		m.sched.taskRecorder.Store(sector, taskRd)
 		logrus.SchedLogger.Infof("===== worker %s is computing Commit2 in sectorID[%+v]", wInfo.Hostname, sector)
-		//go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
+		//go m.sched.StartStore(sector.ID.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPUTING, time.Now())
 		p, err := w.SealCommit2(ctx, sector, phase1Out)
 		if err != nil {
 			return err
 		}
 		out = p
-		//go m.sched.StartStore(sector.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
+		//go m.sched.StartStore(sector.ID.Number, sealtasks.TTCommit2, wInfo.Hostname, sector.Miner, TS_COMPLETE, time.Now())
 
 		//任务结束，更改taskRecorder状态
 		taskRd.taskStatus = TRANSFOR_FINISHED
@@ -1236,7 +1213,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 	return out, err
 }
 
-func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepUnsealed []storage.Range) error {
+func (m *Manager) FinalizeSector(ctx context.Context, sector storage.SectorRef, keepUnsealed []storage.Range) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -1256,7 +1233,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	//	}
 	//}
 
-	selector := newExistingSelector(m.index, sector, storiface.FTCache|storiface.FTSealed, false)
+	selector := newExistingSelector(m.index, sector.ID, storiface.FTCache|storiface.FTSealed, false)
 
 	err := m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
 		//schedFetch(sector, storiface.FTCache|stores.FTSealed|unsealed, storiface.PathSealing, storiface.AcquireMove),
@@ -1278,8 +1255,8 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	if err != nil {
 		return err
 	}
-	logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.Number)
-	m.DeleteDataForSid(sector.Number)
+	logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.ID.Number)
+	m.DeleteDataForSid(sector.ID.Number)
 
 	//fetchSel := newAllocSelector(m.index, storiface.FTCache|stores.FTSealed, storiface.PathStorage)
 	//moveUnsealed := unsealed
@@ -1309,7 +1286,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	return nil
 }
 
-func (m *Manager) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
+func (m *Manager) ReleaseUnsealed(ctx context.Context, sector storage.SectorRef, safeToFree []storage.Range) error {
 	logrus.SchedLogger.Warn("ReleaseUnsealed todo")
 	return nil
 }
