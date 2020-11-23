@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/docker/go-units"
-	//"github.com/filecoin-project/sector-storage/ffiwrapper"
+	"github.com/filecoin-project/go-state-types/network"
 
+	"github.com/docker/go-units"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -131,7 +131,7 @@ var preSealCmd = &cli.Command{
 
 		fmt.Println("1 ================= ", sectorSize)
 
-		spt, err := miner.SealProofTypeFromSectorSize(sectorSize, build.NewestNetworkVersion)
+		spt, err := miner.SealProofTypeFromSectorSize(sectorSize, network.Version0)
 		if err != nil {
 			return err
 		}
