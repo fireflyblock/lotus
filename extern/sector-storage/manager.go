@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"errors"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"io"
 	"net/http"
 	"sync"
@@ -134,7 +135,11 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, sc 
 
 	m.setupWorkTracker()
 
-	go m.sched.runSched()
+	if minertype.CanDoSched() {
+		go m.sched.runSched()
+	} else {
+		log.Info("Do not do sched!!!!!!")
+	}
 
 	localTasks := []sealtasks.TaskType{
 		sealtasks.TTCommit1, sealtasks.TTFinalize, sealtasks.TTFetch, sealtasks.TTReadUnsealed,
@@ -734,6 +739,11 @@ func (m *Manager) SchedDiag(ctx context.Context, doSched bool) (interface{}, err
 
 func (m *Manager) Close(ctx context.Context) error {
 	return m.sched.Close(ctx)
+}
+
+// 尝试遍历所有sector
+func (m *Manager) TryToScanAllSectors(ctx context.Context) {
+	m.localStore.TryToScanAllSectors(ctx)
 }
 
 var _ SectorManager = &Manager{}

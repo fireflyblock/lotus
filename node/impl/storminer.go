@@ -514,6 +514,10 @@ func (sm *StorageMinerAPI) StorageAddLocal(ctx context.Context, path string) err
 	return sm.StorageMgr.AddLocalStorage(ctx, path)
 }
 
+func (sm *StorageMinerAPI) TryToScanAllSectors(ctx context.Context) {
+	sm.StorageMgr.TryToScanAllSectors(ctx)
+}
+
 func (sm *StorageMinerAPI) PiecesListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return sm.PieceStore.ListPieceInfoKeys()
 }

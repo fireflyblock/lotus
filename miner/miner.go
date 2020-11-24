@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"sync"
 	"time"
 
@@ -115,7 +116,11 @@ func (m *Miner) Start(ctx context.Context) error {
 		return fmt.Errorf("miner already started")
 	}
 	m.stop = make(chan struct{})
-	go m.mine(context.TODO())
+	if minertype.CanDoWinningPost() {
+		go m.mine(context.TODO())
+	} else {
+		log.Info("Do not do winning post!!!!")
+	}
 	return nil
 }
 
@@ -365,10 +370,12 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (*types.BlockMsg,
 		return nil, xerrors.Errorf("failed to get mining base info: %w", err)
 	}
 	if mbi == nil {
+		log.Errorf("failed to get base info: %s", mbi)
 		return nil, nil
 	}
 	if !mbi.EligibleForMining {
 		// slashed or just have no power yet
+		log.Errorf("slashed or just have no power yet: %s", mbi.EligibleForMining)
 		return nil, nil
 	}
 
@@ -390,15 +397,18 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (*types.BlockMsg,
 
 	ticket, err := m.computeTicket(ctx, &rbase, base, mbi)
 	if err != nil {
+		log.Errorf("failed to compute ticket: %v", err)
 		return nil, xerrors.Errorf("scratching ticket failed: %w", err)
 	}
 
 	winner, err := gen.IsRoundWinner(ctx, base.TipSet, round, m.address, rbase, mbi, m.api)
 	if err != nil {
+		log.Errorf("failed to check if we win next round: %v", err)
 		return nil, xerrors.Errorf("failed to check if we win next round: %w", err)
 	}
 
 	if winner == nil {
+		log.Errorf("winner: %v", winner)
 		return nil, nil
 	}
 
@@ -406,11 +416,13 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (*types.BlockMsg,
 
 	buf := new(bytes.Buffer)
 	if err := m.address.MarshalCBOR(buf); err != nil {
+		log.Errorf("failed to marshal miner address: %w", err)
 		return nil, xerrors.Errorf("failed to marshal miner address: %w", err)
 	}
 
 	rand, err := store.DrawRandomness(rbase.Data, crypto.DomainSeparationTag_WinningPoStChallengeSeed, base.TipSet.Height()+base.NullRounds+1, buf.Bytes())
 	if err != nil {
+		log.Errorf("failed to get randomness for winning post: %w", err)
 		return nil, xerrors.Errorf("failed to get randomness for winning post: %w", err)
 	}
 
@@ -420,12 +432,14 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (*types.BlockMsg,
 
 	postProof, err := m.epp.ComputeProof(ctx, mbi.Sectors, prand)
 	if err != nil {
+		log.Errorf("failed to compute winning post proof: %w", err)
 		return nil, xerrors.Errorf("failed to compute winning post proof: %w", err)
 	}
 
 	// get pending messages early,
 	msgs, err := m.api.MpoolSelect(context.TODO(), base.TipSet.Key(), ticket.Quality())
 	if err != nil {
+		log.Errorf("failed to select messages for block: %w", err)
 		return nil, xerrors.Errorf("failed to select messages for block: %w", err)
 	}
 
@@ -434,6 +448,7 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (*types.BlockMsg,
 	// TODO: winning post proof
 	b, err := m.createBlock(base, m.address, ticket, winner, bvals, postProof, msgs)
 	if err != nil {
+		log.Errorf("failed to create block: %w", err)
 		return nil, xerrors.Errorf("failed to create block: %w", err)
 	}
 

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/network"
@@ -151,7 +152,11 @@ func (m *Miner) Run(ctx context.Context) error {
 	pcp := sealing.NewBasicPreCommitPolicy(adaptedAPI, policy.GetMaxSectorExpirationExtension()-(md.WPoStProvingPeriod*2), md.PeriodStart%md.WPoStProvingPeriod)
 	m.sealing = sealing.New(adaptedAPI, fc, NewEventsAdapter(evts), m.maddr, m.ds, m.sealer, m.sc, m.verif, &pcp, sealing.GetSealingConfigFunc(m.getSealConfig), m.handleSealingNotifications)
 
-	go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
+	if minertype.CanDoSched() {
+		go m.sealing.Run(ctx) //nolint:errcheck // logged intside the function
+	} else {
+		log.Info("Do not do sealing.Run!!!!")
+	}
 
 	return nil
 }

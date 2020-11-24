@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -43,7 +44,7 @@ import (
 	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-multistore"
-	paramfetch "github.com/filecoin-project/go-paramfetch"
+	//paramfetch "github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-statestore"
 	"github.com/filecoin-project/go-storedcounter"
@@ -86,22 +87,15 @@ func minerAddrFromDS(ds dtypes.MetadataDS) (address.Address, error) {
 }
 
 func GetParams(spt abi.RegisteredSealProof) error {
-	ssize, err := spt.SectorSize()
-	if err != nil {
-		return err
-	}
-
-	// If built-in assets are disabled, we expect the user to have placed the right
-	// parameters in the right location on the filesystem (/var/tmp/filecoin-proof-parameters).
-	if build.DisableBuiltinAssets {
-		return nil
-	}
-
-	// TODO: We should fetch the params for the actual proof type, not just based on the size.
-	if err := paramfetch.GetParams(context.TODO(), build.ParametersJSON(), uint64(ssize)); err != nil {
-		return xerrors.Errorf("fetching proof parameters: %w", err)
-	}
-
+	//ssize, err := spt.SectorSize()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// TODO: We should fetch the params for the actual proof type, not just based on the size.
+	//if err := paramfetch.GetParams(context.TODO(), build.ParametersJSON(), uint64(ssize)); err != nil {
+	//	return xerrors.Errorf("fetching proof parameters: %w", err)
+	//}
 	return nil
 }
 
@@ -194,7 +188,12 @@ func StorageMiner(fc config.MinerFeeConfig) func(params StorageMinerParams) (*st
 
 		lc.Append(fx.Hook{
 			OnStart: func(context.Context) error {
-				go fps.Run(ctx)
+				if minertype.CanDoWDPost() {
+					go fps.Run(ctx)
+				} else {
+					log.Info("Do not do window post!!!!")
+				}
+
 				return sm.Run(ctx)
 			},
 			OnStop: sm.Stop,
@@ -608,6 +607,10 @@ func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, ls stores.LocalStor
 		OnStop: sst.Close,
 	})
 
+	if minertype.CanDoWDPost() || minertype.CanDoWinningPost() {
+		go tryScanAllSectors(ctx, sst)
+	}
+
 	return sst, nil
 }
 
@@ -788,4 +791,18 @@ func mutateCfg(r repo.LockedRepo, mutator func(*config.StorageMiner)) error {
 	})
 
 	return multierr.Combine(typeErr, setConfigErr)
+}
+
+func tryScanAllSectors(ctx context.Context, sst *sectorstorage.Manager) {
+	tick := time.NewTicker(time.Minute * 30)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			log.Infof("try to scan all sectors start...")
+			startAt := time.Now()
+			sst.TryToScanAllSectors(ctx)
+			log.Infof("try to scan all sectors end. cost time %v", time.Now().Sub(startAt))
+		}
+	}
 }

@@ -276,7 +276,8 @@ func (st *Local) declareSectors(ctx context.Context, p string, id ID, primary bo
 
 			sid, err := storiface.ParseSectorID(ent.Name())
 			if err != nil {
-				return xerrors.Errorf("parse sector id %s: %w", ent.Name(), err)
+				continue
+				//return xerrors.Errorf("parse sector id %s: %w", ent.Name(), err)
 			}
 
 			if err := st.index.StorageDeclareSector(ctx, id, sid, t, primary); err != nil {
@@ -658,6 +659,43 @@ func (st *Local) FsStat(ctx context.Context, id ID) (fsutil.FsStat, error) {
 	}
 
 	return p.stat(st.localStorage)
+}
+
+func (st *Local) TryToScanAllSectors(ctx context.Context) error {
+	cfg, err := st.localStorage.GetStorage()
+	if err != nil {
+		return xerrors.Errorf("getting local storage ffconfig: %w", err)
+	}
+
+	for _, path := range cfg.StoragePaths {
+		err := st.tryDeclare(ctx, path.Path)
+		if err != nil {
+			return xerrors.Errorf("opening path %s: %w", path.Path, err)
+		}
+	}
+
+	return nil
+}
+
+func (st *Local) tryDeclare(ctx context.Context, p string) error {
+	st.localLk.Lock()
+	defer st.localLk.Unlock()
+
+	mb, err := ioutil.ReadFile(filepath.Join(p, MetaFile))
+	if err != nil {
+		return xerrors.Errorf("reading storage metadata for %s: %w", p, err)
+	}
+
+	var meta LocalStorageMeta
+	if err := json.Unmarshal(mb, &meta); err != nil {
+		return xerrors.Errorf("unmarshalling storage metadata for %s: %w", p, err)
+	}
+
+	if err := st.declareSectors(ctx, p, meta.ID, meta.CanStore); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 var _ Store = &Local{}
