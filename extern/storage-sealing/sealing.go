@@ -189,7 +189,7 @@ func New(api SealingAPI, fc FeeConfig, events Events, maddr address.Address, ds 
 func (m *Sealing) Run(ctx context.Context) error {
 	m.recoverPledgeSectors = m.SearchRecoveryPledge()
 	// 筛选出未使用的sectornumber
-	m.initRecoverSectorNumber(ctx)
+	//m.initRecoverSectorNumber(ctx)
 
 	if err := m.restartSectors(ctx); err != nil {
 		log.Errorf("%+v", err)
