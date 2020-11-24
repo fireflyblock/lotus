@@ -43,6 +43,8 @@ import (
 
 var log = logging.Logger("lotus-bench")
 
+var homeDir string
+
 type BenchResults struct {
 	SectorSize   abi.SectorSize
 	SectorNumber int
@@ -108,7 +110,6 @@ func main() {
 		Usage:   "Benchmark performance of lotus on your hardware",
 		Version: build.UserVersion(),
 		Commands: []*cli.Command{
-			parellelAddPieceCmd,
 			proveCmd,
 			sealBenchCmd,
 			importBenchCmd,
@@ -119,120 +120,6 @@ func main() {
 		log.Warnf("%+v", err)
 		return
 	}
-}
-
-var parellelAddPieceCmd = &cli.Command{
-	Name: "addpiece",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "storage-dir",
-			Value: "~/.lotus-bench",
-			Usage: "Path to the storage directory that will store sectors long term",
-		},
-		&cli.StringFlag{
-			Name:  "sector-size",
-			Value: "512MiB",
-			Usage: "size of the sectors in bytes, i.e. 32GiB",
-		},
-		&cli.IntFlag{
-			Name:  "num-sectors",
-			Value: 1,
-		},
-	},
-	Action: func(c *cli.Context) error {
-
-		var sbdir string
-
-		sdir, err := homedir.Expand(c.String("storage-dir"))
-		if err != nil {
-			return err
-		}
-
-		err = os.MkdirAll(sdir, 0775) //nolint:gosec
-		if err != nil {
-			return xerrors.Errorf("creating sectorbuilder dir: %w", err)
-		}
-
-		tsdir, err := ioutil.TempDir(sdir, "bench")
-		if err != nil {
-			return err
-		}
-		//defer func() {
-		//	if err := os.RemoveAll(tsdir); err != nil {
-		//		log.Warn("remove all: ", err)
-		//	}
-		//}()
-
-		// TODO: pretty sure this isnt even needed?
-		if err := os.MkdirAll(tsdir, 0775); err != nil {
-			return err
-		}
-
-		sbdir = tsdir
-
-		// miner address
-		maddr, err := address.NewFromString("t01000")
-		if err != nil {
-			return err
-		}
-		amid, err := address.IDFromAddress(maddr)
-		if err != nil {
-			return err
-		}
-		mid := abi.ActorID(amid)
-
-		// sector size
-		sectorSizeInt, err := units.RAMInBytes(c.String("sector-size"))
-		if err != nil {
-			return err
-		}
-		sectorSize := abi.SectorSize(sectorSizeInt)
-
-		spt, err := ffiwrapper.SealProofTypeFromSectorSize(sectorSize)
-		if err != nil {
-			return err
-		}
-
-		cfg := &ffiwrapper.Config{
-			SealProofType: spt,
-		}
-
-		sbfs := &basicfs.Provider{
-			Root: sbdir,
-		}
-
-		sb, err := ffiwrapper.New(sbfs, cfg)
-		if err != nil {
-			return err
-		}
-
-		wg := sync.WaitGroup{}
-		for i := abi.SectorNumber(1); i <= abi.SectorNumber(c.Int("num-sectors")); i++ {
-
-			wg.Add(1)
-			go func(i abi.SectorNumber) {
-				sid := abi.SectorID{
-					Miner:  mid,
-					Number: i,
-				}
-				start := time.Now()
-				//r := rand.New(rand.NewSource(100 + int64(i)))
-				//_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
-				_, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), nil, "_pledgeSector")
-				if err != nil {
-					log.Error(err)
-				}
-				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
-				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
-				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
-				log.Infof("------->>>sector(%+v) finished AddPiece cost time %s", sid, time.Now().Sub(start))
-				wg.Done()
-			}(i)
-		}
-		wg.Wait()
-		//sealTimings, sealedSectors, err = runSeals(sb, sbfs, c.Int("num-sectors"), parCfg, mid, sectorSize, []byte(c.String("ticket-preimage")), c.String("save-commit2-input"), c.Bool("skip-commit2"), c.Bool("skip-unseal"))
-		return nil
-	},
 }
 
 var sealBenchCmd = &cli.Command{
@@ -292,6 +179,10 @@ var sealBenchCmd = &cli.Command{
 			Usage: "num run in parallel",
 			Value: 1,
 		},
+		&cli.StringFlag{
+			Name:  "task",
+			Value: "all",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		policy.AddSupportedProofTypes(abi.RegisteredSealProof_StackedDrg2KiBV1)
@@ -317,29 +208,42 @@ var sealBenchCmd = &cli.Command{
 			if err != nil {
 				return xerrors.Errorf("creating sectorbuilder dir: %w", err)
 			}
-
-			tsdir, err := ioutil.TempDir(sdir, "bench")
-			if err != nil {
-				return err
-			}
-			defer func() {
-				if err := os.RemoveAll(tsdir); err != nil {
-					log.Warn("remove all: ", err)
+			if c.String("task") == "all" {
+				tsdir, err := ioutil.TempDir(sdir, "bench")
+				if err != nil {
+					return err
 				}
-			}()
+				defer func() {
+					if err := os.RemoveAll(tsdir); err != nil {
+						log.Warn("remove all: ", err)
+					}
+				}()
 
-			// TODO: pretty sure this isnt even needed?
-			if err := os.MkdirAll(tsdir, 0775); err != nil {
-				return err
+				// TODO: pretty sure this isnt even needed?
+				if err := os.MkdirAll(tsdir, 0775); err != nil {
+					return err
+				}
+
+				sbdir = tsdir
+
+				homeDir = sdir + "/testdata"
+			} else {
+				if err := os.MkdirAll(sdir+"/testdata", 0775); err != nil {
+					return err
+				}
+
+				sbdir = sdir + "/testdata"
+
+				homeDir = sdir + "/testdata"
 			}
-
-			sbdir = tsdir
 		} else {
 			exp, err := homedir.Expand(robench)
 			if err != nil {
 				return err
 			}
 			sbdir = exp
+
+			homeDir = sbdir + "/testdata"
 		}
 
 		// miner address
@@ -389,7 +293,7 @@ var sealBenchCmd = &cli.Command{
 				PreCommit2: 1,
 				Commit:     1,
 			}
-			sealTimings, sealedSectors, err = runSeals(sb, sbfs, sectorNumber, parCfg, mid, sectorSize, []byte(c.String("ticket-preimage")), c.String("save-commit2-input"), skipc2, c.Bool("skip-unseal"))
+			sealTimings, sealedSectors, err = runSeals(sb, sbfs, sectorNumber, parCfg, mid, sectorSize, []byte(c.String("ticket-preimage")), c.String("save-commit2-input"), skipc2, c.Bool("skip-unseal"), c.String("task"))
 			if err != nil {
 				return xerrors.Errorf("failed to run seals: %w", err)
 			}
@@ -451,6 +355,11 @@ var sealBenchCmd = &cli.Command{
 			}
 
 			candidates := make([]saproof2.SectorInfo, len(fcandidates))
+
+			if len(sealedSectors) == 0 {
+				return xerrors.New("sealedSectors length == 0")
+			}
+
 			for i, fcandidate := range fcandidates {
 				candidates[i] = sealedSectors[fcandidate]
 			}
@@ -575,12 +484,23 @@ var sealBenchCmd = &cli.Command{
 		} else {
 			fmt.Printf("----\nresults (v28) SectorSize:(%d), SectorNumber:(%d)\n", sectorSize, sectorNumber)
 			if robench == "" {
-				fmt.Printf("seal: addPiece: %s (%s)\n", bo.SealingSum.AddPiece, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.AddPiece))
-				fmt.Printf("seal: preCommit phase 1: %s (%s)\n", bo.SealingSum.PreCommit1, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit1))
-				fmt.Printf("seal: preCommit phase 2: %s (%s)\n", bo.SealingSum.PreCommit2, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit2))
-				fmt.Printf("seal: commit phase 1: %s (%s)\n", bo.SealingSum.Commit1, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.Commit1))
-				fmt.Printf("seal: commit phase 2: %s (%s)\n", bo.SealingSum.Commit2, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.Commit2))
-				fmt.Printf("seal: verify: %s\n", bo.SealingSum.Verify)
+				switch c.String("task") {
+				case "ap":
+					fmt.Printf("seal: addPiece: %s (%s)\n", bo.SealingResults[0].AddPiece, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.AddPiece)) // TODO: average across multiple sealings
+				case "p1":
+					fmt.Printf("seal: preCommit phase 1: %s (%s)\n", bo.SealingResults[0].PreCommit1, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit1))
+				case "p2":
+					fmt.Printf("seal: preCommit phase 2: %s (%s)\n", bo.SealingResults[0].PreCommit2, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit2))
+				case "all":
+					fallthrough
+				default:
+					fmt.Printf("seal: addPiece: %s (%s)\n", bo.SealingSum.AddPiece, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.AddPiece))
+					fmt.Printf("seal: preCommit phase 1: %s (%s)\n", bo.SealingSum.PreCommit1, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit1))
+					fmt.Printf("seal: preCommit phase 2: %s (%s)\n", bo.SealingSum.PreCommit2, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.PreCommit2))
+					fmt.Printf("seal: commit phase 1: %s (%s)\n", bo.SealingSum.Commit1, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.Commit1))
+					fmt.Printf("seal: commit phase 2: %s (%s)\n", bo.SealingSum.Commit2, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.Commit2))
+					fmt.Printf("seal: verify: %s\n", bo.SealingSum.Verify)
+				}
 				if !c.Bool("skip-unseal") {
 					fmt.Printf("unseal: %s  (%s)\n", bo.SealingSum.Unseal, bps(bo.SectorSize, bo.SectorNumber, bo.SealingSum.Unseal))
 				}
@@ -1038,4 +958,126 @@ func spt(ssize abi.SectorSize) abi.RegisteredSealProof {
 	}
 
 	return spt
+}
+
+func removeP2CacheFiles() {
+	p1Files := make(map[string]struct{})
+	file, err := os.Open(homeDir + "/p1FileNames.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		p1Files[scanner.Text()] = struct{}{}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	files, err := ioutil.ReadDir(homeDir + "/cache/s-t01000-0/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		_, ok := p1Files[file.Name()]
+		if !ok {
+			err = os.Remove(homeDir + "/cache/s-t01000-0/" + file.Name())
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+	}
+}
+
+func cacheP1(pc1o storage.PreCommit1Out) {
+	err := ioutil.WriteFile(homeDir+"/p1.txt", pc1o, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func takeP1Result() []byte {
+	t := time.Now()
+	buf, err := ioutil.ReadFile(homeDir + "/p1.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("p1 time %+v\n", time.Since(t))
+	return buf
+}
+
+func cacheP1FileName() {
+	files, err := ioutil.ReadDir(homeDir + "/cache/s-t01000-0/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	p1FileNames := new(bytes.Buffer)
+	for _, file := range files {
+		p1FileNames.WriteString(file.Name() + "\n")
+	}
+
+	err = ioutil.WriteFile(homeDir+"/p1FileNames.txt", p1FileNames.Bytes(), 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func takeApResult(pieces []abi.PieceInfo) []abi.PieceInfo {
+	t := time.Now()
+
+	buf, err := ioutil.ReadFile(homeDir + "/apCid.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c, err := cid.Decode(string(buf))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	size, err := ioutil.ReadFile(homeDir + "/apSize.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	s := binary.LittleEndian.Uint64(size)
+	var pieceCids []abi.PieceInfo
+	pieceCids = append(pieceCids, abi.PieceInfo{
+		Size:     abi.PaddedPieceSize(s),
+		PieceCID: c,
+	})
+
+	pieces = append(pieces, pieceCids[0])
+	fmt.Printf("ap time %+v\n", time.Since(t))
+	return pieces
+}
+
+func cacheAp(pieces []abi.PieceInfo) {
+	for _, piece := range pieces {
+		cacheCid(piece.PieceCID.String())
+		cacheSize(uint64(piece.Size))
+	}
+}
+
+func cacheSize(size uint64) {
+	message := make([]byte, 8)
+	binary.LittleEndian.PutUint64(message, size)
+	err := ioutil.WriteFile(homeDir+"/apSize.txt", message, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func cacheCid(cid string) {
+	message := []byte(cid)
+	err := ioutil.WriteFile(homeDir+"/apCid.txt", message, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
