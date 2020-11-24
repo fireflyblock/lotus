@@ -184,7 +184,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 	if exist {
 		newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
 		//pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
-		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(),recover)
+		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
@@ -201,7 +201,7 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 
 		newCtx := sector.sealingCtx(ctx.Context())
 		//pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
-		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(),recover)
+		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
 
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
@@ -620,6 +620,9 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 		}
 		m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
+		//10 worker Count
+		log.Infof("===== rd del workerCount worker %s field %+v \n", gr.SplicingTaskCounntKey(hostname), f)
+		m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
 	}
 
 	if res == 0 {
@@ -652,6 +655,14 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		m.FreeRetryCount(f)
 		//8 wait time
 		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		//9 task status
+		err := m.rc.HGet(gr.PUB_NAME, f, &hostname)
+		if err != nil {
+			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+		}
+		m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
+		//10 worker Count
+		m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
 	}
 }
 
