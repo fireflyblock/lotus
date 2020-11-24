@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/ipfs/go-cid"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	saproof2 "github.com/filecoin-project/specs-actors/v2/actors/runtime/proof"
@@ -606,7 +609,7 @@ type ParCfg struct {
 	Commit     int
 }
 
-func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par ParCfg, mid abi.ActorID, sectorSize abi.SectorSize, ticketPreimage []byte, saveC2inp string, skipc2, skipunseal bool) ([]SealingResult, []saproof2.SectorInfo, error) {
+func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par ParCfg, mid abi.ActorID, sectorSize abi.SectorSize, ticketPreimage []byte, saveC2inp string, skipc2, skipunseal bool, task string) ([]SealingResult, []saproof2.SectorInfo, error) {
 	var pieces []abi.PieceInfo
 	sealTimings := make([]SealingResult, numSectors)
 	sealedSectors := make([]saproof2.SectorInfo, numSectors)
@@ -617,189 +620,320 @@ func runSeals(sb *ffiwrapper.Sealer, sbfs *basicfs.Provider, numSectors int, par
 	if numSectors%par.PreCommit1 != 0 {
 		return nil, nil, fmt.Errorf("parallelism factor must cleanly divide numSectors")
 	}
-	for i := abi.SectorNumber(0); i < abi.SectorNumber(numSectors); i++ {
-		sid := storage.SectorRef{
-			ID: abi.SectorID{
-				Miner:  mid,
-				Number: i,
-			},
-			ProofType: spt(sectorSize),
-		}
 
-		start := time.Now()
-		log.Infof("[%d] Writing piece into sector...", i)
-
-		//r := rand.New(rand.NewSource(100 + int64(i)))
-
-		//pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector")
-		pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), nil, "_pledgeSector")
-		if err != nil {
-			return nil, nil, err
-		}
-
-		pieces = append(pieces, pi)
-
-		sealTimings[i].AddPiece = time.Since(start)
-	}
-
-	sectorsPerWorker := numSectors / par.PreCommit1
-
-	errs := make(chan error, par.PreCommit1)
-	for wid := 0; wid < par.PreCommit1; wid++ {
-		go func(worker int) {
-			sealerr := func() error {
-				start := worker * sectorsPerWorker
-				end := start + sectorsPerWorker
-				for i := abi.SectorNumber(start); i < abi.SectorNumber(end); i++ {
-					sid := storage.SectorRef{
-						ID: abi.SectorID{
-							Miner:  mid,
-							Number: i,
-						},
-						ProofType: spt(sectorSize),
-					}
-
-					start := time.Now()
-
-					trand := blake2b.Sum256(ticketPreimage)
-					ticket := abi.SealRandomness(trand[:])
-
-					log.Infof("[%d] Running replication(1)...", i)
-					piece := []abi.PieceInfo{pieces[i]}
-					pc1o, err := sb.SealPreCommit1(context.TODO(), sid, ticket, piece)
-					if err != nil {
-						return xerrors.Errorf("commit: %w", err)
-					}
-
-					precommit1 := time.Now()
-
-					preCommit2Sema <- struct{}{}
-					pc2Start := time.Now()
-					log.Infof("[%d] Running replication(2)...", i)
-					cids, err := sb.SealPreCommit2(context.TODO(), sid, pc1o)
-					if err != nil {
-						return xerrors.Errorf("commit: %w", err)
-					}
-
-					precommit2 := time.Now()
-					<-preCommit2Sema
-
-					sealedSectors[i] = saproof2.SectorInfo{
-						SealProof:    sid.ProofType,
-						SectorNumber: i,
-						SealedCID:    cids.Sealed,
-					}
-
-					seed := lapi.SealSeed{
-						Epoch: 101,
-						Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 255},
-					}
-
-					commitSema <- struct{}{}
-					commitStart := time.Now()
-					log.Infof("[%d] Generating PoRep for sector (1)", i)
-					c1o, err := sb.SealCommit1(context.TODO(), sid, ticket, seed.Value, piece, cids)
-					if err != nil {
-						return err
-					}
-
-					sealcommit1 := time.Now()
-
-					log.Infof("[%d] Generating PoRep for sector (2)", i)
-
-					if saveC2inp != "" {
-						c2in := Commit2In{
-							SectorNum:  int64(i),
-							Phase1Out:  c1o,
-							SectorSize: uint64(sectorSize),
-						}
-
-						b, err := json.Marshal(&c2in)
-						if err != nil {
-							return err
-						}
-
-						if err := ioutil.WriteFile(saveC2inp, b, 0664); err != nil {
-							log.Warnf("%+v", err)
-						}
-					}
-
-					var proof storage.Proof
-					if !skipc2 {
-						proof, err = sb.SealCommit2(context.TODO(), sid, c1o)
-						if err != nil {
-							return err
-						}
-					}
-
-					sealcommit2 := time.Now()
-					<-commitSema
-
-					if !skipc2 {
-						svi := saproof2.SealVerifyInfo{
-							SectorID:              abi.SectorID{Miner: mid, Number: i},
-							SealedCID:             cids.Sealed,
-							SealProof:             sid.ProofType,
-							Proof:                 proof,
-							DealIDs:               nil,
-							Randomness:            ticket,
-							InteractiveRandomness: seed.Value,
-							UnsealedCID:           cids.Unsealed,
-						}
-
-						ok, err := ffiwrapper.ProofVerifier.VerifySeal(svi)
-						if err != nil {
-							return err
-						}
-						if !ok {
-							return xerrors.Errorf("porep proof for sector %d was invalid", i)
-						}
-					}
-
-					verifySeal := time.Now()
-
-					if !skipunseal {
-						log.Infof("[%d] Unsealing sector", i)
-						{
-							p, done, err := sbfs.AcquireSector(context.TODO(), sid, storiface.FTUnsealed, storiface.FTNone, storiface.PathSealing)
-							if err != nil {
-								return xerrors.Errorf("acquire unsealed sector for removing: %w", err)
-							}
-							done()
-
-							if err := os.Remove(p.Unsealed); err != nil {
-								return xerrors.Errorf("removing unsealed sector: %w", err)
-							}
-						}
-
-						err := sb.UnsealPiece(context.TODO(), sid, 0, abi.PaddedPieceSize(sectorSize).Unpadded(), ticket, cids.Unsealed)
-						if err != nil {
-							return err
-						}
-					}
-					unseal := time.Now()
-
-					sealTimings[i].PreCommit1 = precommit1.Sub(start)
-					sealTimings[i].PreCommit2 = precommit2.Sub(pc2Start)
-					sealTimings[i].Commit1 = sealcommit1.Sub(commitStart)
-					sealTimings[i].Commit2 = sealcommit2.Sub(sealcommit1)
-					sealTimings[i].Verify = verifySeal.Sub(sealcommit2)
-					sealTimings[i].Unseal = unseal.Sub(verifySeal)
-				}
-				return nil
-			}()
-			if sealerr != nil {
-				errs <- sealerr
-				return
+	switch task {
+	case "ap":
+		for i := abi.SectorNumber(0); i < abi.SectorNumber(numSectors); i++ {
+			sid := storage.SectorRef{
+				ID: abi.SectorID{
+					Miner:  mid,
+					Number: i,
+				},
+				ProofType: spt(sectorSize),
 			}
-			errs <- nil
-		}(wid)
-	}
 
-	for i := 0; i < par.PreCommit1; i++ {
-		err := <-errs
-		if err != nil {
-			return nil, nil, err
+			start := time.Now()
+			log.Infof("[%d] Writing piece into sector...", i)
+
+			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector", "")
+			if err != nil {
+				return nil, nil, err
+			}
+			pieces = append(pieces, pi)
+			sealTimings[i].AddPiece = time.Since(start)
+		}
+
+		cacheAp(pieces)
+	case "p1":
+		pieces = takeApResult(pieces)
+
+		sectorsPerWorker := numSectors / par.PreCommit1
+
+		errs := make(chan error, par.PreCommit1)
+
+		for wid := 0; wid < par.PreCommit1; wid++ {
+			go func(worker int) {
+				sealerr := func() error {
+					start := worker * sectorsPerWorker
+					end := start + sectorsPerWorker
+					for i := abi.SectorNumber(start); i < abi.SectorNumber(end); i++ {
+						sid := storage.SectorRef{
+							ID: abi.SectorID{
+								Miner:  mid,
+								Number: i,
+							},
+							ProofType: spt(sectorSize),
+						}
+
+						start := time.Now()
+
+						trand := blake2b.Sum256(ticketPreimage)
+						ticket := abi.SealRandomness(trand[:])
+
+						log.Infof("[%d] Running replication(1)...", i)
+						pieces := []abi.PieceInfo{pieces[i]}
+						pc1o, err := sb.SealPreCommit1(context.TODO(), sid, ticket, pieces, false)
+						if err != nil {
+							return xerrors.Errorf("commit: %w", err)
+						}
+
+						precommit1 := time.Now()
+						sealTimings[i].PreCommit1 = precommit1.Sub(start)
+
+						cacheP1(pc1o)
+						cacheP1FileName()
+					}
+					return nil
+				}()
+
+				if sealerr != nil {
+					errs <- sealerr
+					return
+				}
+				errs <- nil
+			}(wid)
+		}
+
+		for i := 0; i < par.PreCommit1; i++ {
+			err := <-errs
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	case "p2":
+		removeP2CacheFiles()
+
+		sectorsPerWorker := numSectors / par.PreCommit1
+		errs := make(chan error, par.PreCommit1)
+
+		for wid := 0; wid < par.PreCommit1; wid++ {
+			go func(worker int) {
+				sealerr := func() error {
+					start := worker * sectorsPerWorker
+					end := start + sectorsPerWorker
+					for i := abi.SectorNumber(start); i < abi.SectorNumber(end); i++ {
+						sid := storage.SectorRef{
+							ID: abi.SectorID{
+								Miner:  mid,
+								Number: i,
+							},
+							ProofType: spt(sectorSize),
+						}
+						log.Infof("[%d] Running replication(1)...", i)
+
+						pc1o := takeP1Result()
+
+						pc2Start := time.Now()
+
+						_, err := sb.SealPreCommit2(context.TODO(), sid, pc1o)
+						if err != nil {
+							return xerrors.Errorf("commit: %w", err)
+						}
+
+						precommit2 := time.Now()
+						sealTimings[i].PreCommit2 = precommit2.Sub(pc2Start)
+					}
+					return nil
+				}()
+				if sealerr != nil {
+					errs <- sealerr
+					return
+				}
+				errs <- nil
+			}(wid)
+		}
+		for i := 0; i < par.PreCommit1; i++ {
+			err := <-errs
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	case "all":
+		fallthrough
+	default:
+		for i := abi.SectorNumber(0); i < abi.SectorNumber(numSectors); i++ {
+			sid := storage.SectorRef{
+				ID: abi.SectorID{
+					Miner:  mid,
+					Number: i,
+				},
+				ProofType: spt(sectorSize),
+			}
+
+			start := time.Now()
+			log.Infof("[%d] Writing piece into sector...", i)
+
+			//r := rand.New(rand.NewSource(100 + int64(i)))
+
+			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(sectorSize).Unpadded(), "", "_pledgeSector", "")
+			if err != nil {
+				return nil, nil, err
+			}
+
+			pieces = append(pieces, pi)
+
+			sealTimings[i].AddPiece = time.Since(start)
+		}
+
+		sectorsPerWorker := numSectors / par.PreCommit1
+
+		errs := make(chan error, par.PreCommit1)
+		for wid := 0; wid < par.PreCommit1; wid++ {
+			go func(worker int) {
+				sealerr := func() error {
+					start := worker * sectorsPerWorker
+					end := start + sectorsPerWorker
+					for i := abi.SectorNumber(start); i < abi.SectorNumber(end); i++ {
+						sid := storage.SectorRef{
+							ID: abi.SectorID{
+								Miner:  mid,
+								Number: i,
+							},
+							ProofType: spt(sectorSize),
+						}
+
+						start := time.Now()
+
+						trand := blake2b.Sum256(ticketPreimage)
+						ticket := abi.SealRandomness(trand[:])
+
+						log.Infof("[%d] Running replication(1)...", i)
+						piece := []abi.PieceInfo{pieces[i]}
+						pc1o, err := sb.SealPreCommit1(context.TODO(), sid, ticket, piece, false)
+						if err != nil {
+							return xerrors.Errorf("commit: %w", err)
+						}
+
+						precommit1 := time.Now()
+
+						preCommit2Sema <- struct{}{}
+						pc2Start := time.Now()
+						log.Infof("[%d] Running replication(2)...", i)
+						cids, err := sb.SealPreCommit2(context.TODO(), sid, pc1o)
+						if err != nil {
+							return xerrors.Errorf("commit: %w", err)
+						}
+
+						precommit2 := time.Now()
+						<-preCommit2Sema
+
+						sealedSectors[i] = saproof2.SectorInfo{
+							SealProof:    sid.ProofType,
+							SectorNumber: i,
+							SealedCID:    cids.Sealed,
+						}
+
+						seed := lapi.SealSeed{
+							Epoch: 101,
+							Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 255},
+						}
+
+						commitSema <- struct{}{}
+						commitStart := time.Now()
+						log.Infof("[%d] Generating PoRep for sector (1)", i)
+						c1o, err := sb.SealCommit1(context.TODO(), sid, ticket, seed.Value, piece, cids)
+						if err != nil {
+							return err
+						}
+
+						sealcommit1 := time.Now()
+
+						log.Infof("[%d] Generating PoRep for sector (2)", i)
+
+						if saveC2inp != "" {
+							c2in := Commit2In{
+								SectorNum:  int64(i),
+								Phase1Out:  c1o,
+								SectorSize: uint64(sectorSize),
+							}
+
+							b, err := json.Marshal(&c2in)
+							if err != nil {
+								return err
+							}
+
+							if err := ioutil.WriteFile(saveC2inp, b, 0664); err != nil {
+								log.Warnf("%+v", err)
+							}
+						}
+
+						var proof storage.Proof
+						if !skipc2 {
+							proof, err = sb.SealCommit2(context.TODO(), sid, c1o)
+							if err != nil {
+								return err
+							}
+						}
+
+						sealcommit2 := time.Now()
+						<-commitSema
+
+						if !skipc2 {
+							svi := saproof2.SealVerifyInfo{
+								SectorID:              abi.SectorID{Miner: mid, Number: i},
+								SealedCID:             cids.Sealed,
+								SealProof:             sid.ProofType,
+								Proof:                 proof,
+								DealIDs:               nil,
+								Randomness:            ticket,
+								InteractiveRandomness: seed.Value,
+								UnsealedCID:           cids.Unsealed,
+							}
+
+							ok, err := ffiwrapper.ProofVerifier.VerifySeal(svi)
+							if err != nil {
+								return err
+							}
+							if !ok {
+								return xerrors.Errorf("porep proof for sector %d was invalid", i)
+							}
+						}
+
+						verifySeal := time.Now()
+
+						if !skipunseal {
+							log.Infof("[%d] Unsealing sector", i)
+							{
+								p, done, err := sbfs.AcquireSector(context.TODO(), sid, storiface.FTUnsealed, storiface.FTNone, storiface.PathSealing)
+								if err != nil {
+									return xerrors.Errorf("acquire unsealed sector for removing: %w", err)
+								}
+								done()
+
+								if err := os.Remove(p.Unsealed); err != nil {
+									return xerrors.Errorf("removing unsealed sector: %w", err)
+								}
+							}
+
+							err := sb.UnsealPiece(context.TODO(), sid, 0, abi.PaddedPieceSize(sectorSize).Unpadded(), ticket, cids.Unsealed)
+							if err != nil {
+								return err
+							}
+						}
+						unseal := time.Now()
+
+						sealTimings[i].PreCommit1 = precommit1.Sub(start)
+						sealTimings[i].PreCommit2 = precommit2.Sub(pc2Start)
+						sealTimings[i].Commit1 = sealcommit1.Sub(commitStart)
+						sealTimings[i].Commit2 = sealcommit2.Sub(sealcommit1)
+						sealTimings[i].Verify = verifySeal.Sub(sealcommit2)
+						sealTimings[i].Unseal = unseal.Sub(verifySeal)
+					}
+					return nil
+				}()
+				if sealerr != nil {
+					errs <- sealerr
+					return
+				}
+				errs <- nil
+			}(wid)
+		}
+
+		for i := 0; i < par.PreCommit1; i++ {
+			err := <-errs
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
