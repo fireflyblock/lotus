@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	minertype "github.com/filecoin-project/lotus/firefly/miner-type"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -122,7 +123,7 @@ var initCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		log.Info("Initializing lotus miner")
-
+		minertype.SetMinerType("")
 		sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
 		if err != nil {
 			return err

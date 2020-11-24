@@ -620,9 +620,9 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 		}
 		m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
-		//10 worker Count
-		log.Infof("===== rd del workerCount worker %s field %+v \n", gr.SplicingTaskCounntKey(hostname), f)
-		m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
+		////10 worker Count
+		//log.Infof("===== rd del workerCount worker %s field %+v \n", gr.SplicingTaskCounntKey(hostname), f)
+		//m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
 	}
 
 	if res == 0 {
@@ -695,8 +695,8 @@ func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField) {
 	wCKeyList, err := m.rc.HKeys(gr.SplicingTaskCounntKey(hostname))
 	for _, v := range wCKeyList {
 		if field == v {
-			log.Infof("===== rd del workerCount for hostname %s sectorID %+v taskType %s ", hostname, sid, tt)
-			m.rc.HDel(gr.RedisKey(hostname), v)
+			log.Infof("===== rd del workerCount for hostname %s sectorID %+v taskType %s ", gr.SplicingTaskCounntKey(hostname), sid, tt)
+			m.rc.HDel(gr.SplicingTaskCounntKey(hostname), v)
 		}
 	}
 
