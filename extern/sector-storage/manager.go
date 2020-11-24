@@ -131,7 +131,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, sc 
 		remoteHnd:       &stores.FetchHandler{Local: lstor},
 		index:           si,
 		isExistSealTask: true,
-		sched: newScheduler(),
+		sched:           newScheduler(),
 
 		Prover: prover,
 
@@ -245,7 +245,6 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 		tc.Commit2 = 10000
 		logrus.SchedLogger.Infof("===== c2 worker[%s],Resources:[%+v],WorkScope:[%+v]", info.Hostname, info.Resources, scope)
 	}
-
 
 	m.sched.newWorkers <- &workerHandle{
 		w: w,
@@ -493,13 +492,13 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 
 	tick := &time.Ticker{}
 	switch sector.ProofType {
-	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+	case abi.RegisteredSealProof_StackedDrg2KiBV1, abi.RegisteredSealProof_StackedDrg2KiBV1_1:
 		tick = time.NewTicker(time.Second)
 
-	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+	case abi.RegisteredSealProof_StackedDrg512MiBV1, abi.RegisteredSealProof_StackedDrg512MiBV1_1:
 		tick = time.NewTicker(time.Second * 10)
 
-	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+	case abi.RegisteredSealProof_StackedDrg32GiBV1, abi.RegisteredSealProof_StackedDrg32GiBV1_1:
 		tick = time.NewTicker(CHECK_RES_GAP)
 		time.Sleep(time.Hour * 3)
 	default:
@@ -509,6 +508,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 
 	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 	timer := time.NewTimer(P1WaitTime)
+	defer timer.Stop()
 	start := time.Now()
 
 	for {
@@ -648,13 +648,13 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 
 	tick := &time.Ticker{}
 	switch sector.ProofType {
-	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+	case abi.RegisteredSealProof_StackedDrg2KiBV1, abi.RegisteredSealProof_StackedDrg2KiBV1_1:
 		tick = time.NewTicker(time.Second)
 
-	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+	case abi.RegisteredSealProof_StackedDrg512MiBV1, abi.RegisteredSealProof_StackedDrg512MiBV1_1:
 		tick = time.NewTicker(time.Second * 10)
 
-	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+	case abi.RegisteredSealProof_StackedDrg32GiBV1, abi.RegisteredSealProof_StackedDrg32GiBV1_1:
 		tick = time.NewTicker(CHECK_RES_GAP)
 		time.Sleep(time.Minute * 20)
 
@@ -665,6 +665,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 
 	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit2, 0)
 	timer := time.NewTimer(P2WaitTime)
+	defer timer.Stop()
 	start := time.Now()
 
 	for {
@@ -828,15 +829,14 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 
 	tick := &time.Ticker{}
 	switch sector.ProofType {
-	case abi.RegisteredSealProof_StackedDrg2KiBV1:
+	case abi.RegisteredSealProof_StackedDrg2KiBV1, abi.RegisteredSealProof_StackedDrg2KiBV1_1:
 		tick = time.NewTicker(time.Second)
 
-	case abi.RegisteredSealProof_StackedDrg512MiBV1:
+	case abi.RegisteredSealProof_StackedDrg512MiBV1, abi.RegisteredSealProof_StackedDrg512MiBV1_1:
 		tick = time.NewTicker(time.Second * 10)
 
-	case abi.RegisteredSealProof_StackedDrg32GiBV1:
+	case abi.RegisteredSealProof_StackedDrg32GiBV1, abi.RegisteredSealProof_StackedDrg32GiBV1_1:
 		tick = time.NewTicker(CHECK_RES_GAP)
-
 	default:
 		tick = time.NewTicker(CHECK_RES_GAP)
 	}
@@ -844,6 +844,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 
 	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTCommit1, 0)
 	timer := time.NewTimer(C1WaitTime)
+	defer timer.Stop()
 	start := time.Now()
 
 	for {
