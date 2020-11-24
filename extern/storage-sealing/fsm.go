@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"reflect"
 	"time"
 
@@ -532,4 +533,43 @@ func planOne(ts ...func() (mut mutator, next func(*SectorInfo) error)) func(even
 
 		return 0, xerrors.Errorf("planner for state %s received unexpected event %T (%+v)", state.State, events[0].User, events[0])
 	}
+}
+
+func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisField, error) {
+	retryList, err := m.rc.HKeys(gr.RETRY)
+	if err != nil {
+		log.Infof("hkeys retry err %+v", err)
+		return nil, err
+	}
+
+	i := 0
+	for j := 0; j < len(retryList); j++ {
+		var count int64
+		err = m.rc.HGet(gr.RETRY, retryList[j], &count)
+		if err != nil {
+			log.Infof("HGet retry err %+v", err)
+			return nil, err
+		}
+		if count > 1 {
+			retryList[i] = retryList[j]
+			i++
+		}
+	}
+	retryList = retryList[:i]
+
+	successList := make([]gr.RedisField, 0)
+	for _, field := range retryList {
+		sid, _, _, _ := field.TailoredPubAndParamsfield()
+		log.Infof("===== rd CleanAllSectorDataInRedis start %d", sid)
+
+		m.DeleteDataForSid(sid)
+		err := m.sectors.Send(sid, SectorForceState{Faulty})
+		if err != nil {
+			return successList, err
+		}
+		successList = append(successList, field)
+		//return successList, err
+	}
+
+	return retryList, nil
 }

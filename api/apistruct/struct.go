@@ -3,6 +3,7 @@ package apistruct
 import (
 	"context"
 	sectorstorage "github.com/filecoin-project/sector-storage"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"io"
 	"time"
 
@@ -307,6 +308,7 @@ type StorageMinerStruct struct {
 		SectorSetExpectedSealDuration func(context.Context, time.Duration) error                                                    `perm:"write"`
 		SectorGetExpectedSealDuration func(context.Context) (time.Duration, error)                                                  `perm:"read"`
 		SectorsUpdate                 func(context.Context, abi.SectorNumber, api.SectorState) error                                `perm:"admin"`
+		CleanFailedSector             func(context.Context) ([]gr.RedisField, error)                                                `perm:"admin"`
 		SectorRemove                  func(context.Context, abi.SectorNumber) error                                                 `perm:"admin"`
 		SectorMarkForUpgrade          func(ctx context.Context, id abi.SectorNumber) error                                          `perm:"admin"`
 
@@ -385,7 +387,7 @@ type WorkerStruct struct {
 		ReadPiece   func(context.Context, io.Writer, storage.SectorRef, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize) (bool, error)           `perm:"admin"`
 
 		//FetchRealData     func(ctx context.Context, id storage.SectorRef) error                                                               `perm:"admin"`
-		Fetch             func(context.Context, storage.SectorRef, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error `perm:"admin"`
+		Fetch func(context.Context, storage.SectorRef, storiface.SectorFileType, storiface.PathType, storiface.AcquireMode) error `perm:"admin"`
 		//PushDataToStorage func(ctx context.Context, sid storage.SectorRef, dest string) error                                                 `perm:"admin"`
 		//GetBindSectors    func(ctx context.Context) ([]storage.SectorRef, error)                                                              `perm:"admin"`
 
@@ -1256,6 +1258,10 @@ func (c *StorageMinerStruct) SectorGetExpectedSealDuration(ctx context.Context) 
 
 func (c *StorageMinerStruct) SectorsUpdate(ctx context.Context, id abi.SectorNumber, state api.SectorState) error {
 	return c.Internal.SectorsUpdate(ctx, id, state)
+}
+
+func (c *StorageMinerStruct) CleanFailedSector(ctx context.Context) ([]gr.RedisField, error) {
+	return c.Internal.CleanFailedSector(ctx)
 }
 
 func (c *StorageMinerStruct) SectorRemove(ctx context.Context, number abi.SectorNumber) error {

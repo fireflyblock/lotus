@@ -5,6 +5,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
 )
 
 // TODO: refactor this to be direct somehow
@@ -37,6 +38,10 @@ func (m *Miner) PledgeSector() error {
 
 func (m *Miner) ForceSectorState(ctx context.Context, id abi.SectorNumber, state sealing.SectorState) error {
 	return m.sealing.ForceSectorState(ctx, id, state)
+}
+
+func (m *Miner) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisField, error) {
+	return m.sealing.CleanAllSectorDataInRedis(ctx)
 }
 
 func (m *Miner) RemoveSector(ctx context.Context, id abi.SectorNumber) error {

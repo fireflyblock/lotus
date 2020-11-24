@@ -3,6 +3,7 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -26,10 +27,10 @@ import (
 
 	sectorstorage "github.com/filecoin-project/sector-storage"
 	//"github.com/filecoin-project/sector-storage/ffiwrapper"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/apistruct"
@@ -302,6 +303,10 @@ func (sm *StorageMinerAPI) SectorGetExpectedSealDuration(ctx context.Context) (t
 
 func (sm *StorageMinerAPI) SectorsUpdate(ctx context.Context, id abi.SectorNumber, state api.SectorState) error {
 	return sm.Miner.ForceSectorState(ctx, id, sealing.SectorState(state))
+}
+
+func (sm *StorageMinerAPI) CleanFailedSector(ctx context.Context) ([]gr.RedisField, error) {
+	return sm.Miner.CleanAllSectorDataInRedis(ctx)
 }
 
 func (sm *StorageMinerAPI) SectorRemove(ctx context.Context, id abi.SectorNumber) error {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	sectorstorage "github.com/filecoin-project/sector-storage"
+	gr "github.com/filecoin-project/sector-storage/go-redis"
 	"time"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -57,6 +58,8 @@ type StorageMiner interface {
 	// SectorGetExpectedSealDuration gets the expected time for a sector to seal
 	SectorGetExpectedSealDuration(context.Context) (time.Duration, error)
 	SectorsUpdate(context.Context, abi.SectorNumber, SectorState) error
+	//if sector fail multiple times, clear all data
+	CleanFailedSector(context.Context) ([]gr.RedisField, error)
 	SectorRemove(context.Context, abi.SectorNumber) error
 	SectorMarkForUpgrade(ctx context.Context, id abi.SectorNumber) error
 

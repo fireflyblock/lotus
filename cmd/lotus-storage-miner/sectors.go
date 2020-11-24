@@ -42,6 +42,7 @@ var sectorsCmd = &cli.Command{
 		sectorsCapacityCollateralCmd,
 		sectorsPledgeSwitchCmd,
 		sectorsSwitchStatusCmd,
+		sectorsCleanCmd,
 	},
 }
 
@@ -645,4 +646,34 @@ func yesno(b bool) string {
 		return color.GreenString("YES")
 	}
 	return color.RedString("NO")
+}
+
+var sectorsCleanCmd = &cli.Command{
+	Name:  "clean-failed-sector",
+	Usage: "if sector fail multiple times, clear all data",
+	Action: func(cctx *cli.Context) error {
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		list, err := nodeApi.CleanFailedSector(ctx)
+		if err != nil {
+			if len(list) == 0 {
+				fmt.Println("Delete err", err)
+			} else {
+				fmt.Printf("Cleaned up %+v \n", list)
+				fmt.Println("Delete err\n", err)
+			}
+			return nil
+		}
+
+		fmt.Printf("Delete sectors : %+v \n", len(list))
+		for i := 0; i < len(list); i++ {
+			fmt.Printf("%d - task:%+v\n", i+1, list[i])
+		}
+		return nil
+	},
 }
