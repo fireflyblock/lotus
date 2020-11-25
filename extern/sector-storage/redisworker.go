@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/sector-storage/storiface"
 	"github.com/filecoin-project/sector-storage/transfordata"
 	"github.com/filecoin-project/specs-storage/storage"
+	"github.com/go-redis/redis/v8"
 	"golang.org/x/xerrors"
 	"io"
 	"os"
