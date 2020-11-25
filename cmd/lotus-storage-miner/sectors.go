@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -215,9 +214,9 @@ var sectorsListCmd = &cli.Command{
 			commitedIDs[info.SectorNumber] = struct{}{}
 		}
 
-		sort.Slice(list, func(i, j int) bool {
-			return list[i] < list[j]
-		})
+		//sort.Slice(list, func(i, j int) bool {
+		//	return list[i] < list[j]
+		//})
 
 		tw := tablewriter.New(
 			tablewriter.Col("ID"),

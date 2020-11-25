@@ -185,14 +185,14 @@ minerLoop:
 				continue
 			}
 
-      			if base != nil {
+			if base != nil {
 				log.Infof("mine: base=%+v prebase=%+v minTimestamp=%+v",
-				base.TipSet.Height(),
-				prebase.TipSet.Height(),
-				prebase.TipSet.MinTimestamp())
-      			} else {
-      			  	log.Infof("mine: base=%+v", base)
-      			}
+					base.TipSet.Height(),
+					prebase.TipSet.Height(),
+					prebase.TipSet.MinTimestamp())
+			} else {
+				log.Infof("mine: base=%+v", base)
+			}
 
 			if base != nil && base.TipSet.Height() == prebase.TipSet.Height() && base.NullRounds == prebase.NullRounds {
 				base = prebase
@@ -201,7 +201,6 @@ minerLoop:
 			if base != nil {
 				onDone(false, 0, nil)
 			}
-
 
 			// TODO: need to change the orchestration here. the problem is that
 			// we are waiting *after* we enter this loop and selecta mining

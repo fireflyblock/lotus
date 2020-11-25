@@ -45,6 +45,7 @@ func main() {
 		datastoreCmd,
 		ledgerCmd,
 		sectorsCmd,
+		sectorsstorageCmd,
 		msgCmd,
 		electionCmd,
 		rpcCmd,
