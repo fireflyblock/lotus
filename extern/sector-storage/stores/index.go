@@ -201,7 +201,8 @@ loop:
 				if !sid.primary && primary {
 					sid.primary = true
 				} else {
-					log.Warnf("sector %v redeclared in %s", s, storageID)
+					// 过滤掉这个无良消息
+					//log.Warnf("sector %v redeclared in %s", s, storageID)
 				}
 				continue loop
 			}
