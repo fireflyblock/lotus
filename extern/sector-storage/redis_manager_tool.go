@@ -1133,13 +1133,20 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 		//7 wait time
 		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
 		//8 task status
-		err := m.redisCli.HGet(gr.PUB_NAME, f, &hostname)
+		ex, err := m.redisCli.HExist(gr.PUB_NAME, f)
 		if err != nil {
-			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
+			continue
 		}
-		m.redisCli.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
-		//9 retry count
-		m.FreeRetryCount(f, hostname)
+		if ex {
+			err = m.redisCli.HGet(gr.PUB_NAME, f, &hostname)
+			if err != nil {
+				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+			}
+			m.redisCli.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
+			//9 retry count
+			m.FreeRetryCount(f, hostname)
+		}
 	}
 
 	if res == 0 {
