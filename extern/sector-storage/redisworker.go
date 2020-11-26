@@ -715,7 +715,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 				for _, dest := range params.PathList {
 					err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, true)
 					if err != nil {
-						log.Warnf("sector(%+v) c1 transfor data to %s failed", dest)
+						log.Warnf("sector(%+v) c1 transfor data to %s failed", params.Sector, dest)
 						continue
 					}
 					paramsRes.StoragePath = dest
@@ -849,12 +849,13 @@ func getLayersAndTreeCAndTreeDFiles(url string, proofType abi.RegisteredSealProo
 	tailLabel := ".dat"
 	var files []string
 
-	if proofType == abi.RegisteredSealProof_StackedDrg2KiBV1 || proofType == abi.RegisteredSealProof_StackedDrg512MiBV1 {
+	if proofType == abi.RegisteredSealProof_StackedDrg2KiBV1 || proofType == abi.RegisteredSealProof_StackedDrg512MiBV1 ||
+		proofType == abi.RegisteredSealProof_StackedDrg2KiBV1_1 || proofType == abi.RegisteredSealProof_StackedDrg512MiBV1_1 {
 		files = append(files, url+layerLabel+"1"+tailLabel)
 		files = append(files, url+layerLabel+"2"+tailLabel)
 		files = append(files, url+treeD)
 		files = append(files, url+treeCLabel+tailLabel)
-	} else if proofType == abi.RegisteredSealProof_StackedDrg32GiBV1 {
+	} else if proofType == abi.RegisteredSealProof_StackedDrg32GiBV1 || proofType == abi.RegisteredSealProof_StackedDrg32GiBV1_1 {
 		for i := 0; i < 12; i++ {
 			files = append(files, url+layerLabel+strconv.Itoa(i)+tailLabel)
 		}

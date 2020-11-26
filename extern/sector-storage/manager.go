@@ -1049,7 +1049,7 @@ func (m *Manager) GetStoragePathList(ctx context.Context, sector abi.SectorID) (
 		return []string{}, map[string]string{}
 	}
 
-	paths := make([]string, len(sis))
+	paths := make([]string, 0, len(sis))
 	path2sid := make(map[string]string, 0)
 	for _, si := range sis {
 		p, ok := storagePaths[si.ID]
