@@ -3,6 +3,7 @@ package sealing
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	gr "github.com/filecoin-project/sector-storage/go-redis"
 	logrus "github.com/filecoin-project/sector-storage/log"
@@ -122,6 +123,11 @@ func (m *Sealing) handleGetTicket(ctx statemachine.Context, sector SectorInfo) e
 }
 
 func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) error {
+	err := m.SelectWorkersToSetFaulty(sector.SectorNumber)
+	if err == nil {
+		return nil
+	}
+
 	if err := checkPieces(ctx.Context(), m.maddr, sector, m.api); err != nil { // Sanity check state
 		switch err.(type) {
 		case *ErrApi:
@@ -215,6 +221,11 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 }
 
 func (m *Sealing) handlePreCommit2(ctx statemachine.Context, sector SectorInfo) error {
+	err := m.SelectWorkersToSetFaulty(sector.SectorNumber)
+	if err == nil {
+		return nil
+	}
+
 	cids, err := m.sealer.SealPreCommit2(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorType, sector.SectorNumber), sector.PreCommit1Out)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit2Failed{xerrors.Errorf("seal pre commit(2) failed: %w", err)})
@@ -416,6 +427,11 @@ func (m *Sealing) handleWaitSeed(ctx statemachine.Context, sector SectorInfo) er
 }
 
 func (m *Sealing) handleCommitting(ctx statemachine.Context, sector SectorInfo) error {
+	err := m.SelectWorkersToSetFaulty(sector.SectorNumber)
+	if err == nil {
+		return nil
+	}
+
 	if sector.CommitMessage != nil {
 		log.Warnf("sector %d entered committing state with a commit message cid", sector.SectorNumber)
 
@@ -741,4 +757,31 @@ func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField) {
 			m.rc.HDel(gr.RedisKey(hostname), key)
 		}
 	}
+}
+
+func (m *Sealing) SelectWorkersToSetFaulty(sectorID abi.SectorNumber) error {
+	pledgeField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, 0)
+	plExist, err := m.rc.HExist(gr.PUB_NAME, pledgeField)
+	if err != nil {
+		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPiecePl, err)
+		return err
+	}
+
+	sealField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 0)
+	seExist, err := m.rc.HExist(gr.PUB_NAME, sealField)
+	if err != nil {
+		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPieceSe, err)
+		return err
+	}
+
+	if !plExist && !seExist {
+		err = m.sectors.Send(sectorID, SectorForceState{Faulty})
+		if err != nil {
+			return err
+		}
+		log.Infof("===== rd select sector %+v to set Faulty\n", sectorID)
+		return nil
+	}
+
+	return errors.New(fmt.Sprintf("failed to select sector %+v to set Faulty", sectorID))
 }
