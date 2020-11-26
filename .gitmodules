@@ -13,3 +13,6 @@
 [submodule "extern/blst"]
 	path = extern/blst
 	url = https://github.com/supranational/blst.git
+[submodule "extern/fil-blst"]
+	path = extern/fil-blst
+	url = https://github.com/filecoin-project/fil-blst.git
