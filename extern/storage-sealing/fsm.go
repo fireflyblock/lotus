@@ -559,7 +559,35 @@ func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisFiel
 
 	successList := make([]gr.RedisField, 0)
 	for _, field := range retryList {
-		sid, _, _, _ := field.TailoredPubAndParamsfield()
+		sid, tt, _, _ := field.TailoredPubAndParamsfield()
+		//check if it is successful
+		switch tt {
+		case "ap":
+			apRes := &gr.ParamsResAp{}
+			m.rc.HGet(gr.PARAMS_RES_NAME, field, apRes)
+			if apRes.Err == "" {
+				continue
+			}
+		case "p1":
+			p1Res := &gr.ParamsResP1{}
+			m.rc.HGet(gr.PARAMS_RES_NAME, field, p1Res)
+			if p1Res.Err == "" {
+				continue
+			}
+		case "p2":
+			p2Res := &gr.ParamsResP2{}
+			m.rc.HGet(gr.PARAMS_RES_NAME, field, p2Res)
+			if p2Res.Err == "" {
+				continue
+			}
+		case "c1":
+			c1Res := &gr.ParamsResC1{}
+			m.rc.HGet(gr.PARAMS_RES_NAME, field, c1Res)
+			if c1Res.Err == "" {
+				continue
+			}
+		}
+
 		log.Infof("===== rd CleanAllSectorDataInRedis start %d", sid)
 
 		m.DeleteDataForSid(sid)
