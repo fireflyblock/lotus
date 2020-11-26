@@ -469,7 +469,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 		res := m.RecoveryP1(sector.ID.Number, p1Field, rd.TicketEpoch)
 		if res != nil {
 			if res.Err == "" {
-				logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit1)
+				logrus.SchedLogger.Infof("===== rd recovery miner ok, sectorID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit1)
 				m.WhetherToDeleteRetryCount(p1Field, "")
 				return res.Out, nil
 			}
@@ -631,7 +631,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 	res := m.RecoveryP2(sector.ID.Number, p2Field)
 	if res != nil {
 		if res.Err == "" {
-			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectroID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit2)
+			logrus.SchedLogger.Infof("===== rd recovery miner ok, sectorID %d, taskType %+v", sector.ID.Number, sealtasks.TTPreCommit2)
 			m.WhetherToDeleteRetryCount(p2Field, "")
 			return res.Out, nil
 		}
