@@ -494,7 +494,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 	//if err != nil {
 	//	return nil, err
 	//}
-
+	start := time.Now()
 	tick := &time.Ticker{}
 	switch sector.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1, abi.RegisteredSealProof_StackedDrg2KiBV1_1:
@@ -514,7 +514,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 	timer := time.NewTimer(P1WaitTime)
 	defer timer.Stop()
-	start := time.Now()
 
 	for {
 		select {
@@ -651,6 +650,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 	//	return out, err
 	//}
 
+	start := time.Now()
 	tick := &time.Ticker{}
 	switch sector.ProofType {
 	case abi.RegisteredSealProof_StackedDrg2KiBV1, abi.RegisteredSealProof_StackedDrg2KiBV1_1:
@@ -671,7 +671,6 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 	resField := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit2, 0)
 	timer := time.NewTimer(P2WaitTime)
 	defer timer.Stop()
-	start := time.Now()
 
 	for {
 		select {
