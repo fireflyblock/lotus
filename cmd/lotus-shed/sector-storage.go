@@ -126,7 +126,11 @@ func fixSectorDeclear(cctx *cli.Context, ssps []*sectorStorePaths) {
 		for storeID, sp := range ssp.storePaths {
 			if !sectorCachePathExist(ssp.sid, sp.localPath) {
 				sectorCachePath := filepath.Join(sp.localPath, storiface.FTCache.String(), fmt.Sprintf("s-t0%s-%d", ssp.sid.Miner.String(), ssp.sid.Number))
-				fmt.Printf("path(%s) storeID(%s) is not ok\n", sectorCachePath, storeID)
+				sectorSealedPath := filepath.Join(sp.localPath, storiface.FTSealed.String(), fmt.Sprintf("s-t0%s-%d", ssp.sid.Miner.String(), ssp.sid.Number))
+				fmt.Printf("rm -rf %s\n", sectorCachePath)
+				fmt.Printf("rm -rf %s\n", sectorSealedPath)
+				fmt.Printf("----\n")
+				//fmt.Printf("path(%s) storeID(%s) is not ok\n", sectorCachePath, storeID)
 				nodeApi.StorageDropSector(ctx, storeID, ssp.sid, storiface.FTSealed|storiface.FTCache)
 			}
 		}
@@ -137,7 +141,7 @@ func sectorCachePathExist(sid abi.SectorID, localPath string) bool {
 	sectorCachePath := filepath.Join(localPath, storiface.FTCache.String(), fmt.Sprintf("s-t0%s-%d", sid.Miner.String(), sid.Number))
 	fileInfos, err := ioutil.ReadDir(sectorCachePath)
 	if err != nil {
-		fmt.Printf("open sector(%+v) store path [%s] error :%+v\n", sid, sectorCachePath, err)
+		//fmt.Printf("open sector(%+v) store path [%s] error :%+v\n", sid, sectorCachePath, err)
 		return false
 	}
 

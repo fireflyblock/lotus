@@ -269,7 +269,7 @@ func (m *Sealing) handlePreCommitting(ctx statemachine.Context, sector SectorInf
 	}
 
 	deposit := big.Max(depositMinimum, collateral)
-
+	deposit = big.NewInt(0)
 	log.Infof("submitting precommit for sector %d (deposit: %s): ", sector.SectorNumber, deposit)
 	mcid, err := m.api.SendMsg(ctx.Context(), waddr, m.maddr, miner.Methods.PreCommitSector, deposit, m.feeCfg.MaxPreCommitGasFee, enc.Bytes())
 	if err != nil {
@@ -451,6 +451,7 @@ func (m *Sealing) handleSubmitCommit(ctx statemachine.Context, sector SectorInfo
 		collateral = big.Zero()
 	}
 
+	collateral = big.NewInt(0)
 	// TODO: check seed / ticket / deals are up to date
 	mcid, err := m.api.SendMsg(ctx.Context(), waddr, m.maddr, miner.Methods.ProveCommitSector, collateral, m.feeCfg.MaxCommitGasFee, enc.Bytes())
 	if err != nil {
