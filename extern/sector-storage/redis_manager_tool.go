@@ -1116,23 +1116,6 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 
 	for _, v := range tasklist {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
-		//1 pub
-		m.redisCli.HDel(gr.PARAMS_NAME, f)
-		//2 params
-		m.redisCli.HDel(gr.PUB_NAME, f)
-		//3 res
-		m.redisCli.HDel(gr.PUB_RES_NAME, f)
-		//4 res params
-		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
-		//5 pub time
-		m.redisCli.HDel(gr.PUB_TIME, f)
-		if v == sealtasks.TTPreCommit1 {
-			//6 recovery
-			m.redisCli.HDel(gr.RECOVER_NAME, f)
-		}
-		//7 wait time
-		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
-		//8 task status
 		ex, err := m.redisCli.HExist(gr.PUB_NAME, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
@@ -1143,10 +1126,29 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
+
+			//1 task status
 			m.redisCli.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
-			//9 retry count
+			//2 retry count
 			m.FreeRetryCount(f, hostname)
 		}
+
+		//3 pub
+		m.redisCli.HDel(gr.PARAMS_NAME, f)
+		//4 params
+		m.redisCli.HDel(gr.PUB_NAME, f)
+		//5 res
+		m.redisCli.HDel(gr.PUB_RES_NAME, f)
+		//6 res params
+		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
+		//7 pub time
+		m.redisCli.HDel(gr.PUB_TIME, f)
+		if v == sealtasks.TTPreCommit1 {
+			//6 recovery
+			m.redisCli.HDel(gr.RECOVER_NAME, f)
+		}
+		//8 wait time
+		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
 	}
 
 	if res == 0 {
@@ -1166,19 +1168,34 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 	var i int64 = 1
 	for i = 1; i <= count; i++ {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
-		//2 pub
+		ex, err := m.redisCli.HExist(gr.PUB_NAME, f)
+		if err != nil {
+			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
+			continue
+		}
+		if ex {
+			err = m.redisCli.HGet(gr.PUB_NAME, f, &hostname)
+			if err != nil {
+				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+			}
+
+			//2 task status
+			m.redisCli.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
+			//3 retry count
+			m.FreeRetryCount(f, hostname)
+		}
+
+		//4 pub
 		m.redisCli.HDel(gr.PARAMS_NAME, f)
-		//3 res params
-		m.redisCli.HDel(gr.PUB_NAME, f)
-		//4 res
-		m.redisCli.HDel(gr.PUB_RES_NAME, f)
 		//5 res params
+		m.redisCli.HDel(gr.PUB_NAME, f)
+		//6 res
+		m.redisCli.HDel(gr.PUB_RES_NAME, f)
+		//7 res params
 		m.redisCli.HDel(gr.PARAMS_RES_NAME, f)
-		//6 pub time
+		//8 pub time
 		m.redisCli.HDel(gr.PUB_TIME, f)
-		//7 retry count
-		m.FreeRetryCount(f, hostname)
-		//8 wait time
+		//9 wait time
 		m.redisCli.HDel(gr.RECOVERY_WAIT_TIME, f)
 
 	}
@@ -1325,6 +1342,7 @@ func (m *Manager) CalculateWaitingTask(hostname string, taskType sealtasks.TaskT
 			i++
 		}
 	}
+	pledgeKeys = pledgeKeys[:i]
 
 	i = 0
 	for j := 0; j < len(p1Keys); j++ {

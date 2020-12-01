@@ -611,26 +611,6 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 
 	for _, v := range taskList {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
-		m.DeleteWorkerCountAndTaskStatus(f)
-		//1 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
-		//2 params
-		m.rc.HDel(gr.PUB_NAME, f)
-		//3 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
-		//4 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
-		//5 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
-		if v == sealtasks.TTPreCommit1 {
-			//6 recovery
-			m.rc.HDel(gr.RECOVER_NAME, f)
-		}
-		//7 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
-		//8 retry count
-		m.FreeRetryCount(f)
-		//9 task status
 		ex, err := m.rc.HExist(gr.PUB_NAME, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
@@ -641,11 +621,31 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
-			m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
-			////10 worker Count
-			//log.Infof("===== rd del workerCount worker %s field %+v \n", gr.SplicingTaskCounntKey(hostname), f)
-			//m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
+
+			//1 worker count
+			m.DeleteWorkerCountAndTaskStatus(f, hostname)
+			//2 retry count
+			m.FreeRetryCount(f, hostname)
+			//3 cache file count
+			m.FreeCacheFileCount(f, hostname)
 		}
+
+		//4 pub
+		m.rc.HDel(gr.PARAMS_NAME, f)
+		//5 params
+		m.rc.HDel(gr.PUB_NAME, f)
+		//6 res
+		m.rc.HDel(gr.PUB_RES_NAME, f)
+		//7 res params
+		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		//8 pub time
+		m.rc.HDel(gr.PUB_TIME, f)
+		if v == sealtasks.TTPreCommit1 {
+			//9 recovery
+			m.rc.HDel(gr.RECOVER_NAME, f)
+		}
+		//10 wait time
+		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
 	}
 
 	if res == 0 {
@@ -664,21 +664,6 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	var i int64 = 1
 	for i = 1; i <= count; i++ {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
-		//2 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
-		//3 res params
-		m.rc.HDel(gr.PUB_NAME, f)
-		//4 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
-		//5 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
-		//6 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
-		//7 retry count
-		m.FreeRetryCount(f)
-		//8 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
-		//9 task status
 		ex, err := m.rc.HExist(gr.PUB_NAME, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
@@ -689,32 +674,31 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
-			m.rc.HDel(gr.RedisKey(hostname), gr.RedisField(sectorID.String()))
-			//10 worker Count
-			m.rc.HDel(gr.SplicingTaskCounntKey(hostname), f)
+
+			//1 worker count
+			m.DeleteWorkerCountAndTaskStatus(f, hostname)
+			//2 retry count
+			m.FreeRetryCount(f, hostname)
+			//3 cache file count
+			m.FreeCacheFileCount(f, hostname)
 		}
+		//4 pub
+		m.rc.HDel(gr.PARAMS_NAME, f)
+		//5 res params
+		m.rc.HDel(gr.PUB_NAME, f)
+		//6 res
+		m.rc.HDel(gr.PUB_RES_NAME, f)
+		//7 res params
+		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		//8 pub time
+		m.rc.HDel(gr.PUB_TIME, f)
+		//9 wait time
+		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
 	}
 }
 
-func (m *Sealing) FreeRetryCount(retryField gr.RedisField) error {
-	sid, _, _, _ := retryField.TailoredPubAndParamsfield()
-	hostname := ""
-	ex, err := m.rc.HExist(gr.PUB_NAME, retryField)
-	if err != nil {
-		log.Errorf("===== rd HExist hostname for FreeRetryCount, sectorID %+v err %+v", sid, err)
-		return err
-	}
-
-	if !ex {
-		return nil
-	}
-
-	err = m.rc.HGet(gr.PUB_NAME, retryField, &hostname)
-	if err != nil {
-		log.Errorf("===== rd free retry count hget pledge pub err %+v sectorID %+v, pledgeField %+v\n", err, sid, retryField)
-	}
-
-	_, err = m.rc.HDel(gr.RETRY, retryField)
+func (m *Sealing) FreeRetryCount(retryField gr.RedisField, hostname string) error {
+	_, err := m.rc.HDel(gr.RETRY, retryField)
 	//log.Infof("===== rd free retry count hostname %+v sectorID %+v taskType %+v field %+v", hostname, sid, tt, retryField)
 	if err != nil {
 		log.Errorf("===== rd free retry count field %+v err %+v", retryField, err)
@@ -723,26 +707,22 @@ func (m *Sealing) FreeRetryCount(retryField gr.RedisField) error {
 	return nil
 }
 
-func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField) {
-	hostname := ""
+func (m *Sealing) FreeCacheFileCount(retryField gr.RedisField, hostname string) error {
+	newField := gr.TypeToType(retryField, "p1")
+
+	m.rc.HDel(gr.SplicingCounterP1Key(hostname), newField)
+
+	return nil
+}
+
+func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField, hostname string) {
 	sid, tt, _, _ := field.TailoredPubAndParamsfield()
-	ex, err := m.rc.HExist(gr.PUB_NAME, field)
-	if err != nil {
-		log.Errorf("===== rd HExist hostname for DeleteWorkerCountForTask, sectorID %+v taskType %s err %+v", sid, tt, err)
-		return
-	}
-
-	if !ex {
-		return
-	}
-
-	err = m.rc.HGet(gr.PUB_NAME, field, &hostname)
-	if err != nil {
-		log.Errorf("===== rd get hostname for DeleteWorkerCountForTask, sectorID %+v taskType %s err %+v", sid, tt, err)
-		return
-	}
 
 	wCKeyList, err := m.rc.HKeys(gr.SplicingTaskCounntKey(hostname))
+	if err != nil {
+		log.Errorf("===== rd HKeys hostname for DeleteWorkerCountForTask, sectorID %+v taskType %s err %+v", sid, tt, err)
+		return
+	}
 	for _, v := range wCKeyList {
 		if field == v {
 			log.Infof("===== rd del workerCount for hostname %s sectorID %+v taskType %s ", gr.SplicingTaskCounntKey(hostname), sid, tt)
