@@ -385,6 +385,7 @@ func (wh *workerHandle) utilization() float64 {
 }
 
 var GB416 uint64 = 416 << 30
+var GB453 uint64 = 453 << 30
 var GB64 uint64 = 64 << 30
 var GB56 uint64 = 56 << 30
 var GB2 uint64 = 2 << 30
@@ -404,7 +405,7 @@ func CalculateResources(wr storiface.WorkerResources, disk int64) *TaskConfig {
 
 	p1MemCount := (memSize-GB56)/GB64 - p2Num + 2 //内存容量下p1的最大数量
 	logrus.SchedLogger.Infof("===== p1MemCount, p1MemCount [%d] , memSize: [%d] ", p1MemCount, memSize)
-	p1DiskCount := diskSize / GB416 //磁盘容量下p1的最大数量
+	p1DiskCount := diskSize / GB453 //磁盘容量下p1,p2的最大数量
 	logrus.SchedLogger.Infof("===== p1DiskCount, p1DiskCount [%d] ,diskSize: [%+v] ", p1DiskCount, diskSize)
 	p1Num = selectMin(p1MemCount, p1DiskCount/2) //选择最小限度作为p1
 
