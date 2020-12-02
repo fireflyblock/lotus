@@ -566,8 +566,8 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 	}
 
 	{
-		out, err := rw.sealer.SealPreCommit1(ctx, params.Sector, params.Ticket, params.Pieces, params.Recover)
 		startAt := time.Now()
+		out, err := rw.sealer.SealPreCommit1(ctx, params.Sector, params.Ticket, params.Pieces, params.Recover)
 		log.Infof("===== rd p1 finished , sectorID %+v err %+v start at:%s end at:%s cost time:%s", params.Sector.ID.Number, err,
 			startAt.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05"), time.Now().Sub(startAt))
 		if err != nil {
