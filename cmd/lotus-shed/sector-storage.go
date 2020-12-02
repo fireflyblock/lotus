@@ -17,6 +17,7 @@ import (
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 )
 
 var sectorsstorageCmd = &cli.Command{
@@ -26,6 +27,7 @@ var sectorsstorageCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		faultySectorsCmd,
 		fixSectorDeclCmd,
+		checkAllSectorDeclCmd,
 	},
 }
 
@@ -92,21 +94,82 @@ var fixSectorDeclCmd = &cli.Command{
 		}
 
 		fixSectorDeclear(cctx, ssps)
-		//// select right store path, drop fault store path
-		//for _, ssp := range ssps {
-		//	// 检查cache路径中的文件即可
-		//	fmt.Printf("check sector (%+v)\n",ssp.sid)
-		//	for storeID,sp:=range  ssp.storePaths{
+		return nil
+	},
+}
 
-		//		sectorCachePath := filepath.Join(sp.localPath, storiface.FTCache.String(), fmt.Sprintf("s-t0%s-%d", ssp.sid.Miner.String(), ssp.sid.Number))
-		//		if !sectorCachePathExist(ssp.sid,sp.localPath){
-		//			fmt.Printf("path(%s) storeID(%s) is not ok\n",sectorCachePath,storeID)
-		//		}else{
-		//			//fmt.Printf("path(%s) storeID(%s) is ok\n",sectorCachePath,storeID)
-		//		}
-		//	}
-		//	fmt.Println("------")
-		//}
+var checkAllSectorDeclCmd = &cli.Command{
+	Name:  "check-all-sectors-dec",
+	Usage: "Tools for check all sectors declear,may be take loog time.",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fix-decl",
+			Value: false,
+			Usage: "fix sector declear, default false",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+
+		if cctx.Bool("fix-decl") {
+			fmt.Println("try to fix err sector declear")
+		}
+		start := time.Now()
+		provingSectors := getAllProvingSectors(cctx)
+		if len(provingSectors) == 0 {
+			fmt.Println("proving Sectors size is 0")
+			return nil
+		}
+
+		startGetDeclInfo := time.Now()
+		ssps := getSectorsStorageInfo(cctx, provingSectors)
+		if len(ssps) == 0 {
+			fmt.Printf("provingSectors count %d, getSectorStorageDeclear count %d,please check it!!!!!\n", len(provingSectors), len(ssps))
+			return nil
+		}
+
+		startCheckErrPath := time.Now()
+		ctx := lcli.ReqContext(cctx)
+		nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			fmt.Printf("Err:%+v", err)
+			return nil
+		}
+		defer closer()
+
+		// select right store path, drop fault store path
+
+		var errDecPaths []string
+		for _, ssp := range ssps {
+			// 检查cache路径中的文件即可
+			for storeID, sp := range ssp.storePaths {
+				//for _, sp := range ssp.storePaths {
+				if !sectorCachePathExist(ssp.sid, sp.localPath) {
+					sectorCachePath := filepath.Join(sp.localPath, storiface.FTCache.String(), fmt.Sprintf("s-t0%s-%d", ssp.sid.Miner.String(), ssp.sid.Number))
+					sectorSealedPath := filepath.Join(sp.localPath, storiface.FTSealed.String(), fmt.Sprintf("s-t0%s-%d", ssp.sid.Miner.String(), ssp.sid.Number))
+					errDecPaths = append(errDecPaths, sectorSealedPath)
+					errDecPaths = append(errDecPaths, sectorCachePath)
+					//fmt.Printf("rm -rf %s\n", sectorCachePath)
+					//fmt.Printf("rm -rf %s\n", sectorSealedPath)
+					//fmt.Printf("----\n")
+					//fmt.Printf("path(%s) storeID(%s) is not ok\n", sectorCachePath, storeID)
+					if cctx.Bool("fix-decl") {
+						nodeApi.StorageDropSector(ctx, storeID, ssp.sid, storiface.FTSealed|storiface.FTCache)
+					}
+				}
+			}
+		}
+
+		if len(errDecPaths) == 0 {
+			fmt.Printf("all %d proving sectors dec is ok!\n", len(provingSectors))
+			return nil
+		}
+
+		fmt.Printf("check %d errDec %d----total cost time :%s\n", len(provingSectors), len(errDecPaths)/2, time.Now().Sub(start))
+		fmt.Printf("cost time: \ngetAllProvingSectorsNumber:%s\ngetAllDec:%s\ncheckAllPath:%s\n",
+			startGetDeclInfo.Sub(start), startCheckErrPath.Sub(startGetDeclInfo), time.Now().Sub(startCheckErrPath))
+		for _, path := range errDecPaths {
+			fmt.Println(path)
+		}
 		return nil
 	},
 }
@@ -207,6 +270,57 @@ func getSectorsStorageInfo(cctx *cli.Context, sectors []uint64) []*sectorStorePa
 		ssps = append(ssps, &ssp)
 	}
 	return ssps
+}
+
+func getAllProvingSectors(cctx *cli.Context) []uint64 {
+	nodeApi, closer, err := lcli.GetStorageMinerAPI(cctx)
+	if err != nil {
+		return []uint64{}
+	}
+	defer closer()
+
+	api, acloser, err := lcli.GetFullNodeAPI(cctx)
+	if err != nil {
+		return []uint64{}
+	}
+	defer acloser()
+
+	ctx := lcli.ReqContext(cctx)
+
+	stor := store.ActorStore(ctx, apibstore.NewAPIBlockstore(api))
+
+	maddr, err := getActorAddress(ctx, nodeApi, cctx.String("actor"))
+	if err != nil {
+		return []uint64{}
+	}
+
+	mact, err := api.StateGetActor(ctx, maddr, types.EmptyTSK)
+	if err != nil {
+		return []uint64{}
+	}
+
+	mas, err := miner.Load(stor, mact)
+	if err != nil {
+		return []uint64{}
+	}
+
+	var liveSectors []uint64
+	err = mas.ForEachDeadline(func(dlIdx uint64, dl miner.Deadline) error {
+		return dl.ForEachPartition(func(partIdx uint64, part miner.Partition) error {
+			faults, err := part.LiveSectors()
+			if err != nil {
+				return err
+			}
+			return faults.ForEach(func(num uint64) error {
+				liveSectors = append(liveSectors, num)
+				return nil
+			})
+		})
+	})
+	if err != nil {
+		return []uint64{}
+	}
+	return liveSectors
 }
 
 func getFaults(cctx *cli.Context) []uint64 {
