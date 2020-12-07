@@ -178,12 +178,12 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 	//}
 
 	p1RecoverDate := gr.PreCommit1RD{
-		TicketEpoch: height,
+		TicketEpoch: sector.SeedEpoch,
 	}
 	var pc1o storage.PreCommit1Out
 
 	//backup params
-	exist, err := m.rc.HExist(gr.RECOVER_NAME, p1Field)
+	exist, err := m.rc.HExist(gr.RecoverName, p1Field)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 	}
@@ -195,12 +195,12 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
 
-		err = m.rc.HGet(gr.RECOVER_NAME, p1Field, &p1RecoverDate)
+		err = m.rc.HGet(gr.RecoverName, p1Field, &p1RecoverDate)
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
 	} else {
-		err = m.rc.HSet(gr.RECOVER_NAME, p1Field, p1RecoverDate)
+		err = m.rc.HSet(gr.RecoverName, p1Field, p1RecoverDate)
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
@@ -613,13 +613,13 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 
 	for _, v := range taskList {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
-		ex, err := m.rc.HExist(gr.PUB_NAME, f)
+		ex, err := m.rc.HExist(gr.PubName, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
 		if ex {
-			err = m.rc.HGet(gr.PUB_NAME, f, &hostname)
+			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
@@ -633,21 +633,21 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		}
 
 		//4 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
+		m.rc.HDel(gr.ParamsName, f)
 		//5 params
-		m.rc.HDel(gr.PUB_NAME, f)
+		m.rc.HDel(gr.PubName, f)
 		//6 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
+		m.rc.HDel(gr.PubResName, f)
 		//7 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		m.rc.HDel(gr.ParamsResName, f)
 		//8 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
+		m.rc.HDel(gr.PubTime, f)
 		if v == sealtasks.TTPreCommit1 {
 			//9 recovery
-			m.rc.HDel(gr.RECOVER_NAME, f)
+			m.rc.HDel(gr.RecoverName, f)
 		}
 		//10 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		m.rc.HDel(gr.RecoveryWaitTime, f)
 	}
 
 	if res == 0 {
@@ -666,13 +666,13 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	var i int64 = 1
 	for i = 1; i <= count; i++ {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
-		ex, err := m.rc.HExist(gr.PUB_NAME, f)
+		ex, err := m.rc.HExist(gr.PubName, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
 		if ex {
-			err = m.rc.HGet(gr.PUB_NAME, f, &hostname)
+			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
 				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
@@ -685,17 +685,17 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			m.FreeCacheFileCount(f, hostname)
 		}
 		//4 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
+		m.rc.HDel(gr.ParamsName, f)
 		//5 res params
-		m.rc.HDel(gr.PUB_NAME, f)
+		m.rc.HDel(gr.PubName, f)
 		//6 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
+		m.rc.HDel(gr.PubResName, f)
 		//7 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		m.rc.HDel(gr.ParamsResName, f)
 		//8 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
+		m.rc.HDel(gr.PubTime, f)
 		//9 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		m.rc.HDel(gr.RecoveryWaitTime, f)
 	}
 }
 
@@ -743,14 +743,14 @@ func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField, hostname s
 
 func (m *Sealing) SelectWorkersToSetFaulty(sectorID abi.SectorNumber) error {
 	pledgeField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, 0)
-	plExist, err := m.rc.HExist(gr.PUB_NAME, pledgeField)
+	plExist, err := m.rc.HExist(gr.PubName, pledgeField)
 	if err != nil {
 		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPiecePl, err)
 		return err
 	}
 
 	sealField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 0)
-	seExist, err := m.rc.HExist(gr.PUB_NAME, sealField)
+	seExist, err := m.rc.HExist(gr.PubName, sealField)
 	if err != nil {
 		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPieceSe, err)
 		return err

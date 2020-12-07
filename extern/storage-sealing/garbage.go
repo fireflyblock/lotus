@@ -313,7 +313,7 @@ func (m *Sealing) SearchRecoveryPledge() map[abi.SectorNumber]struct{} {
 	pledgeKeys := make([]gr.RedisField, 0)
 	//sealKeys := make([]gr.RedisField, 0)
 
-	allWorkerCountList, _ := m.rc.Keys(gr.WORKER_COUNT)
+	allWorkerCountList, _ := m.rc.Keys(gr.WorkerCount)
 
 	//allKeyList, _ := m.rc.HKeys(gr.PUB_NAME)
 	for _, key := range allWorkerCountList {

@@ -357,7 +357,7 @@ func (st *Local) reportHealth(ctx context.Context) {
 			return
 		}
 
-		st.reportStorage(ctx)
+		st.workerReportStorage(ctx)
 	}
 }
 
@@ -380,6 +380,30 @@ func (st *Local) reportStorage(ctx context.Context) {
 	for id, report := range toReport {
 		if err := st.index.StorageReportHealth(ctx, id, report); err != nil {
 			log.Warnf("error reporting storage health for %s (%+v): %+v", id, report, err)
+		}
+	}
+}
+
+func (st *Local) workerReportStorage(ctx context.Context) {
+	st.localLk.RLock()
+
+	toReport := map[ID]HealthReport{}
+	for id, p := range st.paths {
+		stat, err := p.stat(st.localStorage)
+		r := HealthReport{Stat: stat}
+		if err != nil {
+			r.Err = err.Error()
+		}
+
+		toReport[id] = r
+	}
+
+	st.localLk.RUnlock()
+
+	for id, report := range toReport {
+		if err := st.index.StorageReportHealth(ctx, id, report); err != nil {
+			log.Warnf("error reporting storage health for %s (%+v): %+v", id, report, err)
+			panic("miner closing.....")
 		}
 	}
 }

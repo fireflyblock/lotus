@@ -563,27 +563,30 @@ func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisFiel
 		//check if it is successful
 		switch tt {
 		case "ap":
-			apRes := &gr.ParamsResAp{}
-			m.rc.HGet(gr.PARAMS_RES_NAME, field, apRes)
-			if apRes.Err == "" {
+			apRes := ""
+			m.rc.HGet(gr.PubResName, field, &apRes)
+			if apRes == gr.PubResSucceed {
 				continue
 			}
+
 		case "p1":
-			p1Res := &gr.ParamsResP1{}
-			m.rc.HGet(gr.PARAMS_RES_NAME, field, p1Res)
-			if p1Res.Err == "" {
+			p1Res := ""
+			m.rc.HGet(gr.PubResName, field, &p1Res)
+			if p1Res == gr.PubResSucceed {
 				continue
 			}
+
 		case "p2":
-			p2Res := &gr.ParamsResP2{}
-			m.rc.HGet(gr.PARAMS_RES_NAME, field, p2Res)
-			if p2Res.Err == "" {
+			p2Res := ""
+			m.rc.HGet(gr.PubResName, field, &p2Res)
+			if p2Res == gr.PubResSucceed {
 				continue
 			}
+
 		case "c1":
-			c1Res := &gr.ParamsResC1{}
-			m.rc.HGet(gr.PARAMS_RES_NAME, field, c1Res)
-			if c1Res.Err == "" {
+			c1Res := ""
+			m.rc.HGet(gr.PubResName, field, &c1Res)
+			if c1Res == gr.PubResSucceed {
 				continue
 			}
 		}
