@@ -771,8 +771,8 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	}
 
 	// 删除数据,完成传输文件
-	log.Infof("===== after finished SealCommit1 for sector [%v],try send to dest(%s) delete local layer,tree-c,tree-d files...", sector, dest)
-	rw.RemoveLayersAndTreeCAndD(ctx, sector, removeUnseal)
+	//log.Infof("===== after finished SealCommit1 for sector [%v],try send to dest(%s) delete local layer,tree-c,tree-d files...", sector, dest)
+	//rw.RemoveLayersAndTreeCAndD(ctx, sector, removeUnseal)
 
 	start := time.Now()
 	// send FTSealed
@@ -803,10 +803,10 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	}
 	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))
 
+	srcUnsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String()) + "/"
+	unsealPath := filepath.Join(destPath, storiface.FTUnsealed.String()) + "/"
 	if !removeUnseal {
 		// send FTUnseal
-		srcUnsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String()) + "/"
-		unsealPath := filepath.Join(destPath, storiface.FTUnsealed.String()) + "/"
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
 		code, err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
@@ -817,12 +817,12 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
 			return err
 		}
+	}
 
-		// 删除unsealed文件
-		err = os.RemoveAll(srcUnsealPath + src)
-		if err != nil {
-			log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, unsealPath, srcUnsealPath)
-		}
+	// 删除unsealed文件
+	err = os.RemoveAll(srcUnsealPath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, unsealPath, srcUnsealPath)
 	}
 
 	// 删除sealed文件

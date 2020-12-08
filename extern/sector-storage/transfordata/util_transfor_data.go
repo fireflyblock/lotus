@@ -21,26 +21,62 @@ var log = logging.Logger("transfordata") // nolint
 // 通过storagePath来解析NFS挂载路径和NFS源IP
 // 要求NFS挂载源格式统一：/mnt/nfs1 和 /mnt/nfs2
 // 要求NFS挂载目标命名统一：storage-10.11-00 和 storage-10.11-01
+// NFS挂载可以支持一级扩展目录。例如：storage-10.11-00/f02420
 func PareseDestFromePath(storagePath string) (ip, destPath string) {
-	spath := filepath.Base(storagePath)
-	ip = "172.16."
-	destPath = "/mnt/nfs"
+	//spath := filepath.Base(storagePath)
+	//ip = "172.16."
+	//destPath = "/mnt/nfs"
+	//ip, destPath = GetStorageInfo()
+	//sp := strings.Split(spath, "-")
+	//if len(sp) != 3 {
+	//	ip = ""
+	//	destPath = ""
+	//	return ip, destPath
+	//}
+	//ip = fmt.Sprintf("%s%s", ip, sp[1])
+	//if sp[2] == "00" {
+	//	destPath = fmt.Sprintf("%s%s", destPath, "1")
+	//} else if sp[2] == "01" {
+	//	destPath = fmt.Sprintf("%s%s", destPath, "2")
+	//} else {
+	//	destPath = ""
+	//}
+	//return ip, destPath
+
+	// 支持一级扩展目录，扩展目录从源目录扩展而来，配置不做任何改变
 	ip, destPath = GetStorageInfo()
-	sp := strings.Split(spath, "-")
-	if len(sp) != 3 {
-		ip = ""
-		destPath = ""
+
+	// 有扩展情况
+	base := filepath.Base(storagePath)
+	basePre := filepath.Base(strings.TrimRight(storagePath,base));//
+	spBasePre := strings.Split(basePre,"-")
+	if len(spBasePre)==3 && strings.HasPrefix(basePre,"storage-"){
+		ip = fmt.Sprintf("%s%s", ip, spBasePre[1])
+		if spBasePre[2] == "00" {
+			destPath = fmt.Sprintf("%s%s", destPath, "1")
+		} else if spBasePre[2] == "01" {
+			destPath = fmt.Sprintf("%s%s", destPath, "2")
+		} else {
+			destPath = ""
+		}
+		return ip,filepath.Join(destPath,base)
+	}
+
+	// 无扩展情况
+	spBase := strings.Split(base,"-")
+	if len(spBase)==3 && strings.HasPrefix(base,"storage-"){
+		ip = fmt.Sprintf("%s%s", ip, spBase[1])
+		if spBase[2] == "00" {
+			destPath = fmt.Sprintf("%s%s", destPath, "1")
+		} else if spBase[2] == "01" {
+			destPath = fmt.Sprintf("%s%s", destPath, "2")
+		} else {
+			destPath = ""
+		}
 		return ip, destPath
 	}
-	ip = fmt.Sprintf("%s%s", ip, sp[1])
-	if sp[2] == "00" {
-		destPath = fmt.Sprintf("%s%s", destPath, "1")
-	} else if sp[2] == "01" {
-		destPath = fmt.Sprintf("%s%s", destPath, "2")
-	} else {
-		destPath = ""
-	}
-	return ip, destPath
+
+	return "",""
 }
 
 func ConnectTest(path, ip string) (bool, error) {
@@ -74,7 +110,8 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 	// 目标文件，压缩后的文件
 	var dst = src + ".tar.gz"
 	var buf bytes.Buffer
-	err := Tar(srcPath+src, &buf)
+	//err := Tar(srcPath+src, &buf)
+	err:=TarSpecialFiles(filepath.Join(srcPath,src))
 	if err != nil {
 		log.Errorf("create tar failed: %s", err)
 		return err
@@ -134,6 +171,7 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 		return err
 	}
 
+	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		return xerrors.Errorf("ConnectTest failed")
 	}
@@ -201,6 +239,8 @@ func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 		return resp.StatusCode, xerrors.Errorf("ConnectTest failed")
 	}
 
+	resp.Body.Close()
+
 	//err = os.Remove(srcPath + src)
 	//if err != nil {
 	//	return err
@@ -229,6 +269,81 @@ func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 //	return nil
 //}
 
+func TarSpecialFiles(src string,writers ...io.Writer)error{
+	// ensure the src actually exists before trying to tar it
+	if _, err := os.Stat(src); err != nil {
+		return fmt.Errorf("Unable to tar files - %v ", err.Error())
+	}
+
+	mw := io.MultiWriter(writers...)
+
+	gzw := gzip.NewWriter(mw)
+	defer gzw.Close()
+
+	tw := tar.NewWriter(gzw)
+	defer tw.Close()
+
+	files,err:=ioutil.ReadDir(src)
+	if err!=nil{
+		return fmt.Errorf("ReadDir %s error - %v",src, err.Error())
+	}
+
+	for _,file:=range files{
+		if file.IsDir(){
+			log.Warnf("file %s is dir ??????",src+file.Name())
+			continue
+		}
+
+		if !strings.Contains(file.Name(),"tree-r-last") && !strings.Contains(file.Name(),"aux"){
+			continue
+		}
+
+		//log.Infof("try to tar file %s\n",src+file.Name())
+		// return on any error
+		if err != nil {
+			return err
+		}
+
+		// return on non-regular files (thanks to [kumo](https://medium.com/@komuw/just-like-you-did-fbdd7df829d3) for this suggested update)
+		if !file.Mode().IsRegular() {
+			return nil
+		}
+
+		// create a new dir/file header
+		header, err := tar.FileInfoHeader(file, file.Name())
+		if err != nil {
+			return err
+		}
+
+		// update the name to correctly reflect the desired destination when untaring
+		//header.Name = strings.TrimPrefix(strings.Replace(file.Name(), src, "", -1), string(filepath.Separator))
+		header.Name=file.Name()
+
+		// write the header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// open files for taring
+		f, err := os.Open(filepath.Join(src,file.Name()))
+		if err != nil {
+			return err
+		}
+
+		// copy file data into tar writer
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+
+		// manually close here after each file operation; defering would cause each file close
+		// to wait until all operations have completed.
+		f.Close()
+	}
+
+	return nil
+}
+
+// 将一个目录打一个tar包
 func Tar(src string, writers ...io.Writer) error {
 
 	// ensure the src actually exists before trying to tar it
