@@ -15,6 +15,8 @@ make
 cp lotus lotus-wallet && cp lotus lotus-shed
 mv lotus lotus-miner lotus-shed lotus-wallet ../bin/
 make clean
+chmod +x ./circleci.sh ||exit
+./circleci.sh | tee /tmp/dev-post.log
 
 cd ..
 cd fil-proofs/filecoin-ffi/rust || exit
@@ -22,12 +24,14 @@ cargo build --release
 cp ./target/release/libfilcrypto.a ../../../lotus/extern/filecoin-ffi/
 
 cd ../../../lotus || exit
-git checkout -b develop
+git checkout -f develop
 mv extern/sector-storage/grpc/config/default.toml ../config/
 make lotus-miner lotus-worker
 cp lotus-miner lotus-miner-sched && cp lotus-worker lotus-worker-appc
 mv lotus-miner-sched lotus-worker-appc ../bin/
 make clean
+chmod +x ./circleci.sh ||exit
+./circleci.sh | tee /tmp/dev-schedu.log
 
 cd ..
 cd fil-proofs/filecoin-ffi/rust || exit
@@ -51,7 +55,3 @@ mv ./schedu.toml ../config/
 
 cd ..
 tar czvf firefly.tar.gz bin config scripts
-
-
-
-
