@@ -2,13 +2,14 @@ package miner
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/filecoin-project/sector-storage/grpc/config"
 	"github.com/filecoin-project/sector-storage/grpc/proto"
 	pb "github.com/filecoin-project/sector-storage/grpc/proto"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/grpc"
-	"os"
-	"time"
 )
 
 func init() {
@@ -22,7 +23,7 @@ const MsgSize = 4 * 1024 * 1024 * 7
 
 var log = logging.Logger("miner_worker")
 
-func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
+func C2RPC(phase1Out []byte, Number uint64, Miner uint64, proofType int64) (*pb.Reply, error) {
 	log.Infof("c2 grpc start, sector id %d", Number)
 	address := config.C.GRPC.IP + config.C.GRPC.Port
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MsgSize)))
@@ -39,6 +40,7 @@ func C2RPC(phase1Out []byte, Number uint64, Miner uint64) (*pb.Reply, error) {
 		ActorID:      Miner,
 		SectorNumber: Number,
 		Commit1Out:   phase1Out,
+		ProofType:    proofType,
 	})
 	log.Infof("c2 grpc end, sector id %d", Number)
 	return r, err

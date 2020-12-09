@@ -6,15 +6,16 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/filecoin-project/go-fil-markets/filestore"
-	"github.com/filecoin-project/go-padreader"
-	"github.com/filecoin-project/sector-storage/miner"
 	"io"
 	"io/ioutil"
 	"math/bits"
 	"net/http"
 	"os"
 	"runtime"
+
+	"github.com/filecoin-project/go-fil-markets/filestore"
+	"github.com/filecoin-project/go-padreader"
+	"github.com/filecoin-project/sector-storage/miner"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -568,7 +569,7 @@ func (sb *Sealer) SealCommit2(ctx context.Context, sector storage.SectorRef, pha
 		return ffi.SealCommitPhase2(phase1Out, sector.ID.Number, sector.ID.Miner)
 	case "MINER":
 		log.Info("start SealCommit2 grpc c2_MINER! sector Number ", sector.ID.Number)
-		result, err := miner.C2RPC(phase1Out, uint64(sector.ID.Number), uint64(sector.ID.Miner))
+		result, err := miner.C2RPC(phase1Out, uint64(sector.ID.Number), uint64(sector.ID.Miner), int64(sector.ProofType))
 		if err != nil {
 			log.Errorf("grpc err: %s", err.Error())
 			return []byte{}, err

@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"github.com/filecoin-project/specs-storage/storage"
 	"net"
 	"os"
 	"time"
+
+	"github.com/filecoin-project/specs-storage/storage"
 
 	logging "github.com/ipfs/go-log/v2"
 
@@ -38,7 +39,10 @@ func (c ConnectServer) ConnectTest(ctx context.Context, in *proto.ConnectRequest
 func (s *Server) C2Client(ctx context.Context, in *proto.Request) (*proto.Reply, error) {
 	log.Info("machine Received")
 	message, err := c2.SealCommit2(ctx, storage.SectorRef{
-		ID:        abi.SectorID{abi.ActorID(in.ActorID), abi.SectorNumber(in.SectorNumber)},
+		ID: abi.SectorID{
+			Miner:  abi.ActorID(in.ActorID),
+			Number: abi.SectorNumber(in.SectorNumber),
+		},
 		ProofType: abi.RegisteredSealProof(in.ProofType),
 	}, in.Commit1Out)
 
@@ -46,14 +50,12 @@ func (s *Server) C2Client(ctx context.Context, in *proto.Request) (*proto.Reply,
 		log.Errorf("c2 func err: %s", err.Error())
 		return &pb.Reply{
 			Message: message,
-			Error:   err.Error(),
 		}, err
 	}
 
 	log.Info("c2 func success")
 	return &pb.Reply{
 		Message: message,
-		Error:   "",
 	}, nil
 }
 
@@ -93,7 +95,7 @@ connect:
 	defer cancel()
 	log.Infof("machine ip --- %s port --- %s host --- %s", ip, config.C.LOCALHOST.Port, hostName)
 	r, err := c.Registered(ctx, &proto.RegisteredRequest{
-		IP:   ip,
+		Ip:   ip,
 		Port: config.C.LOCALHOST.Port,
 		Host: hostName,
 	})
