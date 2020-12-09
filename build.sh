@@ -10,39 +10,51 @@ git clone -b dev git@192.168.20.201:filecoin-project/specs-storage.git
 export FFI_BUILD_FROM_SOURCE=1
 export IPFS_GATEWAY="https://proof-parameters.s3.cn-south-1.jdcloud-oss.com/ipfs/"
 
+echo "develop-post start"
 cd lotus || exit
 make
 cp lotus lotus-wallet && cp lotus lotus-shed
 mv lotus lotus-miner lotus-shed lotus-wallet ../bin/
 make clean
-chmod +x ./circleci.sh ||exit
-./circleci.sh | tee /tmp/dev-post.log
+echo "develop-post end"
 
+#chmod +x ./circleci.sh ||exit
+#./circleci.sh | tee /tmp/dev-post.log
+
+echo "rust start"
 cd ..
 cd fil-proofs/filecoin-ffi/rust || exit
 cargo build --release
 cp ./target/release/libfilcrypto.a ../../../lotus/extern/filecoin-ffi/
+echo "rust end"
 
+echo "develop start"
 cd ../../../lotus || exit
 git checkout -f develop
-mv extern/sector-storage/grpc/config/default.toml ../config/
 make lotus-miner lotus-worker
 cp lotus-miner lotus-miner-sched && cp lotus-worker lotus-worker-appc
 mv lotus-miner-sched lotus-worker-appc ../bin/
+mv extern/sector-storage/grpc/config/default.toml ../config/
 make clean
-chmod +x ./circleci.sh ||exit
-./circleci.sh | tee /tmp/dev-schedu.log
+echo "develop end"
 
+echo "corei7 start"
 cd ..
 cd fil-proofs/filecoin-ffi/rust || exit
 RUSTFLAGS="-C target-cpu=corei7" cargo build --release
 cp ./target/release/libfilcrypto.a ../../../lotus/extern/filecoin-ffi/
+echo "corei7 end"
 
+echo "c2 start"
 cd ../../../lotus || exit
 make lotus-worker
 cp lotus-worker lotus-worker-c2
 mv lotus-worker-c2 ../bin/
 make clean
+echo "c2 end"
+
+chmod +x ./circleci.sh ||exit
+./circleci.sh | tee /tmp/dev-schedu.log
 
 cd ..
 cd redis-tools || exit
