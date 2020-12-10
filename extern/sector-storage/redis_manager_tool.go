@@ -8,6 +8,8 @@ import (
 	logrus "github.com/filecoin-project/sector-storage/log"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/specs-storage/storage"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +29,8 @@ var (
 	P1WaitTime           = time.Minute * 210
 	P2WaitTime           = time.Minute * 60
 	C1WaitTime           = time.Minute * 30
+	File                 = "clean_up"
+	ErrTransferPath      = "transfer_err_path"
 )
 
 func (m *Manager) RecoveryPledge(sectorID abi.SectorNumber, pledgeField gr.RedisField) *gr.ParamsResAp {
@@ -1370,4 +1374,73 @@ func (m *Manager) CalculateWaitingTask(hostname string, taskType sealtasks.TaskT
 	logrus.SchedLogger.Infof("===== rd CalculateWaitingTask worker %+v len %+v pledgeKeys %+v", hostname, len(pledgeKeys), pledgeKeys)
 
 	return pledgeKeys
+}
+
+func (m *Manager) CollectFailedPath(hostname string) []string {
+
+	key := gr.SplicingTransferFailurePath(hostname)
+	allPathList := make([]string, 0)
+	count, err := m.redisCli.LLen(key)
+	if err != nil {
+		logrus.SchedLogger.Error("===== rd LLen err : %+v", err)
+	}
+
+	for i := int64(0); i < count; i++ {
+		path, _ := m.redisCli.LPop(key)
+		allPathList = append(allPathList, path)
+	}
+
+	if len(allPathList) == 0 {
+		return allPathList
+	}
+	err = BuildFile(hostname, allPathList)
+	logrus.SchedLogger.Infof("===== rd CollectFailedPath, hostname %s, allPathList %+v", hostname, allPathList)
+
+	return allPathList
+}
+
+func BuildFile(hostname string, pathList []string) error {
+	err := createFolder(ErrTransferPath)
+	if err != nil {
+		return err
+	}
+
+	err = createFolder(path.Join(ErrTransferPath, hostname))
+	if err != nil {
+		return err
+	}
+
+	fileName := path.Join(ErrTransferPath, hostname, File)
+	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Println("OpenFile Error : ", err)
+		return err
+	}
+
+	for _, path := range pathList {
+		_, err = f.WriteString(path + "\n")
+	}
+
+	return nil
+}
+
+func createFolder(filePath string) error {
+	if !isFolderExist(filePath) {
+		err := os.MkdirAll(filePath, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isFolderExist(path string) bool {
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsExist(err) {
+			return true
+		}
+		return false
+	}
+	return true
 }

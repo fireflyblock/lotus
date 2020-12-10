@@ -17,6 +17,7 @@ import (
 	"golang.org/x/xerrors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
@@ -799,10 +800,13 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	if err != nil {
 		if code == 600 {
 			log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task", sector, srcSealedPath, src, ip, sealedPath)
+			return err
 		} else if code == 999 {
 			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v), but file not exist!!!", sector, srcSealedPath, src, ip, sealedPath)
 			return nil
 		}
+
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTSealed.String(), src))
 		return err
 	}
 
@@ -810,10 +814,11 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	srcCachePath := filepath.Join(rw.workerPath, storiface.FTCache.String()) + "/"
 	cachePath := filepath.Join(destPath, storiface.FTCache.String()) + "/"
 	//src:=SectorName(sector)
-	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) cachePath(%+v)", sector, srcCachePath, src, ip, cachePath)
 	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
 	if err != nil {
-		log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTCache.String(), src))
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTSealed.String(), src))
 		return err
 	}
 	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))
@@ -829,7 +834,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 			if code == 300 {
 				log.Infow("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task????", sector, srcSealedPath, src, ip, sealedPath)
 			}
-			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
+			rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTUnsealed.String(), src))
 			return err
 		}
 	}

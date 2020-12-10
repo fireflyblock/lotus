@@ -27,7 +27,7 @@ func NewRedisClusterCLi(ctx context.Context, addrs string, passWord string) *Red
 	// 连接redis集群
 	rc := redis.NewClient(&redis.Options{
 		Addr:         addrs,
-		Password:     passWord,        // 设置密码
+		Password:     passWord,          // 设置密码
 		DialTimeout:  100 * time.Second, // 设置连接超时
 		ReadTimeout:  100 * time.Second, // 设置读取超时
 		WriteTimeout: 100 * time.Second, // 设置写入超时
@@ -259,4 +259,44 @@ func (rc *RedisClient) HKeys(key RedisKey) ([]RedisField, error) {
 		newSlice = append(newSlice, RedisField(v))
 	}
 	return newSlice, nil
+}
+
+func (rc *RedisClient) RPush(key RedisKey, value string) (int64, error) {
+	res, err := rc.RedisClient.RPush(context.TODO(), string(key), value).Result()
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (rc *RedisClient) LPop(key RedisKey) (string, error) {
+	res, err := rc.RedisClient.LPop(context.TODO(), string(key)).Result()
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (rc *RedisClient) LPush(key RedisKey, value string) (int64, error) {
+	res, err := rc.RedisClient.LPush(context.TODO(), string(key), value).Result()
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (rc *RedisClient) RPop(key RedisKey) (string, error) {
+	res, err := rc.RedisClient.LPop(context.TODO(), string(key)).Result()
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (rc *RedisClient) LLen(key RedisKey) (int64, error) {
+	res, err := rc.RedisClient.LLen(context.TODO(), string(key)).Result()
+	if err != nil {
+		return res, err
+	}
+	return res, nil
 }

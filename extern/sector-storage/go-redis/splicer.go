@@ -24,6 +24,7 @@ const (
 	WCT              RedisKey = "worker_count_"
 	WorkerConfig     RedisKey = "worker_config*"
 	WCF              RedisKey = "worker_config_"
+	TFP              RedisKey = "transfer_failure_path_"
 
 	SEALAPID = "seal_ap_"
 	//FIELDPLEDGE    RedisField = "seal/v0/addpiece/pledge"
@@ -273,4 +274,9 @@ func TypeToType(keys, type2 RedisField) RedisField {
 	default:
 		return ""
 	}
+}
+
+func SplicingTransferFailurePath(hostname string) RedisKey {
+	str := fmt.Sprintf("%s%s", TFP, hostname)
+	return RedisKey(str)
 }

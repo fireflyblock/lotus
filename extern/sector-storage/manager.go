@@ -821,6 +821,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 				continue
 			}
 
+			//collect failed transfer path
+			m.CollectFailedPath(hostName)
+
 			if pubRes != gr.PubResSucceed {
 				logrus.SchedLogger.Errorf("===== sector(%+v) c1 computing err:%+v", sector, pubRes)
 				return out, errors.New(fmt.Sprintf("%d c1 res err: %s", sector.ID.Number, pubRes))
