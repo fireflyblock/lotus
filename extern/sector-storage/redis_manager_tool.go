@@ -185,7 +185,7 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 					return nil
 				}
 
-				if ticketEpoch-p1RD.TicketEpoch < 750 {
+				if ticketEpoch == p1RD.TicketEpoch {
 					logrus.SchedLogger.Infof("===== rd recovery data ok, sectorID %+v, p1Field %+v\n", sectorID, p1Field)
 					return &p1Res
 				} else {
