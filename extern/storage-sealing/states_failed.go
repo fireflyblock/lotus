@@ -2,6 +2,7 @@ package sealing
 
 import (
 	"bytes"
+	"github.com/filecoin-project/sector-storage/sealtasks"
 	"time"
 
 	"golang.org/x/xerrors"
@@ -175,7 +176,10 @@ func (m *Sealing) handleComputeProofFailed(ctx statemachine.Context, sector Sect
 	}
 
 	if sector.InvalidProofs > 1 {
-		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("consecutive compute fails")})
+		//delete and set Faulty
+		m.DeleteAllPubAndParams(sector.SectorNumber, sealtasks.TTPreCommit1)
+		return ctx.Send(SectorForceState{Faulty})
+		//return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("consecutive compute fails")})
 	}
 
 	return ctx.Send(SectorRetryComputeProof{})

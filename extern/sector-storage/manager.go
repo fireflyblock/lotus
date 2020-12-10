@@ -428,7 +428,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector storage.SectorRef, existi
 				m.WhetherToDeleteRetryCount(pubField, "")
 				return res.PieceInfo, nil
 			}
-			m.DeleteParamsRes(sector.ID.Number, tt)
+			m.DeleteCurrentParamsRes(sector.ID.Number, tt)
 			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, tt)
 		}
 
@@ -479,7 +479,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd recovery hset p1RecoverDate %+v  sectorID %+v, p1Field %+v\n", rd, sector.ID.Number, p1Field)
 		}
-		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTPreCommit1)
+		m.DeleteCurrentParamsRes(sector.ID.Number, sealtasks.TTPreCommit1)
 	}
 
 	//1.publish
@@ -542,6 +542,14 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 				continue
 			}
 
+			//update taskCount (need lock)
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
+				}
+			}()
+
 			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTPreCommit1, hostName)
 			//get params res
 			pubRes := ""
@@ -562,14 +570,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 				logrus.SchedLogger.Errorf("===== hget p1 res params err %+v sectorID %+v, p1Field %+v\n", err, sector.ID.Number, p1Field)
 				continue
 			}
-
-			//update taskCount (need lock)
-			defer func() {
-				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit1, 0)
-				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v p1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
-				}
-			}()
 
 			return paramsRes.Out, nil
 		}
@@ -600,7 +600,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 			m.WhetherToDeleteRetryCount(p2Field, "")
 			return res.Out, nil
 		}
-		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTPreCommit2)
+		m.DeleteCurrentParamsRes(sector.ID.Number, sealtasks.TTPreCommit2)
 		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit2)
 	}
 
@@ -663,6 +663,14 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 				continue
 			}
 
+			//update taskCount (need lock)
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit2, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
+				}
+			}()
+
 			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTPreCommit2, hostName)
 			//get params res
 			pubRes := ""
@@ -683,14 +691,6 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 				logrus.SchedLogger.Errorf("===== hget p2 res params err %+v sectorID %+v, p2Field %+v\n", err, sector.ID.Number, p2Field)
 				continue
 			}
-
-			//update taskCount (need lock)
-			defer func() {
-				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTPreCommit2, 0)
-				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v p2 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
-				}
-			}()
 
 			return paramsRes.Out, nil
 		}
@@ -745,7 +745,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 			return res.Out, nil
 		}
 		//delete res
-		m.DeleteParamsRes(sector.ID.Number, sealtasks.TTCommit1)
+		m.DeleteCurrentParamsRes(sector.ID.Number, sealtasks.TTCommit1)
 		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTCommit1)
 	}
 
@@ -812,6 +812,14 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 				continue
 			}
 
+			//update taskCount (need lock)
+			defer func() {
+				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTCommit1, 0)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
+				}
+			}()
+
 			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sector.ID.Number, sealtasks.TTCommit1, hostName)
 			//get params res
 			pubRes := ""
@@ -846,14 +854,6 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 				logrus.SchedLogger.Errorf("===== sector(%+v) c1 transfor error,not find sid, path is :%s, ", sector, paramsRes.StoragePath)
 				return out, xerrors.Errorf("===== sector(%+v) c1 transfor error,not find sid, path is :%s, ", sector, paramsRes.StoragePath)
 			}
-
-			//update taskCount (need lock)
-			defer func() {
-				err = m.FreeTaskCount(hostName, sector.ID.Number, sealtasks.TTCommit1, 0)
-				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v c1 finished , update %s taskCount err:%+v", sector.ID.Number, hostName, err)
-				}
-			}()
 
 			// declareSector  申明新的存储路径
 			// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件

@@ -562,7 +562,7 @@ func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisFiel
 		sid, tt, _, _ := field.TailoredPubAndParamsfield()
 		//check if it is successful
 		switch tt {
-		case "ap":
+		case "pledge":
 			apRes := ""
 			m.rc.HGet(gr.PubResName, field, &apRes)
 			if apRes == gr.PubResSucceed {
@@ -593,8 +593,19 @@ func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisFiel
 
 		log.Infof("===== rd CleanAllSectorDataInRedis start %d", sid)
 
-		m.DeleteDataForSid(sid)
-		err := m.sectors.Send(sid, SectorForceState{Faulty})
+		err := m.DeleteDataForSid(sid)
+		if err != nil {
+			log.Errorf("===== rd CleanAllSectorDataInRedis, rd cant't find hostname  %d", sid)
+			continue
+		}
+
+		switch tt {
+		case "pledge", "seal":
+			successList = append(successList, field)
+			continue
+		}
+
+		err = m.sectors.Send(sid, SectorForceState{Faulty})
 		if err != nil {
 			return successList, err
 		}
@@ -602,5 +613,5 @@ func (m *Sealing) CleanAllSectorDataInRedis(ctx context.Context) ([]gr.RedisFiel
 		//return successList, err
 	}
 
-	return retryList, nil
+	return successList, nil
 }

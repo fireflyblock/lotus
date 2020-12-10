@@ -188,6 +188,10 @@ func (m *Manager) RecoveryP1(sectorID abi.SectorNumber, p1Field gr.RedisField, t
 				if ticketEpoch-p1RD.TicketEpoch < 750 {
 					logrus.SchedLogger.Infof("===== rd recovery data ok, sectorID %+v, p1Field %+v\n", sectorID, p1Field)
 					return &p1Res
+				} else {
+					//if the ticket epoch is changed, the task has timed out,delete the task records of p1 and later
+					m.DeleteAllParamsRes(sectorID, sealtasks.TTPreCommit1)
+					logrus.SchedLogger.Infof("===== rd recovery p1 timeout, sectorID %+v, p1Field %+v\n", sectorID, p1Field)
 				}
 			}
 			logrus.SchedLogger.Errorf("===== rd recovery p1 params res err %s sectorID %+v, p1Field %+v\n", p1Res.Err, sectorID, p1Field)
@@ -492,6 +496,14 @@ func (m *Manager) SubscribeResult(sectorID storage.SectorRef, taskType sealtasks
 				continue
 			}
 
+			//update taskCount (need lock)
+			defer func() {
+				err = m.FreeTaskCount(hostName, sectorID.ID.Number, taskType, sealApId)
+				if err != nil {
+					logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
+				}
+			}()
+
 			logrus.SchedLogger.Infof("===== rd ticker check task, sectorID %+v taskType %+v worker %+v\n", sectorID, taskType, hostName)
 			//get params res
 			pubRes := ""
@@ -512,14 +524,6 @@ func (m *Manager) SubscribeResult(sectorID storage.SectorRef, taskType sealtasks
 				logrus.SchedLogger.Errorf("===== hget ap res params err:%+v", err)
 				continue
 			}
-
-			//update taskCount (need lock)
-			defer func() {
-				err = m.FreeTaskCount(hostName, sectorID.ID.Number, taskType, sealApId)
-				if err != nil {
-					logrus.SchedLogger.Errorf("===== sector %+v ap finished , update %s taskCount err:%+v", sectorID, hostName, err)
-				}
-			}()
 
 			return paramsRes.PieceInfo, nil
 		}
@@ -1212,8 +1216,8 @@ func (m *Manager) DeleteDataForSid(sectorID abi.SectorNumber) {
 	}
 }
 
-func (m *Manager) DeleteParamsRes(sectorID abi.SectorNumber, tashType sealtasks.TaskType) {
-	logrus.SchedLogger.Infof("===== rd DeleteParamsRes, sectorID %+v", sectorID)
+func (m *Manager) DeleteCurrentParamsRes(sectorID abi.SectorNumber, tashType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd DeleteCurrentParamsRes, sectorID %+v", sectorID)
 	f := gr.SplicingBackupPubAndParamsField(sectorID, tashType, 0)
 
 	m.redisCli.HDel(gr.ParamsName, f)
@@ -1225,6 +1229,39 @@ func (m *Manager) DeleteParamsRes(sectorID abi.SectorNumber, tashType sealtasks.
 	m.redisCli.HDel(gr.PubResName, f)
 
 	m.redisCli.HDel(gr.RecoveryWaitTime, f)
+
+}
+
+func (m *Manager) DeleteAllParamsRes(sectorID abi.SectorNumber, taskType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd DeleteCurrentParamsRes, sectorID %+v", sectorID)
+	f := gr.SplicingBackupPubAndParamsField(sectorID, taskType, 0)
+	fieldList := make([]gr.RedisField, 0)
+
+	switch taskType {
+	case sealtasks.TTAddPiecePl, sealtasks.TTAddPieceSe:
+
+	case sealtasks.TTPreCommit1:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDP2))
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	case sealtasks.TTPreCommit2:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	}
+
+	for _, field := range fieldList {
+		m.redisCli.HDel(gr.ParamsName, field)
+
+		m.redisCli.HDel(gr.PubName, field)
+
+		m.redisCli.HDel(gr.ParamsResName, field)
+
+		m.redisCli.HDel(gr.PubResName, field)
+
+		m.redisCli.HDel(gr.RecoveryWaitTime, field)
+	}
 
 }
 

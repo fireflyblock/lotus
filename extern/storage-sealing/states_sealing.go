@@ -592,7 +592,7 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector SectorInf
 	return nil
 }
 
-func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
+func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) error {
 	log.Infof("===== rd restart DeleteDataForSid, sectorID %+v", sectorID)
 	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
 	taskList := make([]sealtasks.TaskType, 0)
@@ -601,7 +601,7 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	res, err := m.rc.Exist(sealKey)
 	if err != nil {
 		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
-		return
+		return err
 	}
 	if res > 0 {
 		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
@@ -618,16 +618,23 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
-		if ex {
+
+		if v == sealtasks.TTAddPiecePl {
+			if !ex {
+				return errors.New("===== rd cant't find hostname")
+			}
+		}
+
+		if ex || hostname != "" {
 			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+				log.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
 
 			//1 worker count
 			m.DeleteWorkerCountAndTaskStatus(f, hostname)
 			//2 retry count
-			m.FreeRetryCount(f, hostname)
+			m.FreeRetryCount(f)
 			//3 cache file count
 			m.FreeCacheFileCount(f, hostname)
 		}
@@ -651,14 +658,14 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	}
 
 	if res == 0 {
-		return
+		return nil
 	}
 
 	var count int64
 	err = m.rc.Get(sealKey, &count)
 	if err != nil {
 		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
-		return
+		return err
 	}
 
 	m.rc.Del(sealKey)
@@ -671,16 +678,16 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
-		if ex {
+		if ex || hostname != "" {
 			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+				log.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
 
 			//1 worker count
 			m.DeleteWorkerCountAndTaskStatus(f, hostname)
 			//2 retry count
-			m.FreeRetryCount(f, hostname)
+			m.FreeRetryCount(f)
 			//3 cache file count
 			m.FreeCacheFileCount(f, hostname)
 		}
@@ -697,9 +704,11 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 		//9 wait time
 		m.rc.HDel(gr.RecoveryWaitTime, f)
 	}
+
+	return nil
 }
 
-func (m *Sealing) FreeRetryCount(retryField gr.RedisField, hostname string) error {
+func (m *Sealing) FreeRetryCount(retryField gr.RedisField) error {
 	_, err := m.rc.HDel(gr.RETRY, retryField)
 	//log.Infof("===== rd free retry count hostname %+v sectorID %+v taskType %+v field %+v", hostname, sid, tt, retryField)
 	if err != nil {
@@ -766,4 +775,35 @@ func (m *Sealing) SelectWorkersToSetFaulty(sectorID abi.SectorNumber) error {
 	}
 
 	return errors.New(fmt.Sprintf("failed to select sector %+v to set Faulty", sectorID))
+}
+
+func (m *Sealing) DeleteAllPubAndParams(sectorID abi.SectorNumber, taskType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd DeleteAllPubAndParams, sectorID %+v", sectorID)
+	f := gr.SplicingBackupPubAndParamsField(sectorID, taskType, 0)
+	fieldList := make([]gr.RedisField, 0)
+
+	switch taskType {
+	case sealtasks.TTPreCommit1:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDP2))
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	case sealtasks.TTPreCommit2:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	}
+
+	for _, field := range fieldList {
+		m.rc.HDel(gr.ParamsName, field)
+
+		m.rc.HDel(gr.PubName, field)
+
+		m.rc.HDel(gr.ParamsResName, field)
+
+		m.rc.HDel(gr.PubResName, field)
+
+		m.rc.HDel(gr.RecoveryWaitTime, field)
+	}
+
 }
