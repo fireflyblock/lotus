@@ -428,8 +428,8 @@ func (m *Manager) AddPiece(ctx context.Context, sector storage.SectorRef, existi
 				m.WhetherToDeleteRetryCount(pubField, "")
 				return res.PieceInfo, nil
 			}
-			m.DeleteCurrentParamsRes(sector.ID.Number, tt)
 			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, tt)
+			m.DeleteCurrentParamsRes(sector.ID.Number, tt)
 		}
 
 		//1.publish
@@ -465,7 +465,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 	p1Field := gr.SplicingBackupPubAndParamsField(sector.ID.Number, sealtasks.TTPreCommit1, 0)
 
 	if rd, ok := ticketEpoch.(gr.PreCommit1RD); ok {
-		logrus.SchedLogger.Infof("===== rd PreCommit1RD sectorID %d rd %+v", rd, sector.ID.Number)
 		res := m.RecoveryP1(sector.ID.Number, p1Field, rd.TicketEpoch)
 		if res != nil {
 			if res.Err == "" {
@@ -473,7 +472,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector storage.SectorRef, 
 				m.WhetherToDeleteRetryCount(p1Field, "")
 				return res.Out, nil
 			}
-			logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit1)
+			logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit1)
 		}
 		err = m.redisCli.HSet(gr.RecoverName, p1Field, rd)
 		if err != nil {
@@ -600,8 +599,8 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector storage.SectorRef, 
 			m.WhetherToDeleteRetryCount(p2Field, "")
 			return res.Out, nil
 		}
+		logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit2)
 		m.DeleteCurrentParamsRes(sector.ID.Number, sealtasks.TTPreCommit2)
-		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTPreCommit2)
 	}
 
 	//1.publish
@@ -744,9 +743,9 @@ func (m *Manager) SealCommit1(ctx context.Context, sector storage.SectorRef, tic
 
 			return res.Out, nil
 		}
+		logrus.SchedLogger.Infof("===== rd recovery miner and find err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTCommit1)
 		//delete res
 		m.DeleteCurrentParamsRes(sector.ID.Number, sealtasks.TTCommit1)
-		logrus.SchedLogger.Infof("===== rd recovery miner err %+v, hostName %d, taskType %+v", res.Err, sector.ID.Number, sealtasks.TTCommit1)
 	}
 
 	//1.publish
@@ -1122,7 +1121,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector storage.SectorRef, 
 	if err != nil {
 		return err
 	}
-	logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.ID.Number)
+	//logrus.SchedLogger.Infof("===== rd start delete data, sectorID %+v", sector.ID.Number)
 	m.DeleteDataForSid(sector.ID.Number)
 
 	//fetchSel := newAllocSelector(m.index, storiface.FTCache|stores.FTSealed, storiface.PathStorage)
