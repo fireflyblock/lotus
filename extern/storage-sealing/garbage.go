@@ -85,7 +85,7 @@ func (m *Sealing) PledgeSector() error {
 	}
 
 	// 有机会就去尝试消化积压的sector
-	m.RecoverPledgeSector()
+	//m.RecoverPledgeSector()
 
 	go func() {
 		ctx := context.TODO() // we can't use the context from command which invokes
@@ -189,7 +189,6 @@ func (m *Sealing) RecoverPledgeSector() error {
 
 	log.Infof("===== RecoverPledgeSector need recoverPledgeSectorNumber length:%d\n", recoverLen)
 	if recoverLen > 0 {
-		// 循环发送，前期应该会造成不少浪费，但是目的是抓紧消化完所有的这种存量sector
 		m.recoverPledgeLK.Lock()
 		var keys []abi.SectorNumber
 		for key, _ := range m.recoverPledgeSectors {
@@ -197,9 +196,9 @@ func (m *Sealing) RecoverPledgeSector() error {
 		}
 		m.recoverPledgeLK.Unlock()
 
-		for _, sid := range keys {
+		for _, snum := range keys {
 			// 循环发送
-			go func() {
+			go func(sid abi.SectorNumber) {
 				ctx := context.TODO() // we can't use the context from command which invokes
 				// this, as we run everything here async, and it's cancelled when the
 				// command exits
@@ -217,10 +216,11 @@ func (m *Sealing) RecoverPledgeSector() error {
 
 				//size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
 
+				log.Infof("===== try to recovrey pledge  sector(%d)...\n", sid)
 				pieces, err := m.pledgeSector(ctx, m.minerSector(abi.RegisteredSealProof_StackedDrg32GiBV1, sid), []abi.UnpaddedPieceSize{}, abi.PaddedPieceSize(size).Unpadded())
 				if err != nil {
-					//log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
-					//log.Warnf("%+v", err)
+					log.Infof("===== PledgeSector failed collect sectorNumber(%d),after recoverSectorNumber length:%d\n", sid, len(m.recoverSectorNumbers))
+					log.Warnf("%+v", err)
 					return
 				}
 
@@ -242,7 +242,7 @@ func (m *Sealing) RecoverPledgeSector() error {
 					return
 				}
 				log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
-			}()
+			}(snum)
 			//log.Infof("===== try to recoverPledgeSectorNumber(%d)\n", sid)
 		}
 	}

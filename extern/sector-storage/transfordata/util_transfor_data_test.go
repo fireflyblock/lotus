@@ -10,8 +10,7 @@ import (
 	"testing"
 )
 
-
-func Test(t *testing.T){
+func Test(t *testing.T) {
 	//files,err:=ioutil.ReadDir(".")
 	//if err!=nil{ //	fmt.Printf("%v",err)
 	//}
@@ -19,18 +18,23 @@ func Test(t *testing.T){
 	//	fmt.Printf("name :%s\n",file.Name())
 	//}
 
-	var path = "/home/firefly/storage/storage-10.11-00/f02420"
-	base:=filepath.Base(path)
-	fmt.Printf("base = %s\n",base)
-	fmt.Printf("basePre = %s\n",filepath.Base(strings.TrimRight(path,base)))
+	//var path = "/home/firefly/storage/storage-10.11-00/f02420"
+	var path = "/opt/lotus/storage/storage-20.164-00"
+	path = strings.TrimRight(path, fmt.Sprintf("%c", os.PathSeparator))
+	fmt.Printf("path = %s\n", path)
+	base := filepath.Base(path)
+	fmt.Printf("base = %s\n", base)
+	fmt.Printf("basePre = %s\n", filepath.Base(strings.TrimRight(path, base)))
 }
 
-func TestTarSpecialFiles(t *testing.T){
+func TestTarSpecialFiles(t *testing.T) {
 	// 目标文件，压缩后的文件
-	var srcPath="./s-t088290-2300"
-	var dst = filepath.Base(srcPath) +".tar.gz"
+	//var srcPath="./s-t088290-2300"
+	var srcPath = "./s-t01002-2"
+	var dst = filepath.Base(srcPath) + ".tar.gz"
 	var buf bytes.Buffer
-	err := TarSpecialFiles(srcPath, &buf)
+	//err := TarSpecialFiles(srcPath, &buf)
+	err := Tar(srcPath, &buf)
 	if err != nil {
 		fmt.Printf("create tar failed: %s", err)
 	}
@@ -51,13 +55,16 @@ func TestTarSpecialFiles(t *testing.T){
 	}
 }
 
-func TestPareseDestFromePath(t *testing.T){
-	var path1 = "/home/firefly/storage/storage-10.11-00/f02420"
-	var path2 = "/home/firefly/storage/storage-10.11-00"
+func TestPareseDestFromePath(t *testing.T) {
+	//var path1 = "/home/firefly/storage/storage-10.11-00/f02420"
+	//var path2 = "/home/firefly/storage/storage-10.11-00"
+	var path3 = "/opt/lotus/storage/storage-20.164-00/"
 
-	ip1,dest1:=PareseDestFromePath(path1)
-	ip2,dest2:=PareseDestFromePath(path2)
-	fmt.Printf("\nip1 = %s, dest1 = %s\n",ip1,dest1)
-	fmt.Printf("\nip2 = %s, dest2 = %s\n",ip2,dest2)
+	//ip1,dest1:=PareseDestFromePath(path1)
+	//ip2,dest2:=PareseDestFromePath(path2)
+	ip3, dest3 := PareseDestFromePath(path3)
+	//fmt.Printf("\nip1 = %s, dest1 = %s\n",ip1,dest1)
+	//fmt.Printf("\nip2 = %s, dest2 = %s\n",ip2,dest2)
+	fmt.Printf("\nip3 = %s, dest3 = %s\n", ip3, dest3)
 
 }

@@ -47,10 +47,11 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 	ip, destPath = GetStorageInfo()
 
 	// 有扩展情况
+	storagePath = strings.TrimRight(storagePath, fmt.Sprintf("%c", os.PathSeparator))
 	base := filepath.Base(storagePath)
-	basePre := filepath.Base(strings.TrimRight(storagePath,base));//
-	spBasePre := strings.Split(basePre,"-")
-	if len(spBasePre)==3 && strings.HasPrefix(basePre,"storage-"){
+	basePre := filepath.Base(strings.TrimRight(storagePath, base)) //
+	spBasePre := strings.Split(basePre, "-")
+	if len(spBasePre) == 3 && strings.HasPrefix(basePre, "storage-") {
 		ip = fmt.Sprintf("%s%s", ip, spBasePre[1])
 		if spBasePre[2] == "00" {
 			destPath = fmt.Sprintf("%s%s", destPath, "1")
@@ -59,12 +60,12 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 		} else {
 			destPath = ""
 		}
-		return ip,filepath.Join(destPath,base)
+		return ip, filepath.Join(destPath, base)
 	}
 
 	// 无扩展情况
-	spBase := strings.Split(base,"-")
-	if len(spBase)==3 && strings.HasPrefix(base,"storage-"){
+	spBase := strings.Split(base, "-")
+	if len(spBase) == 3 && strings.HasPrefix(base, "storage-") {
 		ip = fmt.Sprintf("%s%s", ip, spBase[1])
 		if spBase[2] == "00" {
 			destPath = fmt.Sprintf("%s%s", destPath, "1")
@@ -76,7 +77,7 @@ func PareseDestFromePath(storagePath string) (ip, destPath string) {
 		return ip, destPath
 	}
 
-	return "",""
+	return "", ""
 }
 
 func ConnectTest(path, ip string) (bool, error) {
@@ -111,7 +112,7 @@ func SendZipFile(srcPath, src, dstPath, ip string) error {
 	var dst = src + ".tar.gz"
 	var buf bytes.Buffer
 	//err := Tar(srcPath+src, &buf)
-	err:=TarSpecialFiles(filepath.Join(srcPath,src))
+	err := TarSpecialFiles(filepath.Join(srcPath, src), &buf)
 	if err != nil {
 		log.Errorf("create tar failed: %s", err)
 		return err
@@ -200,7 +201,7 @@ func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 	m := multipart.NewWriter(w)
 
 	if !isFileExist(srcPath + src) {
-		return 999,xerrors.Errorf("file %s not exit ",srcPath+src)
+		return 999, xerrors.Errorf("file %s not exit ", srcPath+src)
 	}
 
 	go func() {
@@ -269,7 +270,7 @@ func SendFile(srcPath, src, dstPath, ip string) (int, error) {
 //	return nil
 //}
 
-func TarSpecialFiles(src string,writers ...io.Writer)error{
+func TarSpecialFiles(src string, writers ...io.Writer) error {
 	// ensure the src actually exists before trying to tar it
 	if _, err := os.Stat(src); err != nil {
 		return fmt.Errorf("Unable to tar files - %v ", err.Error())
@@ -283,18 +284,18 @@ func TarSpecialFiles(src string,writers ...io.Writer)error{
 	tw := tar.NewWriter(gzw)
 	defer tw.Close()
 
-	files,err:=ioutil.ReadDir(src)
-	if err!=nil{
-		return fmt.Errorf("ReadDir %s error - %v",src, err.Error())
+	files, err := ioutil.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("ReadDir %s error - %v", src, err.Error())
 	}
 
-	for _,file:=range files{
-		if file.IsDir(){
-			log.Warnf("file %s is dir ??????",src+file.Name())
+	for _, file := range files {
+		if file.IsDir() {
+			log.Warnf("file %s is dir ??????", src+file.Name())
 			continue
 		}
 
-		if !strings.Contains(file.Name(),"tree-r-last") && !strings.Contains(file.Name(),"aux"){
+		if !strings.Contains(file.Name(), "tree-r-last") && !strings.Contains(file.Name(), "aux") {
 			continue
 		}
 
@@ -317,7 +318,7 @@ func TarSpecialFiles(src string,writers ...io.Writer)error{
 
 		// update the name to correctly reflect the desired destination when untaring
 		//header.Name = strings.TrimPrefix(strings.Replace(file.Name(), src, "", -1), string(filepath.Separator))
-		header.Name=file.Name()
+		header.Name = file.Name()
 
 		// write the header
 		if err := tw.WriteHeader(header); err != nil {
@@ -325,7 +326,7 @@ func TarSpecialFiles(src string,writers ...io.Writer)error{
 		}
 
 		// open files for taring
-		f, err := os.Open(filepath.Join(src,file.Name()))
+		f, err := os.Open(filepath.Join(src, file.Name()))
 		if err != nil {
 			return err
 		}
