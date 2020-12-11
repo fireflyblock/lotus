@@ -16,6 +16,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/xerrors"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -971,4 +972,49 @@ func (Reader) Read(out []byte) (int, error) {
 
 func (rw *RedisWorker) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(Reader{}, int64(size))
+}
+
+// CheckLocalSectors check all local sector
+// 只需要读取unseal目录即可，因为unseal一定是最全的。
+func (rw *RedisWorker) CheckLocalSectors() []storage.SectorRef {
+	sectorFiles, err := ioutil.ReadDir(filepath.Join(rw.workerPath, storiface.FTUnsealed.String()))
+	if err != nil {
+		log.Errorf("CheckLocalSectors err:%+v", err)
+		return []storage.SectorRef{}
+	}
+
+	var sids []storage.SectorRef
+	for _, sf := range sectorFiles {
+		sid, err := storiface.ParseSectorID(sf.Name())
+		if err != nil {
+			log.Warnf("CheckLocalSectors parse sector Id err:%+v", err)
+			continue
+		}
+		sids = append(sids, storage.SectorRef{ID: sid})
+	}
+
+	return sids
+}
+
+// 删除指定sectorNumber
+func (rw *RedisWorker) DeleteLocalSectors(sids []storage.SectorRef) {
+	for _, sid := range sids {
+		unsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String(), storiface.SectorName(sid.ID))
+		sealPath := filepath.Join(rw.workerPath, storiface.FTSealed.String(), storiface.SectorName(sid.ID))
+		cachePath := filepath.Join(rw.workerPath, storiface.FTCache.String(), storiface.SectorName(sid.ID))
+		err := os.RemoveAll(unsealPath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) unsealPath failed . err:%+v", sid, err)
+		}
+
+		os.RemoveAll(sealPath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) SealPath failed . err:%+v", sid, err)
+		}
+
+		os.RemoveAll(cachePath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) CachePath failed . err:%+v", sid, err)
+		}
+	}
 }
