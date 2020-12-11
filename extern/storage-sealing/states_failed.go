@@ -65,6 +65,7 @@ func (m *Sealing) handleSealPrecommit2Failed(ctx statemachine.Context, sector Se
 	}
 
 	if sector.PreCommit2Fails > 3 {
+		m.DeleteAllPubAndParams(sector.SectorNumber, sealtasks.TTPreCommit1)
 		return ctx.Send(SectorRetrySealPreCommit1{})
 	}
 
@@ -177,7 +178,7 @@ func (m *Sealing) handleComputeProofFailed(ctx statemachine.Context, sector Sect
 
 	if sector.InvalidProofs > 1 {
 		//delete and set Faulty
-		m.DeleteAllPubAndParams(sector.SectorNumber, sealtasks.TTPreCommit1)
+		m.DeleteDataForSid(sector.SectorNumber)
 		return ctx.Send(SectorForceState{Faulty})
 		//return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("consecutive compute fails")})
 	}
