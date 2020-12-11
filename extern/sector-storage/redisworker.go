@@ -1018,3 +1018,50 @@ func (rw *RedisWorker) DeleteLocalSectors(sids []storage.SectorRef) {
 		}
 	}
 }
+
+func (rw *RedisWorker) RunCleaner(ctx context.Context, sw *sync.WaitGroup) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("====== RunCleaner err", err)
+			s := debug.Stack()
+			log.Error(string(s))
+			sw.Done()
+		}
+	}()
+
+	rw.CleanUp()
+
+	ticker := time.NewTicker(CLEAN_UP_GAP)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			rw.CleanUp()
+		}
+	}
+
+}
+
+func (rw *RedisWorker) CleanUp() {
+	sectorRefList := rw.CheckLocalSectors()
+	delList := make([]storage.SectorRef, 0)
+
+	for _, sectorRef := range sectorRefList {
+		field := gr.SplicingBackupPubAndParamsField(sectorRef.ID.Number, sealtasks.TTAddPiecePl, 0)
+		ex, err := rw.redisCli.HExist(gr.PubName, field)
+		if err != nil {
+			log.Errorf("===== rd clean up err : %+v", err)
+			continue
+		}
+
+		if !ex {
+			delList = append(delList, sectorRef)
+		}
+	}
+
+	log.Infof("===== rd clean up,  delList : %+v", delList)
+	if len(delList) > 0 {
+		rw.DeleteLocalSectors(delList)
+	}
+}

@@ -17,6 +17,7 @@ import (
 
 const CHECK_RES_GAP = time.Minute * 1
 const CHECK_RECOVERY_RES_GAP = time.Minute * 5
+const CLEAN_UP_GAP = time.Minute * 10
 
 var (
 	//DefaultRedisURL = "192.168.20.178:6379"
