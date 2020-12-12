@@ -50,6 +50,7 @@ func main() {
 		electionCmd,
 		rpcCmd,
 		cidCmd,
+		actorCmd,
 	}
 
 	app := &cli.App{
