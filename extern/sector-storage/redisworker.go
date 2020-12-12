@@ -16,7 +16,9 @@ import (
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/xerrors"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
@@ -93,7 +95,7 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 	tc := rw.InitWorkerConfig(path)
 
 	tcfKey := gr.SplicingTaskConfigKey(rw.hostName)
-	err = rw.redisCli.HSet(tcfKey, gr.FIELDPAP, uint64(tc.AddPieceSize))
+	err = rw.redisCli.HSet(tcfKey, gr.FIELDAP, uint64(tc.AddPieceSize))
 	if err != nil {
 		return
 	}
@@ -110,7 +112,7 @@ func (rw *RedisWorker) RegisterWorker(ctx context.Context, path string) (err err
 		return
 	}
 
-	err = rw.redisCli.HSet(tcfKey, gr.REGISTER_TIME, time.Now())
+	err = rw.redisCli.HSet(tcfKey, gr.RegisterTime, time.Now())
 	if err != nil {
 		return
 	}
@@ -159,7 +161,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 			}
 
 			sealField := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), res.ToOfficalTaskType(), uint64(id))
-			exist, err := rw.redisCli.HExist(gr.PARAMS_RES_NAME, sealField)
+			exist, err := rw.redisCli.HExist(gr.ParamsResName, sealField)
 			if err != nil {
 				log.Errorf("===== rd RecoveryTask, hexist err:", err)
 			}
@@ -171,9 +173,9 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 			pubMsg := gr.SplicingPubMessage(abi.SectorNumber(sid), res.ToOfficalTaskType(), rw.hostName, 0)
 			go rw.DealSeal(ctx, sealField, pubMsg)
 
-		case gr.FIELDPLEDGEP:
+		case gr.FIELDPLEDGE:
 			pledgeField := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), res.ToOfficalTaskType(), 0)
-			exist, err := rw.redisCli.HExist(gr.PARAMS_RES_NAME, pledgeField)
+			exist, err := rw.redisCli.HExist(gr.ParamsResName, pledgeField)
 			if err != nil {
 				log.Errorf("===== rd RecoveryTask, hexist err:", err)
 			}
@@ -188,7 +190,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 
 		case gr.FIELDP1:
 			p1Field := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), res.ToOfficalTaskType(), 0)
-			exist, err := rw.redisCli.HExist(gr.PARAMS_RES_NAME, p1Field)
+			exist, err := rw.redisCli.HExist(gr.ParamsResName, p1Field)
 			if err != nil {
 				log.Errorf("===== rd RecoveryTask, hexist err:", err)
 			}
@@ -202,7 +204,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 
 		case gr.FIELDP2:
 			p2Field := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), res.ToOfficalTaskType(), 0)
-			exist, err := rw.redisCli.HExist(gr.PARAMS_RES_NAME, p2Field)
+			exist, err := rw.redisCli.HExist(gr.ParamsResName, p2Field)
 			if err != nil {
 				log.Errorf("===== rd RecoveryTask, hexist err:", err)
 			}
@@ -216,7 +218,7 @@ func (rw *RedisWorker) RecoveryTask(ctx context.Context) error {
 
 		case gr.FIELDC1:
 			c1Field := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), res.ToOfficalTaskType(), 0)
-			exist, err := rw.redisCli.HExist(gr.PARAMS_RES_NAME, c1Field)
+			exist, err := rw.redisCli.HExist(gr.ParamsResName, c1Field)
 			if err != nil {
 				log.Errorf("===== rd RecoveryTask, hexist err:", err)
 			}
@@ -264,7 +266,7 @@ func (rw *RedisWorker) CheckRecovery() error {
 		}
 
 		field := gr.SplicingBackupPubAndParamsField(abi.SectorNumber(sid), taskType.ToOfficalTaskType(), uint64(id))
-		exist, err := rw.redisCli.HExist(gr.PUB_NAME, field)
+		exist, err := rw.redisCli.HExist(gr.PubName, field)
 		if err != nil {
 			log.Errorf("===== rd check recovery worker, hexist err:", err)
 			return err
@@ -451,8 +453,9 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 
 	paramsRes := &gr.ParamsResAp{}
 	params := &gr.ParamsAp{}
+	pubResErr := ""
 	//get params
-	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
+	err := rw.redisCli.HGet(gr.ParamsName, pubField, params)
 	if err != nil {
 		log.Errorf("===== hget pledge params err:%+v", err)
 		paramsRes = &gr.ParamsResAp{
@@ -476,23 +479,25 @@ func (rw *RedisWorker) DealPledge(ctx context.Context, pubField, pubMessage gr.R
 				PieceInfo: pi,
 				Err:       err.Error(),
 			}
+			pubResErr = err.Error()
 		} else {
 			paramsRes = &gr.ParamsResAp{
 				PieceInfo: pi,
 				Err:       "",
 			}
+			pubResErr = gr.PubResSucceed
 		}
 	}
 
 RESRETURN:
 	//back params-res
-	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
+	err = rw.redisCli.HSet(gr.ParamsResName, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset ap params_res err:%+v", err)
 	}
 
 	//back pub-res
-	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	err = rw.redisCli.HSet(gr.PubResName, pubField, pubResErr)
 	if err != nil {
 		log.Errorf("===== hset ap pub_res err:%+v", err)
 	}
@@ -505,7 +510,8 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 
 	paramsRes := &gr.ParamsResAp{}
 	params := &gr.ParamsAp{}
-	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
+	pubResErr := ""
+	err := rw.redisCli.HGet(gr.ParamsName, pubField, params)
 	if err != nil {
 		log.Errorf("===== hget seal params err:%+v", err)
 		paramsRes = &gr.ParamsResAp{
@@ -526,23 +532,25 @@ func (rw *RedisWorker) DealSeal(ctx context.Context, pubField, pubMessage gr.Red
 				PieceInfo: pi,
 				Err:       err.Error(),
 			}
+			pubResErr = err.Error()
 		} else {
 			paramsRes = &gr.ParamsResAp{
 				PieceInfo: pi,
 				Err:       "",
 			}
+			pubResErr = gr.PubResSucceed
 		}
 	}
 
 RESRETURN:
 	//back params-res
-	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
+	err = rw.redisCli.HSet(gr.ParamsResName, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hget seal params err:%+v", err)
 	}
 
 	//back pub-res
-	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	err = rw.redisCli.HSet(gr.PubResName, pubField, pubResErr)
 	if err != nil {
 		log.Errorf("===== hset seal pub_res err:%+v", err)
 	}
@@ -555,7 +563,8 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 
 	paramsRes := &gr.ParamsResP1{}
 	params := &gr.ParamsP1{}
-	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
+	pubResErr := ""
+	err := rw.redisCli.HGet(gr.ParamsName, pubField, params)
 	if err != nil {
 		log.Errorf("===== hget p1 params err:%+v", err)
 		paramsRes = &gr.ParamsResP1{
@@ -575,23 +584,25 @@ func (rw *RedisWorker) DealP1(ctx context.Context, pubField, pubMessage gr.Redis
 				Out: out,
 				Err: err.Error(),
 			}
+			pubResErr = err.Error()
 		} else {
 			paramsRes = &gr.ParamsResP1{
 				Out: out,
 				Err: "",
 			}
+			pubResErr = gr.PubResSucceed
 		}
 	}
 
 RESRETURN:
 	//back params-res
-	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
+	err = rw.redisCli.HSet(gr.ParamsResName, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset p1 params_res err:%+v", err)
 	}
 
 	//back pub-res
-	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	err = rw.redisCli.HSet(gr.PubResName, pubField, pubResErr)
 	if err != nil {
 		log.Errorf("===== hset p1 pub_res err:%+v", err)
 	}
@@ -604,7 +615,8 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 
 	paramsRes := &gr.ParamsResP2{}
 	params := &gr.ParamsP2{}
-	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
+	pubResErr := ""
+	err := rw.redisCli.HGet(gr.ParamsName, pubField, params)
 	if err != nil {
 		log.Errorf("===== hget p2 params err:%+v", err)
 		paramsRes = &gr.ParamsResP2{
@@ -624,23 +636,25 @@ func (rw *RedisWorker) DealP2(ctx context.Context, pubField, pubMessage gr.Redis
 				Out: out,
 				Err: err.Error(),
 			}
+			pubResErr = err.Error()
 		} else {
 			paramsRes = &gr.ParamsResP2{
 				Out: out,
 				Err: "",
 			}
+			pubResErr = gr.PubResSucceed
 		}
 	}
 
 RESRETURN:
 	//back params-res
-	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
+	err = rw.redisCli.HSet(gr.ParamsResName, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset p2 params_res err:%+v", err)
 	}
 
 	//back pub-res
-	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	err = rw.redisCli.HSet(gr.PubResName, pubField, pubResErr)
 	if err != nil {
 		log.Errorf("===== hset p2 pub_res err:%+v", err)
 	}
@@ -653,7 +667,8 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 
 	paramsRes := &gr.ParamsResC1{}
 	params := &gr.ParamsC1{}
-	err := rw.redisCli.HGet(gr.PARAMS_NAME, pubField, params)
+	pubResErr := ""
+	err := rw.redisCli.HGet(gr.ParamsName, pubField, params)
 	if err != nil {
 		log.Errorf("===== hget c1 params err:%+v", err)
 		paramsRes = &gr.ParamsResC1{
@@ -673,19 +688,21 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 				Out: out,
 				Err: err.Error(),
 			}
+			pubResErr = err.Error()
 			goto RESRETURN
 		} else {
 			paramsRes = &gr.ParamsResC1{
 				Out: out,
 				Err: "",
 			}
+			pubResErr = gr.PubResSucceed
 		}
 	}
 
 	// 传输文件
 	{
 		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
-		exist, err := rw.redisCli.HExist(gr.PUB_NAME, gr.SplicingBackupPubAndParamsField(params.Sector.ID.Number, sealtasks.TTAddPieceSe, 1))
+		exist, err := rw.redisCli.HExist(gr.PubName, gr.SplicingBackupPubAndParamsField(params.Sector.ID.Number, sealtasks.TTAddPieceSe, 1))
 		if err != nil {
 			log.Errorf("===== sector(%+v) c1 finished , check sector is deal or not err:%+v", params.Sector, err)
 			paramsRes.StoragePath = ""
@@ -735,13 +752,13 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 
 RESRETURN:
 	//back params-res
-	err = rw.redisCli.HSet(gr.PARAMS_RES_NAME, pubField, paramsRes)
+	err = rw.redisCli.HSet(gr.ParamsResName, pubField, paramsRes)
 	if err != nil {
 		log.Errorf("===== hset c1 params_res err:%+v", err)
 	}
 
 	//back pub-res
-	err = rw.redisCli.HSet(gr.PUB_RES_NAME, pubField, rw.hostName)
+	err = rw.redisCli.HSet(gr.PubResName, pubField, pubResErr)
 	if err != nil {
 		log.Errorf("===== hset c1 pub_res err:%+v", err)
 	}
@@ -771,8 +788,8 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	}
 
 	// 删除数据,完成传输文件
-	log.Infof("===== after finished SealCommit1 for sector [%v],try send to dest(%s) delete local layer,tree-c,tree-d files...", sector, dest)
-	rw.RemoveLayersAndTreeCAndD(ctx, sector, removeUnseal)
+	//log.Infof("===== after finished SealCommit1 for sector [%v],try send to dest(%s) delete local layer,tree-c,tree-d files...", sector, dest)
+	//rw.RemoveLayersAndTreeCAndD(ctx, sector, removeUnseal)
 
 	start := time.Now()
 	// send FTSealed
@@ -784,10 +801,13 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	if err != nil {
 		if code == 600 {
 			log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task", sector, srcSealedPath, src, ip, sealedPath)
+			return err
 		} else if code == 999 {
 			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v), but file not exist!!!", sector, srcSealedPath, src, ip, sealedPath)
 			return nil
 		}
+
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTSealed.String(), src))
 		return err
 	}
 
@@ -795,18 +815,19 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 	srcCachePath := filepath.Join(rw.workerPath, storiface.FTCache.String()) + "/"
 	cachePath := filepath.Join(destPath, storiface.FTCache.String()) + "/"
 	//src:=SectorName(sector)
-	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcCachePath, src, ip, cachePath)
+	log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) cachePath(%+v)", sector, srcCachePath, src, ip, cachePath)
 	err = transfordata.SendZipFile(srcCachePath, src, cachePath, ip)
 	if err != nil {
-		log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcCachePath, src, ip, cachePath, err)
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTCache.String(), src))
+		rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTSealed.String(), src))
 		return err
 	}
 	log.Infof("===== transfor sector(%+v) to Storage(%+v) cost time %s", sector, destPath, time.Now().Sub(start))
 
+	srcUnsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String()) + "/"
+	unsealPath := filepath.Join(destPath, storiface.FTUnsealed.String()) + "/"
 	if !removeUnseal {
 		// send FTUnseal
-		srcUnsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String()) + "/"
-		unsealPath := filepath.Join(destPath, storiface.FTUnsealed.String()) + "/"
 		//src:=SectorName(sector)
 		log.Infof("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v)", sector, srcUnsealPath, src, ip, unsealPath)
 		code, err = transfordata.SendFile(srcUnsealPath, src, unsealPath, ip)
@@ -814,15 +835,15 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 			if code == 300 {
 				log.Infow("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),failed target ip had too many task????", sector, srcSealedPath, src, ip, sealedPath)
 			}
-			log.Errorf("try to send sector(%+v) form srcPath(%s) + src(%s) ----->>>> to ip(%+v) destPath(%+v),error:%+v", sector, srcUnsealPath, src, ip, unsealPath, err)
+			rw.redisCli.RPush(gr.SplicingTransferFailurePath(rw.hostName), path.Join(dest, storiface.FTUnsealed.String(), src))
 			return err
 		}
+	}
 
-		// 删除unsealed文件
-		err = os.RemoveAll(srcUnsealPath + src)
-		if err != nil {
-			log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, unsealPath, srcUnsealPath)
-		}
+	// 删除unsealed文件
+	err = os.RemoveAll(srcUnsealPath + src)
+	if err != nil {
+		log.Warnf("===== transfor sector(%+v) to Storage(%+v) success, but remove %s error", sector, unsealPath, srcUnsealPath)
 	}
 
 	// 删除sealed文件
@@ -951,4 +972,96 @@ func (Reader) Read(out []byte) (int, error) {
 
 func (rw *RedisWorker) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 	return io.LimitReader(Reader{}, int64(size))
+}
+
+// CheckLocalSectors check all local sector
+// 只需要读取unseal目录即可，因为unseal一定是最全的。
+func (rw *RedisWorker) CheckLocalSectors() []storage.SectorRef {
+	sectorFiles, err := ioutil.ReadDir(filepath.Join(rw.workerPath, storiface.FTUnsealed.String()))
+	if err != nil {
+		log.Errorf("CheckLocalSectors err:%+v", err)
+		return []storage.SectorRef{}
+	}
+
+	var sids []storage.SectorRef
+	for _, sf := range sectorFiles {
+		sid, err := storiface.ParseSectorID(sf.Name())
+		if err != nil {
+			log.Warnf("CheckLocalSectors parse sector Id err:%+v", err)
+			continue
+		}
+		sids = append(sids, storage.SectorRef{ID: sid})
+	}
+
+	return sids
+}
+
+// 删除指定sectorNumber
+func (rw *RedisWorker) DeleteLocalSectors(sids []storage.SectorRef) {
+	for _, sid := range sids {
+		unsealPath := filepath.Join(rw.workerPath, storiface.FTUnsealed.String(), storiface.SectorName(sid.ID))
+		sealPath := filepath.Join(rw.workerPath, storiface.FTSealed.String(), storiface.SectorName(sid.ID))
+		cachePath := filepath.Join(rw.workerPath, storiface.FTCache.String(), storiface.SectorName(sid.ID))
+		err := os.RemoveAll(unsealPath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) unsealPath failed . err:%+v", sid, err)
+		}
+
+		os.RemoveAll(sealPath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) SealPath failed . err:%+v", sid, err)
+		}
+
+		os.RemoveAll(cachePath)
+		if err != nil {
+			log.Warnf("DeleteLocalSector (%+v) CachePath failed . err:%+v", sid, err)
+		}
+	}
+}
+
+func (rw *RedisWorker) RunCleaner(ctx context.Context, sw *sync.WaitGroup) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("====== RunCleaner err", err)
+			s := debug.Stack()
+			log.Error(string(s))
+			sw.Done()
+		}
+	}()
+
+	rw.CleanUp()
+
+	ticker := time.NewTicker(CLEAN_UP_GAP)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			rw.CleanUp()
+		}
+	}
+
+}
+
+func (rw *RedisWorker) CleanUp() {
+	sectorRefList := rw.CheckLocalSectors()
+	delList := make([]storage.SectorRef, 0)
+
+	for _, sectorRef := range sectorRefList {
+		field := gr.SplicingBackupPubAndParamsField(sectorRef.ID.Number, sealtasks.TTAddPiecePl, 0)
+		ex, err := rw.redisCli.HExist(gr.PubName, field)
+		if err != nil {
+			log.Errorf("===== rd clean up err : %+v", err)
+			continue
+		}
+
+		if !ex {
+			delList = append(delList, sectorRef)
+		}
+	}
+
+	log.Infof("===== rd clean up,  delList : %+v", delList)
+	if len(delList) > 0 {
+		rw.DeleteLocalSectors(delList)
+	}
 }

@@ -190,6 +190,8 @@ func (m *Sealing) Run(ctx context.Context) error {
 	m.recoverPledgeSectors = m.SearchRecoveryPledge()
 	// 筛选出未使用的sectornumber
 	//m.initRecoverSectorNumber(ctx)
+	// 初始化恢复一次
+	m.RecoverPledgeSector()
 
 	if err := m.restartSectors(ctx); err != nil {
 		log.Errorf("%+v", err)
