@@ -701,6 +701,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 
 	// 传输文件
 	{
+		log.Infof("sector (%+v) try to send to 11111111111111111111111")
 		// 判断是否是deal 的sector，如果是，则存储unseal的文件，否则不存unsealed文件
 		exist, err := rw.redisCli.HExist(gr.PubName, gr.SplicingBackupPubAndParamsField(params.Sector.ID.Number, sealtasks.TTAddPieceSe, 1))
 		if err != nil {
@@ -715,6 +716,7 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 			//if isTransforSuccess {
 			//	break
 			//}
+			log.Infof("sector (%+v) try to send to 222222222222")
 			if exist {
 				// deal sector 传输unseal文件
 				for _, dest := range params.PathList {
@@ -729,7 +731,9 @@ func (rw *RedisWorker) DealC1(ctx context.Context, pubField, pubMessage gr.Redis
 				}
 			} else {
 				// not deal sector 不传输unseal文件
+				log.Infof("sector (%+v) try to send to 3333333333333")
 				for _, dest := range params.PathList {
+					log.Infof("sector (%+v) try to send to dest %s",params.Sector,dest)
 					err := rw.TransforDataToStorageServer(ctx, params.Sector, dest, true)
 					if err != nil {
 						log.Warnf("sector(%+v) c1 transfor data to %s failed", params.Sector, dest)
@@ -781,6 +785,7 @@ func (rw *RedisWorker) TransforDataToStorageServer(ctx context.Context, sector s
 		return xerrors.Errorf("")
 	}
 
+	log.Infof("try to send sector(%+v) to ip(%+v) destPath(%s) check connect...", sector, ip, destPath)
 	// 检测连通行
 	ok, err := transfordata.ConnectTest(destPath+"/firefly-miner", ip)
 	if !ok || err != nil {
