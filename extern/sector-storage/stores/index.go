@@ -393,15 +393,15 @@ func (i *Index) StorageBestAlloc(ctx context.Context, allocate storiface.SectorF
 			continue
 		}
 
-		if time.Since(p.lastHeartbeat) > SkippedHeartbeatThresh {
-			log.Debugf("not allocating on %s, didn't receive heartbeats for %s", p.info.ID, time.Since(p.lastHeartbeat))
-			continue
-		}
+		//if time.Since(p.lastHeartbeat) > SkippedHeartbeatThresh {
+		//	log.Debugf("not allocating on %s, didn't receive heartbeats for %s", p.info.ID, time.Since(p.lastHeartbeat))
+		//	continue
+		//}
 
-		if p.heartbeatErr != nil {
-			log.Debugf("not allocating on %s, heartbeat error: %s", p.info.ID, p.heartbeatErr)
-			continue
-		}
+		//if p.heartbeatErr != nil {
+		//	log.Debugf("not allocating on %s, heartbeat error: %s", p.info.ID, p.heartbeatErr)
+		//	continue
+		//}
 
 		candidates = append(candidates, *p)
 	}
