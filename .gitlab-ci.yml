@@ -6,8 +6,10 @@ image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:verson1
 
 before_script:
   - source /etc/profile
+  - git clone http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus
 after_script:
   - echo "After script section"
+
 
 build1:
   stage: build
