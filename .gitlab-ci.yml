@@ -30,7 +30,9 @@ build_develop:
   stage: build
   extends: .go-cache
   script:
-    - git submodule update --init --recursive
+    - git submodule sync
+    - git submodule update --init
+    - source /etc/profile
     - golangci-lint run -v --timeout 2m --concurrency 16
     - go mod tidy -v
     - go fmt ./...
@@ -45,6 +47,7 @@ build_develop-post:
     - cd ../lotus-post || exit
     - git submodule sync
     - git submodule update --init
+    - source /etc/profile
     - golangci-lint run -v --timeout 2m --concurrency 16
     - go mod tidy -v
     - go fmt ./...
