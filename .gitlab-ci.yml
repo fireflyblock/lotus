@@ -5,7 +5,10 @@
 image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
 
 before_script:
-  - git clone -b develop-post http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git
+  - ls -l ./
+  - ls -l ..
+  - cd ..;  git clone -b develop-post http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git
+  - ls -l ./
   - git clone -b proofs-v5.4.0 http://ci:${CI_JOB_TOKEN}@192.168.20.201/firefly-rust/fil-proofs.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/go-fil-markets.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/specs-storage.git
