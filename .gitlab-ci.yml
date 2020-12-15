@@ -6,7 +6,7 @@ image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
 
 before_script:
   - cd ..
-  - rm -rf firefly-rustc  lotus-post go-fil-markets specs-storage
+  - rm -rf lotus-post fil-proofs go-fil-markets specs-storage
   - git clone -b develop-post http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git lotus-post
   - git clone -b proofs-v5.4.0 http://ci:${CI_JOB_TOKEN}@192.168.20.201/firefly-rust/fil-proofs.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/go-fil-markets.git
