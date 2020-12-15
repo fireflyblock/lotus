@@ -4,47 +4,56 @@
 # you can delete this line if you're not using Docker
 image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
 
+.go-cache:
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+  before_script:
+    - mkdir -p .go
+  cache:
+    paths:
+      - .go/pkg/mod/
+
 before_script:
-  - git clone -b develop http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git
+  - cd ..
+  - rm -rf lotus-post fil-proofs go-fil-markets specs-storage
+  - git clone -b develop-post http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git lotus-post
   - git clone -b proofs-v5.4.0 http://ci:${CI_JOB_TOKEN}@192.168.20.201/firefly-rust/fil-proofs.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/go-fil-markets.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/specs-storage.git
+  - cd lotus-post
   - source /etc/profile
+  - apt install -y ocl-icd-opencl-dev libhwloc-dev
 after_script:
   - echo "After script section"
 
-build1:
+build_develop:
   stage: build
+  extends: .go-cache
   script:
-    - echo "build start"
-    - go mod tidy -v
-    - git --no-pager diff go.mod go.sum
-    - git --no-pager diff --quiet go.mod go.sum
+    - git submodule update --init --recursive
     - golangci-lint run -v --timeout 2m --concurrency 16
-    - ! go fmt ./... 2>&1 | read
-    - make debug
-    - apt install ocl-icd-opencl-dev libhwloc-dev
+    - go mod tidy -v
+    - go fmt ./...
+    - make deps
+    #  lotus-miner-sched lotus-amd-worker lotus-gpu-worker
+    - make lotus-miner lotus-worker
+
+build_develop-post:
+  stage: build
+  extends: .go-cache
+  script:
+    - cd ../lotus-post || exit
     - git submodule sync
     - git submodule update --init
-    - cd extern/oni && git submodule sync
-    - cd ../..
-    - cd extern/oni && git submodule update --init
-    - cd ../..
-    - cd extern/filecoin-ffi && make
-    - cd ../..
-    - cd extern/oni/lotus-soup && go mod edit -replace github.com/filecoin-project/lotus=../../../ && go mod edit -replace github.com/filecoin-project/filecoin-ffi=../../filecoin-ffi && go mod edit -replace github.com/supranational/blst=../../blst
-    - cd ../../..
-    - pushd extern/oni/lotus-soup && go build -tags=testground .
-    - cd ../../..
+    - golangci-lint run -v --timeout 2m --concurrency 16
+    - go mod tidy -v
+    - go fmt ./...
     - make deps
-    - make deps lotus
-    - go generate ./...
-    - git --no-pager diff
-    - git --no-pager diff --quiet
-    - echo "build end"
+    - make lotus-miner lotus-worker lotus-shed  lotus
 
 test_window_post:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -52,8 +61,10 @@ test_window_post:
       -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/lotus/... \
       -run=TestWindowedPost \
       ./...
+
 test_storage:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -64,6 +75,7 @@ test_storage:
 
 test_short:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -74,6 +86,7 @@ test_short:
 
 test_node:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -84,6 +97,7 @@ test_node:
 
 test_conformance_bleeding_edge:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       -- \
@@ -91,6 +105,7 @@ test_conformance_bleeding_edge:
 
 test_conformance:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       -- \
@@ -98,6 +113,7 @@ test_conformance:
 
 test_cli:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -108,6 +124,7 @@ test_cli:
 
 test_chain:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -118,6 +135,7 @@ test_chain:
 
 test:
   stage: test
+  extends: .go-cache
   script:
     - gotestsum \
       --format pkgname-and-test-fails \
@@ -128,10 +146,12 @@ test:
 
 go_test:
   stage: test
+  extends: .go-cache
   script:
     - go test ./...
 
 deploy1:
   stage: deploy
+  extends: .go-cache
   script:
     - echo "Do your deploy here"
