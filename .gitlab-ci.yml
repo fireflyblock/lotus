@@ -3,6 +3,13 @@
 
 # you can delete this line if you're not using Docker
 image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
+  cache:
+    paths:
+      - .cache
+  script:
+    - mkdir -p .cache
+    - export GOPATH="$CI_PROJECT_DIR/.cache"
+    - make test
 
 before_script:
   - cd ..
