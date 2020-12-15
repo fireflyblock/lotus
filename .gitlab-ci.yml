@@ -13,7 +13,7 @@ before_script:
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/specs-storage.git
   - cd lotus-post
   - source /etc/profile
-  - apt install ocl-icd-opencl-dev libhwloc-dev
+  - apt install -y ocl-icd-opencl-dev libhwloc-dev
 after_script:
   - echo "After script section"
 
