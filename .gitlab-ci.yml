@@ -6,12 +6,12 @@ image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
 
 before_script:
   - cd ..
-  - rm firefly-rustc  lotus-post go-fil-markets specs-storage
+  - rm -rf firefly-rustc  lotus-post go-fil-markets specs-storage
   - git clone -b develop-post http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/lotus.git lotus-post
   - git clone -b proofs-v5.4.0 http://ci:${CI_JOB_TOKEN}@192.168.20.201/firefly-rustc.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/go-fil-markets.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/specs-storage.git
-  - cd lotus-develop
+  - cd lotus-post
   - source /etc/profile
 after_script:
   - echo "After script section"
