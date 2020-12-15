@@ -20,6 +20,7 @@ build1:
   stage: build
   script:
     - echo "build start"
+    - cd  ../lotus-post
     - go mod tidy -v
     - git --no-pager diff go.mod go.sum
     - git --no-pager diff --quiet go.mod go.sum
