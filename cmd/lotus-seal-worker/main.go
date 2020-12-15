@@ -311,7 +311,11 @@ var runCmd = &cli.Command{
 			log.Info("===== recovery task success ")
 
 			sw := &sync.WaitGroup{}
-			sw.Add(1)
+			sw.Add(2)
+
+			go sb.RunCleaner(ctx, sw)
+			log.Info("===== run Cleaner success ")
+
 			err = sb.StartWorker(ctx, sw)
 			if err != nil {
 				return xerrors.Errorf("start worker err: %w", err)
@@ -492,7 +496,7 @@ var runCmd = &cli.Command{
 			}
 
 			//sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
-			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"}, ) //abi.SectorSize(sectorSizeInt)
+			localStore, err := stores.NewLocal(ctx, lr, nodeApi, []string{"http://" + address + "/remote"}) //abi.SectorSize(sectorSizeInt)
 			if err != nil {
 				return err
 			}
@@ -513,7 +517,7 @@ var runCmd = &cli.Command{
 				LocalWorker: sectorstorage.NewLocalWorker(sectorstorage.WorkerConfig{
 					TaskTypes: taskTypes,
 					NoSwap:    cctx.Bool("no-swap"),
-				}, remote, localStore, nodeApi),   //wsts
+				}, remote, localStore, nodeApi), //wsts
 				localStore: localStore,
 				ls:         lr,
 			}

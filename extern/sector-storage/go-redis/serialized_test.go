@@ -60,7 +60,7 @@ func TestHset(t *testing.T) {
 	}
 
 	field := SplicingBackupPubAndParamsField(48, sealtasks.TTPreCommit1, 0)
-	err := rc.HSet(PUB_RES_NAME, field, "ff-203-worker8")
+	err := rc.HSet(PubResName, field, "ff-203-worker8")
 	if err != nil {
 		t.Errorf("hset err")
 	}
@@ -119,25 +119,25 @@ func TestDelete(t *testing.T) {
 	for _, v := range tasklist {
 		f := SplicingBackupPubAndParamsField(sectorID, v, 0)
 		//2 backup  pub
-		count, err := cc.HDel(PARAMS_NAME, f)
+		count, err := cc.HDel(ParamsName, f)
 		t.Logf("delete params field:%+v count:%d", f, count)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
 		}
 		//3 backup res params
-		count, err = cc.HDel(PUB_NAME, f)
+		count, err = cc.HDel(PubName, f)
 		t.Logf("delete pub field:%+v count:%d", f, count)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
 		}
 		//4 backup res
-		count, err = cc.HDel(PUB_RES_NAME, f)
+		count, err = cc.HDel(PubResName, f)
 		t.Logf("delete pub res field:%+v count:%d", f, count)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
 		}
 		//5 seal_ap_%d
-		count, err = cc.HDel(PARAMS_RES_NAME, f)
+		count, err = cc.HDel(ParamsResName, f)
 		t.Logf("delete params res field:%+v count:%d", f, count)
 		if err != nil {
 			logrus.SchedLogger.Errorf("===== rd DeleteDataForSid err, sectorID %+v err %+v", sectorID, err)
@@ -162,13 +162,13 @@ func TestDelete(t *testing.T) {
 	for i = 1; i <= count; i++ {
 		f := SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
 		//2 backup  pub
-		cc.HDel(PARAMS_NAME, f)
+		cc.HDel(ParamsName, f)
 		//3 backup res params
-		cc.HDel(PUB_NAME, f)
+		cc.HDel(PubName, f)
 		//4 backup res
-		cc.HDel(PUB_RES_NAME, f)
+		cc.HDel(PubResName, f)
 		//5 seal_ap_%d
-		cc.HDel(PUB_RES_NAME, f)
+		cc.HDel(PubResName, f)
 	}
 
 }

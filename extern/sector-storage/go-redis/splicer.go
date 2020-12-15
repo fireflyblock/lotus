@@ -10,41 +10,43 @@ import (
 )
 
 const (
-	PUB_NAME           RedisKey = "pub"
-	PARAMS_NAME        RedisKey = "params"
-	PUB_TIME           RedisKey = "pub_time"
-	PUB_RES_NAME       RedisKey = "pub_res"
-	PARAMS_RES_NAME    RedisKey = "params_res"
-	RECOVER_NAME       RedisKey = "recover"
-	RETRY              RedisKey = "retry"
-	RECOVERY_WAIT_TIME RedisKey = "recovery_wait_time"
-	COUNTER_P1         RedisKey = "counter_p1_"
-	CURRENT_TASKS      RedisKey = "current_tasks_"
-	WORKER_COUNT       RedisKey = "worker_count*"
-	W_C_T              RedisKey = "worker_count_"
-	WORKER_CONFIG      RedisKey = "worker_config*"
-	W_C_F              RedisKey = "worker_config_"
+	PubName          RedisKey = "pub"
+	ParamsName       RedisKey = "params"
+	PubTime          RedisKey = "pub_time"
+	PubResName       RedisKey = "pub_res"
+	ParamsResName    RedisKey = "params_res"
+	RecoverName      RedisKey = "recover"
+	RETRY            RedisKey = "retry"
+	RecoveryWaitTime RedisKey = "recovery_wait_time"
+	CountCacheFile   RedisKey = "count_cache_file_"
+	CurrentTasks     RedisKey = "current_tasks_"
+	WorkerCount      RedisKey = "worker_count*"
+	WCT              RedisKey = "worker_count_"
+	WorkerConfig     RedisKey = "worker_config*"
+	WCF              RedisKey = "worker_config_"
+	TFP              RedisKey = "transfer_failure_path_"
 
 	SEALAPID = "seal_ap_"
-	//FIELDPLEDGEP    RedisField = "seal/v0/addpiece/pledge"
+	//FIELDPLEDGE    RedisField = "seal/v0/addpiece/pledge"
 	//FIELDSEAL       RedisField = "seal/v0/addpiece/seal"
 	//FIELDP1         RedisField = "seal/v0/precommit/1"
 	//FIELDP2         RedisField = "seal/v0/precommit/2"
 	//FIELDC1         RedisField = "seal/v0/commit/1"
-	FIELDPAP      RedisField = "ap"
-	FIELDPLEDGEP  RedisField = "pledge"
-	FIELDSEAL     RedisField = "seal"
-	FIELDP1       RedisField = "p1"
-	FIELDP2       RedisField = "p2"
-	FIELDC1       RedisField = "c1"
-	REGISTER_TIME RedisField = "register"
+	FIELDAP      RedisField = "ap"
+	FIELDPLEDGE  RedisField = "pledge"
+	FIELDSEAL    RedisField = "seal"
+	FIELDP1      RedisField = "p1"
+	FIELDP2      RedisField = "p2"
+	FIELDC1      RedisField = "c1"
+	RegisterTime RedisField = "register"
 
 	PUBLISHCHANNELAP = "pub_cha_ap" //miner pub task
 	PUBLISHCHANNELP1 = "pub_cha_p1" //miner pub task
 	PUBLISHCHANNELP2 = "pub_cha_p2" //miner pub task
 	PUBLISHCHANNELC1 = "pub_cha_c1" //miner pub task
 
-	SUBSCRIBECHANNEL = "sub_cha" //worker pub res
+	PubResSucceed = "s"
+	PubResFailed  = "f"
 
 	TASKRECORD = "task_*"
 )
@@ -55,7 +57,7 @@ type RedisField string
 func SplicingPubMessage(sectorID abi.SectorNumber, taskType sealtasks.TaskType, hostName string, sealApId uint64) RedisField {
 	switch taskType {
 	case sealtasks.TTAddPiecePl:
-		str := fmt.Sprintf("%d_%s_%s", sectorID, FIELDPLEDGEP, hostName)
+		str := fmt.Sprintf("%d_%s_%s", sectorID, FIELDPLEDGE, hostName)
 		return RedisField(str)
 	case sealtasks.TTAddPieceSe:
 		str := fmt.Sprintf("%d_%s_%s_%d", sectorID, FIELDSEAL, hostName, sealApId)
@@ -99,9 +101,9 @@ func SplicingBackupPubAndParamsField(sectorID abi.SectorNumber, taskType sealtas
 func ToFieldTaskType(tt sealtasks.TaskType) RedisField {
 	switch tt {
 	case sealtasks.TTAddPiece:
-		return FIELDPAP
+		return FIELDAP
 	case sealtasks.TTAddPiecePl:
-		return FIELDPLEDGEP
+		return FIELDPLEDGE
 	case sealtasks.TTAddPieceSe:
 		return FIELDSEAL
 	case sealtasks.TTPreCommit1:
@@ -169,9 +171,9 @@ func (rf RedisField) TailoredSubMessage() (sid abi.SectorNumber, taskType RedisF
 
 func (rf RedisField) ToOfficalTaskType() sealtasks.TaskType {
 	switch rf {
-	case FIELDPAP:
+	case FIELDAP:
 		return sealtasks.TTAddPiece
-	case FIELDPLEDGEP:
+	case FIELDPLEDGE:
 		return sealtasks.TTAddPiecePl
 	case FIELDSEAL:
 		return sealtasks.TTAddPieceSe
@@ -210,19 +212,19 @@ type RedisKey string
 
 //拼接worker配置的key
 func SplicingTaskCounntKey(hostName string) RedisKey {
-	str := fmt.Sprintf("%s%s", W_C_T, hostName)
+	str := fmt.Sprintf("%s%s", WCT, hostName)
 	return RedisKey(str)
 }
 
 //拼接counter_p1配置的key
 func SplicingCounterP1Key(hostName string) RedisKey {
-	str := fmt.Sprintf("%s%s", COUNTER_P1, hostName)
+	str := fmt.Sprintf("%s%s", CountCacheFile, hostName)
 	return RedisKey(str)
 }
 
 //拼接counter_p1配置的key
 func SplicingCurrentTasks(hostName string) RedisKey {
-	str := fmt.Sprintf("%s%s", CURRENT_TASKS, hostName)
+	str := fmt.Sprintf("%s%s", CurrentTasks, hostName)
 	return RedisKey(str)
 }
 
@@ -241,7 +243,7 @@ func (rk RedisKey) ToString() string {
 
 //拼接worker计数的key
 func SplicingTaskConfigKey(hostName string) RedisKey {
-	str := fmt.Sprintf("%s%s", W_C_F, hostName)
+	str := fmt.Sprintf("%s%s", WCF, hostName)
 	return RedisKey(str)
 }
 
@@ -254,7 +256,7 @@ func TypeToType(keys, type2 RedisField) RedisField {
 	list1 := strings.Split(string(keys), "_")
 
 	switch type2 {
-	case FIELDPLEDGEP:
+	case FIELDPLEDGE:
 		res := fmt.Sprintf("%s_%s", list1[0], "pledge")
 		return RedisField(res)
 	case FIELDSEAL:
@@ -272,4 +274,9 @@ func TypeToType(keys, type2 RedisField) RedisField {
 	default:
 		return ""
 	}
+}
+
+func SplicingTransferFailurePath(hostname string) RedisKey {
+	str := fmt.Sprintf("%s%s", TFP, hostname)
+	return RedisKey(str)
 }

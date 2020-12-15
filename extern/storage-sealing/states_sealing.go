@@ -78,14 +78,14 @@ func (m *Sealing) getTicket(ctx statemachine.Context, sector SectorInfo) (abi.Se
 		return nil, 0, err
 	}
 
-	pci, err := m.api.StateSectorPreCommitInfo(ctx.Context(), m.maddr, sector.SectorNumber, tok)
-	if err != nil {
-		return nil, 0, xerrors.Errorf("getting precommit info: %w", err)
-	}
+	//pci, err := m.api.StateSectorPreCommitInfo(ctx.Context(), m.maddr, sector.SectorNumber, tok)
+	//if err != nil {
+	//	return nil, 0, xerrors.Errorf("getting precommit info: %w", err)
+	//}
 
-	if pci != nil {
-		ticketEpoch = pci.Info.SealRandEpoch
-	}
+	//if pci != nil {
+	//	ticketEpoch = pci.Info.SealRandEpoch
+	//}
 
 	rand, err := m.api.ChainGetRandomnessFromTickets(ctx.Context(), tok, crypto.DomainSeparationTag_SealRandomness, ticketEpoch, buf.Bytes())
 	if err != nil {
@@ -164,43 +164,21 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 		//  process has just restarted and the worker had the result ready)
 	}
 
-	p1Field := gr.SplicingBackupPubAndParamsField(sector.SectorNumber, sealtasks.TTPreCommit1, 0)
-	// 如果ticketEpoch存在，或许曾经做个P1，
-	// 判断Epoch是否会超时，预计我们一轮Seal过程耗时720个Epoch
-	//height-(si.TicketEpoch+SealRandomnessLookback) > SealRandomnessLookbackLimit(si.SectorType)
 	recover := false
-	//if sector.TicketEpoch.String() != "" && len(sector.TicketValue) > 0 &&
-	//	ticketEpoch-(sector.TicketEpoch+SealRandomnessLookback)+abi.ChainEpoch(720) > abi.ChainEpoch(10000) {
-	//	ticketValue = sector.TicketValue
-	//	ticketEpoch = sector.TicketEpoch
-	//	recover = true
-	//	log.Infof("sector(%+v) recovering do p1 use TicketEpoch %+v, TicketValue %+v", m.minerSector(sector.SectorNumber), sector.TicketEpoch, sector.TicketValue)
-	//}
 
+	p1Field := gr.SplicingBackupPubAndParamsField(sector.SectorNumber, sealtasks.TTPreCommit1, 0)
 	p1RecoverDate := gr.PreCommit1RD{
-		TicketEpoch: height,
+		TicketEpoch: sector.TicketEpoch,
+		TicketValue: sector.TicketValue,
 	}
 	var pc1o storage.PreCommit1Out
 
-	//backup params
-	exist, err := m.rc.HExist(gr.RECOVER_NAME, p1Field)
+	exist, err := m.rc.HExist(gr.RecoverName, p1Field)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 	}
-	if exist {
-		newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
-		//pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
-		pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
-		if err != nil {
-			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
-		}
-
-		err = m.rc.HGet(gr.RECOVER_NAME, p1Field, &p1RecoverDate)
-		if err != nil {
-			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
-		}
-	} else {
-		err = m.rc.HSet(gr.RECOVER_NAME, p1Field, p1RecoverDate)
+	if !exist {
+		err = m.rc.HSet(gr.RecoverName, p1Field, p1RecoverDate)
 		if err != nil {
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
@@ -213,6 +191,24 @@ func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) 
 			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
 		}
 
+	} else {
+		//check timeout
+		nv, err := m.api.StateNetworkVersion(ctx.Context(), tok)
+		if err != nil {
+			return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+		}
+		msd := policy.GetMaxProveCommitDuration(actors.VersionForNetwork(nv), sector.SectorType)
+		if height-(sector.TicketEpoch+policy.SealRandomnessLookback) > msd/2 {
+			return ctx.Send(SectorOldTicket{}) // go get new ticket
+
+		} else {
+			newCtx := context.WithValue(sector.sealingCtx(ctx.Context()), "p1RecoverDate", p1RecoverDate)
+			//pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
+			pc1o, err = m.sealer.SealPreCommit1(newCtx, m.minerSector(sector.SectorType, sector.SectorNumber), sector.TicketValue, sector.pieceInfos(), recover)
+			if err != nil {
+				return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("seal pre commit(1) failed: %w", err)})
+			}
+		}
 	}
 
 	return ctx.Send(SectorPreCommit1{
@@ -592,7 +588,7 @@ func (m *Sealing) handleProvingSector(ctx statemachine.Context, sector SectorInf
 	return nil
 }
 
-func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
+func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) error {
 	log.Infof("===== rd restart DeleteDataForSid, sectorID %+v", sectorID)
 	sealKey := gr.RedisKey(fmt.Sprintf("seal_ap_%d", sectorID))
 	taskList := make([]sealtasks.TaskType, 0)
@@ -601,7 +597,7 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	res, err := m.rc.Exist(sealKey)
 	if err != nil {
 		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
-		return
+		return err
 	}
 	if res > 0 {
 		list := []sealtasks.TaskType{sealtasks.TTPreCommit1, sealtasks.TTPreCommit2, sealtasks.TTCommit1}
@@ -613,52 +609,59 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 
 	for _, v := range taskList {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, v, 0)
-		ex, err := m.rc.HExist(gr.PUB_NAME, f)
+		ex, err := m.rc.HExist(gr.PubName, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
-		if ex {
-			err = m.rc.HGet(gr.PUB_NAME, f, &hostname)
+
+		if v == sealtasks.TTAddPiecePl {
+			if !ex {
+				return errors.New("===== rd cant't find hostname")
+			}
+		}
+
+		if ex || hostname != "" {
+			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+				log.Errorf("===== rd DeleteDataForSid, hget pledge pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
 
 			//1 worker count
 			m.DeleteWorkerCountAndTaskStatus(f, hostname)
 			//2 retry count
-			m.FreeRetryCount(f, hostname)
+			m.FreeRetryCount(f)
 			//3 cache file count
 			m.FreeCacheFileCount(f, hostname)
 		}
 
 		//4 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
+		m.rc.HDel(gr.ParamsName, f)
 		//5 params
-		m.rc.HDel(gr.PUB_NAME, f)
+		m.rc.HDel(gr.PubName, f)
 		//6 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
+		m.rc.HDel(gr.PubResName, f)
 		//7 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		m.rc.HDel(gr.ParamsResName, f)
 		//8 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
+		m.rc.HDel(gr.PubTime, f)
 		if v == sealtasks.TTPreCommit1 {
 			//9 recovery
-			m.rc.HDel(gr.RECOVER_NAME, f)
+			m.rc.HDel(gr.RecoverName, f)
 		}
 		//10 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		m.rc.HDel(gr.RecoveryWaitTime, f)
 	}
 
 	if res == 0 {
-		return
+		return nil
 	}
 
 	var count int64
 	err = m.rc.Get(sealKey, &count)
 	if err != nil {
 		log.Errorf("===== rd get sealKey err, sectorID %+v err %+v", sectorID, err)
-		return
+		return err
 	}
 
 	m.rc.Del(sealKey)
@@ -666,40 +669,42 @@ func (m *Sealing) DeleteDataForSid(sectorID abi.SectorNumber) {
 	var i int64 = 1
 	for i = 1; i <= count; i++ {
 		f := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, uint64(i))
-		ex, err := m.rc.HExist(gr.PUB_NAME, f)
+		ex, err := m.rc.HExist(gr.PubName, f)
 		if err != nil {
 			log.Errorf("===== rd HExist hostname for DeleteDataForSid, sectorID %+v err %+v", sectorID, err)
 			continue
 		}
-		if ex {
-			err = m.rc.HGet(gr.PUB_NAME, f, &hostname)
+		if ex || hostname != "" {
+			err = m.rc.HGet(gr.PubName, f, &hostname)
 			if err != nil {
-				logrus.SchedLogger.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
+				log.Errorf("===== rd DeleteDataForSid, hget seal pub err %+v sectorID %+v, field %+v\n", err, sectorID, f)
 			}
 
 			//1 worker count
 			m.DeleteWorkerCountAndTaskStatus(f, hostname)
 			//2 retry count
-			m.FreeRetryCount(f, hostname)
+			m.FreeRetryCount(f)
 			//3 cache file count
 			m.FreeCacheFileCount(f, hostname)
 		}
 		//4 pub
-		m.rc.HDel(gr.PARAMS_NAME, f)
+		m.rc.HDel(gr.ParamsName, f)
 		//5 res params
-		m.rc.HDel(gr.PUB_NAME, f)
+		m.rc.HDel(gr.PubName, f)
 		//6 res
-		m.rc.HDel(gr.PUB_RES_NAME, f)
+		m.rc.HDel(gr.PubResName, f)
 		//7 res params
-		m.rc.HDel(gr.PARAMS_RES_NAME, f)
+		m.rc.HDel(gr.ParamsResName, f)
 		//8 pub time
-		m.rc.HDel(gr.PUB_TIME, f)
+		m.rc.HDel(gr.PubTime, f)
 		//9 wait time
-		m.rc.HDel(gr.RECOVERY_WAIT_TIME, f)
+		m.rc.HDel(gr.RecoveryWaitTime, f)
 	}
+
+	return nil
 }
 
-func (m *Sealing) FreeRetryCount(retryField gr.RedisField, hostname string) error {
+func (m *Sealing) FreeRetryCount(retryField gr.RedisField) error {
 	_, err := m.rc.HDel(gr.RETRY, retryField)
 	//log.Infof("===== rd free retry count hostname %+v sectorID %+v taskType %+v field %+v", hostname, sid, tt, retryField)
 	if err != nil {
@@ -743,14 +748,14 @@ func (m *Sealing) DeleteWorkerCountAndTaskStatus(field gr.RedisField, hostname s
 
 func (m *Sealing) SelectWorkersToSetFaulty(sectorID abi.SectorNumber) error {
 	pledgeField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPiecePl, 0)
-	plExist, err := m.rc.HExist(gr.PUB_NAME, pledgeField)
+	plExist, err := m.rc.HExist(gr.PubName, pledgeField)
 	if err != nil {
 		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPiecePl, err)
 		return err
 	}
 
 	sealField := gr.SplicingBackupPubAndParamsField(sectorID, sealtasks.TTAddPieceSe, 0)
-	seExist, err := m.rc.HExist(gr.PUB_NAME, sealField)
+	seExist, err := m.rc.HExist(gr.PubName, sealField)
 	if err != nil {
 		log.Errorf("===== rd HExist hostname for SelectWorkersToSetFaulty, sectorID %+v taskType %s err %+v", sectorID, sealtasks.TTAddPieceSe, err)
 		return err
@@ -766,4 +771,35 @@ func (m *Sealing) SelectWorkersToSetFaulty(sectorID abi.SectorNumber) error {
 	}
 
 	return errors.New(fmt.Sprintf("failed to select sector %+v to set Faulty", sectorID))
+}
+
+func (m *Sealing) DeleteAllPubAndParams(sectorID abi.SectorNumber, taskType sealtasks.TaskType) {
+	logrus.SchedLogger.Infof("===== rd DeleteAllPubAndParams, sectorID %+v", sectorID)
+	f := gr.SplicingBackupPubAndParamsField(sectorID, taskType, 0)
+	fieldList := make([]gr.RedisField, 0)
+
+	switch taskType {
+	case sealtasks.TTPreCommit1:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDP2))
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	case sealtasks.TTPreCommit2:
+		fieldList = append(fieldList, f)
+		fieldList = append(fieldList, gr.TypeToType(f, gr.FIELDC1))
+
+	}
+
+	for _, field := range fieldList {
+		m.rc.HDel(gr.ParamsName, field)
+
+		m.rc.HDel(gr.PubName, field)
+
+		m.rc.HDel(gr.ParamsResName, field)
+
+		m.rc.HDel(gr.PubResName, field)
+
+		m.rc.HDel(gr.RecoveryWaitTime, field)
+	}
+
 }
