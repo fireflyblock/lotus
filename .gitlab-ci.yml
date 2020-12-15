@@ -2,11 +2,12 @@
 # see https://docs.gitlab.com/ce/ci/yaml/README.html for all available options
 
 # you can delete this line if you're not using Docker
-image: registry.cn-hangzhou.aliyuncs.com/ksco/ksco:version1
+image: circleci/golang:1.15.5
 
 .go-cache:
   variables:
     GOPATH: $CI_PROJECT_DIR/.go
+    GOPROXY: https://goproxy.cn,direct
   before_script:
     - mkdir -p .go
   cache:
@@ -21,8 +22,12 @@ before_script:
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/go-fil-markets.git
   - git clone -b dev http://ci:${CI_JOB_TOKEN}@192.168.20.201/filecoin-project/specs-storage.git
   - cd lotus-post
-  - source /etc/profile
+  - sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list
+  - sed -i 's|security.debian.org/debian-security|mirrors.ustc.edu.cn/debian-security|g' /etc/apt/sources.list
   - apt install -y ocl-icd-opencl-dev libhwloc-dev
+  - go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.33.0
+  - go get gotest.tools/gotestsum
+
 after_script:
   - echo "After script section"
 
@@ -32,8 +37,7 @@ build_develop:
   script:
     - make clean
     - git submodule update --init --recursive
-    - source /etc/profile
-    - golangci-lint run -v --timeout 2m --concurrency 16
+    # - golangci-lint run -v --timeout 2m --concurrency 16
     - go mod tidy -v
     - go fmt ./...
     - make deps
